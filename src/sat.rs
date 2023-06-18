@@ -84,7 +84,7 @@ fn inv(var: &Var) -> Var {
     -var
 }
 
-pub fn read_json_expr<P>(path: P) -> CNF
+pub fn read_cnf_json<P>(path: P) -> CNF
 where
     P: AsRef<Path>,
 {

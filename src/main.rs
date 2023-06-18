@@ -5,9 +5,7 @@ mod graph;
 mod observe;
 mod sat;
 
-use sat::solve;
-
-use crate::sat::{check, read_json_expr};
+use sat::{check, read_cnf_json, solve};
 
 fn main() {
     // let expr = vec![vec![-1, 2], vec![-1, 3]];
@@ -31,7 +29,7 @@ fn main() {
     //     vec![-2, 3],
     // ];
 
-    let expr = read_json_expr(
+    let expr = read_cnf_json(
         "/home/zahash/storage/sat/CBS_k3_n100_m449_b90_json/CBS_k3_n100_m449_b90_1.json",
     );
     let res = solve(&expr);
