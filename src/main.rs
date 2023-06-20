@@ -5,39 +5,26 @@ mod graph;
 mod observe;
 mod sat;
 
-use sat::{check, read_cnf_json, solve};
+use graph::{BinaryGrid, Graph};
 
 fn main() {
-    // let expr = vec![vec![-1, 2], vec![-1, 3]];
+    // let grid = BinaryGrid::grid_to_bool(vec![
+    //     vec![1, 1, 0, 0, 0],
+    //     vec![1, 1, 0, 0, 0],
+    //     vec![0, 0, 1, 0, 0],
+    //     vec![0, 0, 0, 1, 1],
+    // ]);
 
-    // https://www.borealisai.com/research-blogs/tutorial-10-sat-solvers-ii-algorithms/#:~:text=Worked%20example%3A%C2%A0This%20process%20is%20easiest%20to%20understand%20using%20a%20concrete%20example.%C2%A0Consider%20the%20following%202%2DSAT%20problem%20in%20four%20variables%3A
-    // let expr = vec![
-    //     vec![1, -2],
-    //     vec![-1, -3],
-    //     vec![2, 3],
-    //     vec![-2, 4],
-    //     vec![3, -4],
-    // ];
+    let grid = BinaryGrid::grid_to_bool(vec![
+        vec![1, 1, 1, 1, 0],
+        vec![1, 1, 0, 1, 0],
+        vec![1, 1, 0, 0, 0],
+        vec![0, 0, 0, 0, 0],
+    ]);
 
-    // let expr = vec![
-    //     vec![1, 2],
-    //     vec![1, -2, -3, 4],
-    //     vec![1, -3, -4],
-    //     vec![-1, 2, -3],
-    //     vec![-1, 2, -4],
-    //     vec![-1, 3, 4],
-    //     vec![-2, 3],
-    // ];
+    let graph = BinaryGrid::new_hv(grid);
 
-    let expr = read_cnf_json(
-        "/home/zahash/storage/sat/CBS_k3_n100_m449_b90_json/CBS_k3_n100_m449_b90_1.json",
-    );
-    let res = solve(&expr);
-
-    println!("expr = {:?}", expr);
-    println!("res  = {:?}", res);
-
-    if let Some(sol) = res {
-        println!("check = {}", check(&expr, &sol));
+    for path in graph.breadth_first_traverse(&(0, 0)) {
+        println!("{:?}", path.into_list());
     }
 }

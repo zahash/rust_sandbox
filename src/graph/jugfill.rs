@@ -14,7 +14,7 @@ pub struct JugFill {
 
 impl Graph for JugFill {
     type Node = Containers;
-    type Edge = (Containers, Containers);
+    type Edge = (Self::Node, Self::Node);
 
     fn out_nodes(&self, node: &Containers) -> Vec<Containers> {
         let water = node;
