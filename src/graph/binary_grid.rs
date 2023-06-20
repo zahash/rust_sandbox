@@ -49,7 +49,7 @@ impl BinaryGrid {
             .collect()
     }
 
-    fn nrc(&self, (r, c): &<BinaryGrid as Graph>::Node) -> Vec<<BinaryGrid as Graph>::Node> {
+    fn nrc(&self, (r, c): &<BinaryGrid as Graph>::V) -> Vec<<BinaryGrid as Graph>::V> {
         let mut nrc = vec![];
 
         let r = *r;
@@ -98,46 +98,42 @@ impl BinaryGrid {
 }
 
 impl Graph for BinaryGrid {
-    type Node = (usize, usize);
-    type Edge = (Self::Node, Self::Node);
+    type V = (usize, usize);
+    type E = (Self::V, Self::V);
 
-    fn out_nodes(&self, node: &Self::Node) -> Vec<Self::Node> {
+    fn out_vertices(&self, node: &Self::V) -> Vec<Self::V> {
         self.nrc(node)
     }
 
-    fn in_nodes(&self, node: &Self::Node) -> Vec<Self::Node> {
-        self.out_nodes(node)
+    fn in_vertices(&self, node: &Self::V) -> Vec<Self::V> {
+        self.out_vertices(node)
     }
 
-    fn out_edges(&self, node: &Self::Node) -> Vec<Self::Edge> {
+    fn out_edges(&self, node: &Self::V) -> Vec<Self::E> {
         let mut edges = vec![];
 
-        for next_node in self.out_nodes(node) {
+        for next_node in self.out_vertices(node) {
             edges.push((*node, next_node));
         }
 
         edges
     }
 
-    fn in_edges(&self, node: &Self::Node) -> Vec<Self::Edge> {
+    fn in_edges(&self, node: &Self::V) -> Vec<Self::E> {
         let mut edges = vec![];
 
-        for next_node in self.in_nodes(node) {
+        for next_node in self.in_vertices(node) {
             edges.push((next_node, *node));
         }
 
         edges
     }
 
-    fn edges(&self, from: &Self::Node, to: &Self::Node) -> Vec<Self::Edge> {
+    fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
         vec![(*from, *to)]
     }
 
-    fn nodes(&self, edge: &Self::Edge) -> (Self::Node, Self::Node) {
+    fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
         *edge
-    }
-
-    fn weight(&self, edge: &Self::Edge) -> f64 {
-        1.
     }
 }

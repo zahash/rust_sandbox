@@ -1,7 +1,5 @@
-use crate::graph::Graph;
+use crate::graph::{algorithm::breadth_first_search, Graph, Planning};
 use std::vec;
-
-use super::Planning;
 
 const CONTAINER_SIZE: usize = 3;
 type Containers = [i32; CONTAINER_SIZE];
@@ -13,10 +11,10 @@ pub struct JugFill {
 }
 
 impl Graph for JugFill {
-    type Node = Containers;
-    type Edge = (Self::Node, Self::Node);
+    type V = Containers;
+    type E = (Self::V, Self::V);
 
-    fn out_nodes(&self, node: &Containers) -> Vec<Containers> {
+    fn out_vertices(&self, node: &Containers) -> Vec<Containers> {
         let water = node;
 
         let pour = |from: usize, to: usize| -> Option<Containers> {
@@ -51,40 +49,36 @@ impl Graph for JugFill {
         res
     }
 
-    fn in_nodes(&self, node: &Self::Node) -> Vec<Self::Node> {
-        self.out_nodes(node)
+    fn in_vertices(&self, node: &Self::V) -> Vec<Self::V> {
+        self.out_vertices(node)
     }
 
-    fn out_edges(&self, node: &Self::Node) -> Vec<Self::Edge> {
+    fn out_edges(&self, node: &Self::V) -> Vec<Self::E> {
         let mut edges = vec![];
 
-        for next_node in self.out_nodes(node) {
+        for next_node in self.out_vertices(node) {
             edges.push((*node, next_node));
         }
 
         edges
     }
 
-    fn in_edges(&self, node: &Self::Node) -> Vec<Self::Edge> {
+    fn in_edges(&self, node: &Self::V) -> Vec<Self::E> {
         let mut edges = vec![];
 
-        for next_node in self.in_nodes(node) {
+        for next_node in self.in_vertices(node) {
             edges.push((next_node, *node));
         }
 
         edges
     }
 
-    fn edges(&self, from: &Self::Node, to: &Self::Node) -> Vec<Self::Edge> {
+    fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
         vec![(*from, *to)]
     }
 
-    fn nodes(&self, edge: &Self::Edge) -> (Self::Node, Self::Node) {
+    fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
         *edge
-    }
-
-    fn weight(&self, _edge: &Self::Edge) -> f64 {
-        1.
     }
 }
 
@@ -92,7 +86,7 @@ impl Planning for JugFill {
     type Solution = Vec<Containers>;
 
     fn solve(&self) -> Option<Vec<Containers>> {
-        self.breadth_first_search(&self.start, |node| node == &self.target)
+        breadth_first_search(self, &self.start, |node| node == &self.target)
             .map(|path| path.into_list())
     }
 }

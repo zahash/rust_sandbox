@@ -5,7 +5,7 @@ mod graph;
 mod observe;
 mod sat;
 
-use graph::{BinaryGrid, Graph};
+use graph::BinaryGrid;
 
 fn main() {
     // let grid = BinaryGrid::grid_to_bool(vec![
@@ -23,8 +23,4 @@ fn main() {
     ]);
 
     let graph = BinaryGrid::new_hv(grid);
-
-    for path in graph.breadth_first_traverse(&(0, 0)) {
-        println!("{:?}", path.into_list());
-    }
 }
