@@ -4,15 +4,15 @@ pub struct Path<Node> {
     pub parent: Box<Option<Path<Node>>>,
 }
 
-impl<Node> Path<Node> {
-    pub fn into_list(self) -> Vec<Node> {
+impl<Node> From<Path<Node>> for Vec<Node> {
+    fn from(path: Path<Node>) -> Self {
         let mut result = vec![];
 
-        if let Some(parent) = *self.parent {
-            result.append(&mut parent.into_list())
+        if let Some(parent) = *path.parent {
+            result.append(&mut parent.into())
         }
 
-        result.push(self.node);
+        result.push(path.node);
 
         result
     }

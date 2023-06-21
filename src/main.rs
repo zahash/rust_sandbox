@@ -5,22 +5,34 @@ mod graph;
 mod observe;
 mod sat;
 
-use graph::BinaryGrid;
+use graph::AdjacencyList;
+use std::collections::HashMap;
+
+use crate::graph::algorithm::breadth_first_search;
 
 fn main() {
-    // let grid = BinaryGrid::grid_to_bool(vec![
-    //     vec![1, 1, 0, 0, 0],
-    //     vec![1, 1, 0, 0, 0],
-    //     vec![0, 0, 1, 0, 0],
-    //     vec![0, 0, 0, 1, 1],
-    // ]);
+    let graph = AdjacencyList::new(HashMap::from([
+        ("ATL", vec!["BOS", "DFW", "MOB"]),
+        ("BOS", vec!["ATL", "DFW"]),
+        ("MOB", vec!["ATL"]),
+        ("AUS", vec!["DFW", "HOU", "SAT"]),
+        ("HOU", vec!["AUS", "DFW", "SAT"]),
+        ("SAT", vec!["AUS", "HOU"]),
+        ("LAX", vec!["DFW", "SFO"]),
+        ("LIT", vec!["DFW"]),
+        ("MSY", vec!["DFW"]),
+        ("OKC", vec!["DFW"]),
+        ("SHV", vec!["DFW"]),
+        ("SFO", vec!["DFW", "LA"]),
+        (
+            "DFW",
+            vec![
+                "ATL", "AUS", "BOS", "HOU", "LAX", "LIT", "MSY", "OKC", "SHV", "SFO",
+            ],
+        ),
+    ]));
 
-    let grid = BinaryGrid::grid_to_bool(vec![
-        vec![1, 1, 1, 1, 0],
-        vec![1, 1, 0, 1, 0],
-        vec![1, 1, 0, 0, 0],
-        vec![0, 0, 0, 0, 0],
-    ]);
-
-    let graph = BinaryGrid::new_hv(grid);
+    if let Some(path) = breadth_first_search(&graph, &"DFW", |airport| airport == &"LA") {
+        println!("{:?}", Vec::<&str>::from(path));
+    }
 }

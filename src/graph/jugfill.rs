@@ -86,7 +86,6 @@ impl Planning for JugFill {
     type Solution = Vec<Containers>;
 
     fn solve(&self) -> Option<Vec<Containers>> {
-        breadth_first_search(self, &self.start, |node| node == &self.target)
-            .map(|path| path.into_list())
+        breadth_first_search(self, &self.start, |node| node == &self.target).map(|path| path.into())
     }
 }

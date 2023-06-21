@@ -5,6 +5,12 @@ pub struct AdjacencyList<Node> {
     graph: HashMap<Node, Vec<Node>>,
 }
 
+impl<Node> AdjacencyList<Node> {
+    pub fn new(graph: HashMap<Node, Vec<Node>>) -> Self {
+        Self { graph }
+    }
+}
+
 impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
     type V = Node;
     type E = (Node, Node);
@@ -17,22 +23,38 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
     }
 
     fn in_vertices(&self, node: &Self::V) -> Vec<Self::V> {
-        todo!()
+        self.graph
+            .iter()
+            .filter(|(k, v)| v.contains(node))
+            .map(|(k, v)| k.clone())
+            .collect()
     }
 
     fn out_edges(&self, node: &Self::V) -> Vec<Self::E> {
-        todo!()
+        let mut edges = vec![];
+
+        for next_node in self.out_vertices(node) {
+            edges.push((node.clone(), next_node));
+        }
+
+        edges
     }
 
     fn in_edges(&self, node: &Self::V) -> Vec<Self::E> {
-        todo!()
+        let mut edges = vec![];
+
+        for next_node in self.in_vertices(node) {
+            edges.push((next_node, node.clone()));
+        }
+
+        edges
     }
 
     fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
-        todo!()
+        vec![(from.clone(), to.clone())]
     }
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
-        todo!()
+        edge.clone()
     }
 }
