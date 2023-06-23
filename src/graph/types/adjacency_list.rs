@@ -51,7 +51,11 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
     }
 
     fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
-        vec![(from.clone(), to.clone())]
+        self.out_edges(from)
+            .iter()
+            .filter(|(_, t)| t == to)
+            .cloned()
+            .collect::<Vec<Self::E>>()
     }
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {

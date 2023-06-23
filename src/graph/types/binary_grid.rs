@@ -130,7 +130,10 @@ impl Graph for BinaryGrid {
     }
 
     fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
-        vec![(*from, *to)]
+        match self.out_vertices(from).contains(to) {
+            true => vec![(*from, *to)],
+            false => vec![],
+        }
     }
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {

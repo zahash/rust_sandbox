@@ -14,3 +14,10 @@ pub trait Graph {
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V);
 }
+
+pub trait Weighted
+where
+    Self: Graph,
+{
+    fn weight(&self, edge: &Self::E) -> f64;
+}

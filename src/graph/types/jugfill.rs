@@ -14,7 +14,7 @@ impl Graph for JugFill {
     type V = Containers;
     type E = (Self::V, Self::V);
 
-    fn out_vertices(&self, node: &Containers) -> Vec<Containers> {
+    fn out_vertices(&self, node: &Self::V) -> Vec<Self::V> {
         let water = node;
 
         let pour = |from: usize, to: usize| -> Option<Containers> {
@@ -74,7 +74,10 @@ impl Graph for JugFill {
     }
 
     fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E> {
-        vec![(*from, *to)]
+        match self.out_vertices(from).contains(to) {
+            true => vec![(*from, *to)],
+            false => vec![],
+        }
     }
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
