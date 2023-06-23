@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 
+#[derive(Default)]
 pub struct Reactive<T> {
     val: T,
     observers: Vec<Box<dyn FnMut(&T)>>,
@@ -23,7 +24,7 @@ impl<T: PartialEq> Reactive<T> {
         }
     }
 
-    pub fn add_observer<F>(&mut self, f: impl FnMut(&T) + 'static) {
+    pub fn add_observer(&mut self, f: impl FnMut(&T) + 'static) {
         self.observers.push(Box::new(f));
     }
 }
@@ -107,21 +108,30 @@ impl<T: Debug> Debug for Reactive<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
     use super::*;
 
     #[test]
     fn test() {
-        let mut a: Reactive<Vec<i32>> = Reactive::new(vec![]);
-        let mut sum_of_a = Reactive::new(0);
-        let mut three_times_sum_of_a = Reactive::new(0);
+        let a: Rc<RefCell<Reactive<Vec<i32>>>> = Default::default();
+        let sum_of_a: Rc<RefCell<Reactive<i32>>> = Default::default();
+        let three_times_sum_of_a: Rc<RefCell<Reactive<i32>>> = Default::default();
 
-        // a.add_observer(|nums| sum_of_a.update(|_| nums.iter().sum()));
-        // sum_of_a.add_observer(|val| three_times_sum_of_a.update(|_| val * 3));
+        a.borrow_mut().add_observer({
+            let sum_of_a = sum_of_a.clone();
+            move |nums| sum_of_a.borrow_mut().update(|_| nums.iter().sum())
+        });
 
-        a.update(|_| vec![1, 2, 3]);
+        sum_of_a.borrow_mut().add_observer({
+            let three_times_sum_of_a = three_times_sum_of_a.clone();
+            move |val| three_times_sum_of_a.borrow_mut().update(|_| val * 3)
+        });
 
-        // println!("{:?}", a);
-        // println!("{:?}", sum_of_a);
-        // println!("{:?}", three_times_sum_of_a);
+        a.borrow_mut().update(|_| vec![1, 2, 3]);
+
+        println!("{:?}", a);
+        println!("{:?}", sum_of_a);
+        println!("{:?}", three_times_sum_of_a);
     }
 }
