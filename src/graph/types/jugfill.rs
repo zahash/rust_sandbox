@@ -92,3 +92,23 @@ impl Planning for JugFill {
         breadth_first_search(self, &self.start, |node| node == &self.target).map(|path| path.into())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let jugfill = JugFill {
+            start: [8, 0, 0],
+            capacity: [8, 5, 3],
+            target: [4, 4, 0],
+        };
+
+        let sol = jugfill.solve();
+
+        if let Some(path) = jugfill.solve() {
+            println!("{:?}", path);
+        }
+    }
+}

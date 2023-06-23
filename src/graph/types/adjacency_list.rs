@@ -62,3 +62,37 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
         edge.clone()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::graph::algorithm::breadth_first_search;
+
+    #[test]
+    fn test() {
+        let graph = AdjacencyList::new(HashMap::from([
+            ("ATL", vec!["BOS", "DFW", "MOB"]),
+            ("BOS", vec!["ATL", "DFW"]),
+            ("MOB", vec!["ATL"]),
+            ("AUS", vec!["DFW", "HOU", "SAT"]),
+            ("HOU", vec!["AUS", "DFW", "SAT"]),
+            ("SAT", vec!["AUS", "HOU"]),
+            ("LAX", vec!["DFW", "SFO"]),
+            ("LIT", vec!["DFW"]),
+            ("MSY", vec!["DFW"]),
+            ("OKC", vec!["DFW"]),
+            ("SHV", vec!["DFW"]),
+            ("SFO", vec!["DFW", "LA"]),
+            (
+                "DFW",
+                vec![
+                    "ATL", "AUS", "BOS", "HOU", "LAX", "LIT", "MSY", "OKC", "SHV", "SFO",
+                ],
+            ),
+        ]));
+
+        if let Some(path) = breadth_first_search(&graph, &"DFW", |airport| airport == &"LA") {
+            println!("{:?}", Vec::<&str>::from(path));
+        }
+    }
+}

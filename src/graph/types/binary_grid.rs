@@ -140,3 +140,27 @@ impl Graph for BinaryGrid {
         *edge
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        // let grid = BinaryGrid::grid_to_bool(vec![
+        //     vec![1, 1, 0, 0, 0],
+        //     vec![1, 1, 0, 0, 0],
+        //     vec![0, 0, 1, 0, 0],
+        //     vec![0, 0, 0, 1, 1],
+        // ]);
+
+        let grid = BinaryGrid::grid_to_bool(vec![
+            vec![1, 1, 1, 1, 0],
+            vec![1, 1, 0, 1, 0],
+            vec![1, 1, 0, 0, 0],
+            vec![0, 0, 0, 0, 0],
+        ]);
+
+        let graph = BinaryGrid::new_hv(grid);
+    }
+}

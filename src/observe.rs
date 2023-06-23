@@ -1,3 +1,39 @@
+use std::fmt::Debug;
+
+pub struct Reactive<T> {
+    val: T,
+    observers: Vec<Box<dyn FnMut(&T)>>,
+}
+
+impl<T: PartialEq> Reactive<T> {
+    pub fn new(val: T) -> Self {
+        Self {
+            val,
+            observers: vec![],
+        }
+    }
+
+    pub fn update(&mut self, f: impl Fn(&T) -> T) {
+        let new_val = f(&self.val);
+        if self.val != new_val {
+            self.val = new_val;
+            for obs in &mut self.observers {
+                obs(&self.val);
+            }
+        }
+    }
+
+    pub fn add_observer<F>(&mut self, f: impl FnMut(&T) + 'static) {
+        self.observers.push(Box::new(f));
+    }
+}
+
+impl<T: Debug> Debug for Reactive<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Reactive").field("val", &self.val).finish()
+    }
+}
+
 // class Reactive<T> {
 //     private _val: T;
 //     private observers: ((value: T) => void)[] = [];
@@ -68,3 +104,24 @@
 //     console.log(b.val());
 //     console.log(c.val());
 //   };
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test() {
+        let mut a: Reactive<Vec<i32>> = Reactive::new(vec![]);
+        let mut sum_of_a = Reactive::new(0);
+        let mut three_times_sum_of_a = Reactive::new(0);
+
+        // a.add_observer(|nums| sum_of_a.update(|_| nums.iter().sum()));
+        // sum_of_a.add_observer(|val| three_times_sum_of_a.update(|_| val * 3));
+
+        a.update(|_| vec![1, 2, 3]);
+
+        // println!("{:?}", a);
+        // println!("{:?}", sum_of_a);
+        // println!("{:?}", three_times_sum_of_a);
+    }
+}
