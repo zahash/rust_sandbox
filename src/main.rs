@@ -2,7 +2,7 @@
 
 mod fraction;
 mod graph;
-mod observe;
+mod reactive;
 mod sat;
 
 fn main() {}
