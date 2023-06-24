@@ -1,5 +1,11 @@
 // use std::fmt::Debug;
-use std::{cell::RefCell, fmt::Debug, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::hash_map::DefaultHasher,
+    fmt::Debug,
+    hash::{Hash, Hasher},
+    rc::Rc,
+};
 
 #[derive(Clone, Default)]
 pub struct Reactive<T> {
@@ -39,8 +45,14 @@ impl<T: Clone> Reactive<T> {
 }
 
 impl<T: PartialEq> Reactive<T> {
-    pub fn update(&self, f: impl FnMut(&T) -> T) {
+    pub fn update(&self, f: impl Fn(&T) -> T) {
         self.inner.borrow_mut().update(f);
+    }
+}
+
+impl<T: Hash> Reactive<T> {
+    pub fn update_inplace(&self, f: impl Fn(&mut T)) {
+        self.inner.borrow_mut().update_inplace(f);
     }
 }
 
@@ -68,10 +80,34 @@ impl<T> ReactiveInner<T> {
 }
 
 impl<T: PartialEq> ReactiveInner<T> {
-    fn update(&mut self, mut f: impl FnMut(&T) -> T) {
+    fn update(&mut self, f: impl Fn(&T) -> T) {
         let new_value = f(&self.value);
         if new_value != self.value {
             self.value = new_value;
+            for obs in &mut self.observers {
+                obs(&self.value);
+            }
+        }
+    }
+}
+
+impl<T: Hash> ReactiveInner<T> {
+    fn update_inplace(&mut self, f: impl Fn(&mut T)) {
+        let old_hash = {
+            let mut hasher = DefaultHasher::new();
+            self.value.hash(&mut hasher);
+            hasher.finish()
+        };
+
+        f(&mut self.value);
+
+        let new_hash = {
+            let mut hasher = DefaultHasher::new();
+            self.value.hash(&mut hasher);
+            hasher.finish()
+        };
+
+        if old_hash != new_hash {
             for obs in &mut self.observers {
                 obs(&self.value);
             }
@@ -170,7 +206,12 @@ mod tests {
             move |val| three_times_sum_of_a.update(|_| val * 3)
         });
 
-        a.update(|_| vec![1, 2, 3]);
+        // a.update(|_| vec![1, 2, 3]);
+        a.update_inplace(|nums| {
+            nums.push(10);
+            nums.push(20);
+            nums.push(30);
+        });
 
         println!("{:?}", a);
         println!("{:?}", sum_of_a);
