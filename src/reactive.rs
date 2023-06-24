@@ -13,6 +13,20 @@ impl<T> Reactive<T> {
         }
     }
 
+    pub fn derived<U: Default + Clone + PartialEq + 'static>(
+        reactive: &Reactive<T>,
+        f: impl Fn(&T) -> U + 'static,
+    ) -> Reactive<U> {
+        let derived: Reactive<U> = Default::default();
+
+        reactive.add_observer({
+            let derived = derived.clone();
+            move |value| derived.update(|_| f(value))
+        });
+
+        derived
+    }
+
     pub fn add_observer(&self, f: impl FnMut(&T) + 'static) {
         self.inner.borrow_mut().observers.push(Box::new(f));
     }
@@ -25,7 +39,7 @@ impl<T: Clone> Reactive<T> {
 }
 
 impl<T: PartialEq> Reactive<T> {
-    fn update(&self, f: impl FnMut(&T) -> T) {
+    pub fn update(&self, f: impl FnMut(&T) -> T) {
         self.inner.borrow_mut().update(f);
     }
 }
@@ -90,16 +104,6 @@ impl<T: PartialEq> ReactiveInner<T> {
 //     }
 //   }
 
-// pub struct Derived<U> {
-//     reactive: Reactive<U>
-// }
-
-// impl<U> Derived<U> {
-//     pub fn new<T>(reactive: Reactive<T>, f: impl Fn(&T) -> U) -> Self {
-
-//     }
-// }
-
 //   class Derived<T, U> {
 //     private reactive: Reactive<U>;
 
@@ -153,8 +157,8 @@ mod tests {
     #[test]
     fn test_reactive() {
         let a: Reactive<Vec<i32>> = Default::default();
-        let sum_of_a: Reactive<i32> = Default::default();
-        let three_times_sum_of_a: Reactive<i32> = Default::default();
+        let sum_of_a = Reactive::new(0);
+        let three_times_sum_of_a = Reactive::new(0);
 
         a.add_observer({
             let sum_of_a = sum_of_a.clone();
@@ -165,6 +169,19 @@ mod tests {
             let three_times_sum_of_a = three_times_sum_of_a.clone();
             move |val| three_times_sum_of_a.update(|_| val * 3)
         });
+
+        a.update(|_| vec![1, 2, 3]);
+
+        println!("{:?}", a);
+        println!("{:?}", sum_of_a);
+        println!("{:?}", three_times_sum_of_a);
+    }
+
+    #[test]
+    fn test_derived() {
+        let a: Reactive<Vec<i32>> = Default::default();
+        let sum_of_a = Reactive::derived(&a, |nums| nums.iter().sum());
+        let three_times_sum_of_a = Reactive::derived(&sum_of_a, |val| val * 3);
 
         a.update(|_| vec![1, 2, 3]);
 
