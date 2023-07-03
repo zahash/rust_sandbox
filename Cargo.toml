@@ -6,3 +6,8 @@ edition = "2021"
 [dependencies]
 serde = { version = "1" }
 serde_json = { version = "1" }
+yew = { version = "0.20", features = ["csr"] }
+wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3" }
+log = { version = "0.4" }
+wasm-logger = { version = "0.2" }

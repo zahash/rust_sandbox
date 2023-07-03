@@ -4,5 +4,8 @@ mod fraction;
 mod graph;
 mod reactive;
 mod sat;
+mod ui;
 
-fn main() {}
+fn main() {
+    ui::run();
+}
