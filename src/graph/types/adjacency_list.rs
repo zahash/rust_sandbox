@@ -61,6 +61,14 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
         edge.clone()
     }
+
+    fn all_vertices(&self) -> Vec<Self::V> {
+        todo!()
+    }
+
+    fn all_edges(&self) -> Vec<Self::E> {
+        todo!()
+    }
 }
 
 #[cfg(test)]

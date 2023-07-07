@@ -69,6 +69,14 @@ where
     fn vertices(&self, e: &Self::E) -> (Self::V, Self::V) {
         (e.from(), e.to())
     }
+
+    fn all_vertices(&self) -> Vec<Self::V> {
+        todo!()
+    }
+
+    fn all_edges(&self) -> Vec<Self::E> {
+        todo!()
+    }
 }
 
 impl<V, E> Mutable for Classic<V, E> {

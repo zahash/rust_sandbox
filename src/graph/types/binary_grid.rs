@@ -139,6 +139,26 @@ impl Graph for BinaryGrid {
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
         *edge
     }
+
+    fn all_vertices(&self) -> Vec<Self::V> {
+        let mut vertices = vec![];
+        for r in 0..self.grid.len() {
+            for c in 0..self.grid[r].len() {
+                vertices.push((r, c));
+            }
+        }
+        vertices
+    }
+
+    fn all_edges(&self) -> Vec<Self::E> {
+        let mut edges = vec![];
+        for rc in self.all_vertices() {
+            for nrc in self.nrc(&rc) {
+                edges.push((rc, nrc));
+            }
+        }
+        edges
+    }
 }
 
 #[cfg(test)]

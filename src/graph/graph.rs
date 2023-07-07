@@ -13,6 +13,10 @@ pub trait Graph {
     fn edges(&self, from: &Self::V, to: &Self::V) -> Vec<Self::E>;
 
     fn vertices(&self, e: &Self::E) -> (Self::V, Self::V);
+
+    fn all_vertices(&self) -> Vec<Self::V>;
+
+    fn all_edges(&self) -> Vec<Self::E>;
 }
 
 pub trait Weighted {

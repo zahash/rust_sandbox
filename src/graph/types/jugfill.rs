@@ -83,6 +83,14 @@ impl Graph for JugFill {
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
         *edge
     }
+
+    fn all_vertices(&self) -> Vec<Self::V> {
+        todo!()
+    }
+
+    fn all_edges(&self) -> Vec<Self::E> {
+        todo!()
+    }
 }
 
 impl Planning for JugFill {
