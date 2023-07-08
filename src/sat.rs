@@ -1,7 +1,5 @@
 // conjunctive normal form = (x1 V x2) /\ (~x3 V x4)
 
-use std::{fs::File, io::BufReader, path::Path};
-
 type Var = isize;
 type Clause = Vec<Var>;
 type CNF = Vec<Clause>;
@@ -84,18 +82,10 @@ fn inv(var: &Var) -> Var {
     -var
 }
 
-pub fn read_cnf_json<P>(path: P) -> CNF
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(path).unwrap();
-    let reader = BufReader::new(file);
-    serde_json::from_reader::<BufReader<File>, CNF>(reader).unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::util::read_json;
 
     #[test]
     fn test() {
@@ -120,7 +110,7 @@ mod tests {
         //     vec![-2, 3],
         // ];
 
-        let expr = read_cnf_json(
+        let expr: CNF = read_json(
             "/home/zahash/storage/sat/CBS_k3_n100_m449_b90_json/CBS_k3_n100_m449_b90_1.json",
         );
         let res = solve(&expr);

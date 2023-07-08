@@ -9,6 +9,7 @@ mod random_words;
 mod reactive;
 mod sat;
 mod ui;
+mod util;
 
 fn main() {
     print_random_words();

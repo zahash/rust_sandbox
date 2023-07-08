@@ -1,6 +1,7 @@
 use clap::Parser;
 use rand::seq::SliceRandom;
-use std::{fs::File, io::BufReader, path::Path};
+
+use crate::util::read_json;
 
 #[derive(Parser, Debug)]
 struct RandomWordGeneratorArgs {
@@ -16,7 +17,7 @@ struct RandomWordGeneratorArgs {
 pub fn print_random_words() {
     let args = RandomWordGeneratorArgs::parse();
 
-    let all_words = read_words_json(args.filepath);
+    let all_words: Vec<String> = read_json(args.filepath);
     let chosen_words: Vec<_> = all_words
         .choose_multiple(&mut rand::thread_rng(), args.amount)
         .collect();
@@ -24,13 +25,4 @@ pub fn print_random_words() {
     for word in chosen_words {
         println!("{}", word);
     }
-}
-
-pub fn read_words_json<P>(path: P) -> Vec<String>
-where
-    P: AsRef<Path>,
-{
-    let file = File::open(path).unwrap();
-    let reader = BufReader::new(file);
-    serde_json::from_reader::<BufReader<File>, Vec<String>>(reader).unwrap()
 }
