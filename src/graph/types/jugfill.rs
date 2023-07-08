@@ -1,23 +1,20 @@
 use crate::graph::{algorithm::breadth_first_search, Graph, Planning};
 use std::vec;
 
-const CONTAINER_SIZE: usize = 3;
-type Containers = [i32; CONTAINER_SIZE];
-
-pub struct JugFill {
-    pub start: Containers,
-    pub capacity: Containers,
-    pub target: Containers,
+pub struct JugFill<const N: usize> {
+    pub start: [i32; N],
+    pub capacity: [i32; N],
+    pub target: [i32; N],
 }
 
-impl Graph for JugFill {
-    type V = Containers;
+impl<const N: usize> Graph for JugFill<N> {
+    type V = [i32; N];
     type E = (Self::V, Self::V);
 
     fn out_vertices(&self, node: &Self::V) -> Vec<Self::V> {
         let water = node;
 
-        let pour = |from: usize, to: usize| -> Option<Containers> {
+        let pour = |from: usize, to: usize| -> Option<[i32; N]> {
             let leftover_capacity = std::cmp::max(0, self.capacity[to] - water[to]);
             let amount_to_pour = std::cmp::min(leftover_capacity, water[from]);
 
@@ -34,8 +31,8 @@ impl Graph for JugFill {
 
         let mut res = vec![];
 
-        for i in 0..CONTAINER_SIZE {
-            for j in 0..CONTAINER_SIZE {
+        for i in 0..N {
+            for j in 0..N {
                 if i == j {
                     continue;
                 }
@@ -93,10 +90,10 @@ impl Graph for JugFill {
     }
 }
 
-impl Planning for JugFill {
-    type Solution = Vec<Containers>;
+impl<const N: usize> Planning for JugFill<N> {
+    type Solution = Vec<[i32; N]>;
 
-    fn solve(&self) -> Option<Vec<Containers>> {
+    fn solve(&self) -> Option<Vec<[i32; N]>> {
         breadth_first_search(self, &self.start, |node| node == &self.target).map(|path| path.into())
     }
 }
