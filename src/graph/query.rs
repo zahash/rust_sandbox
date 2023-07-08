@@ -45,14 +45,14 @@ impl<T> Iterator for QueryIter<T> {
 }
 
 impl<T> QueryIter<T> {
-    pub fn in_edges<E>(&self) -> QueryIter<E> {
-        QueryIter { items: todo!() }
-    }
+    // pub fn in_edges<E>(&self) -> QueryIter<E> {
+    //     QueryIter { items: todo!() }
+    // }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
     use crate::graph::AdjacencyList;
     use std::collections::HashMap;
 
