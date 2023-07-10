@@ -1,4 +1,3 @@
-// use std::fmt::Debug;
 use std::{
     cell::RefCell,
     collections::hash_map::DefaultHasher,
@@ -19,20 +18,6 @@ impl<T> Reactive<T> {
         }
     }
 
-    pub fn derive<U: Default + Clone + PartialEq + 'static>(
-        &self,
-        f: impl Fn(&T) -> U + 'static,
-    ) -> Reactive<U> {
-        let derived: Reactive<U> = Default::default();
-
-        self.add_observer({
-            let derived = derived.clone();
-            move |value| derived.update(|_| f(value))
-        });
-
-        derived
-    }
-
     pub fn add_observer(&self, f: impl FnMut(&T) + 'static) {
         self.inner.borrow_mut().observers.push(Box::new(f));
     }
@@ -41,6 +26,21 @@ impl<T> Reactive<T> {
 impl<T: Clone> Reactive<T> {
     pub fn value(&self) -> T {
         self.inner.borrow().value.clone()
+    }
+
+    pub fn derive<U: Default + Clone + PartialEq + 'static>(
+        &self,
+        f: impl Fn(&T) -> U + 'static,
+    ) -> Reactive<U> {
+        let derived_val = f(&self.value());
+        let derived: Reactive<U> = Reactive::new(derived_val);
+
+        self.add_observer({
+            let derived = derived.clone();
+            move |value| derived.update(|_| f(value))
+        });
+
+        derived
     }
 }
 
@@ -120,61 +120,56 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_reactive() {
-        let a: Reactive<Vec<i32>> = Default::default();
-        let sum_of_a = Reactive::new(0);
-        let three_times_sum_of_a = Reactive::new(0);
+    fn initial_derived_values_must_not_be_default() {
+        let r = Reactive::new(10);
+        let d = r.derive(|val| val + 5);
 
-        a.add_observer({
-            let sum_of_a = sum_of_a.clone();
-            move |nums| sum_of_a.update(|_| nums.iter().sum())
-        });
-
-        sum_of_a.add_observer({
-            let three_times_sum_of_a = three_times_sum_of_a.clone();
-            move |val| three_times_sum_of_a.update(|_| val * 3)
-        });
-
-        // a.update(|_| vec![1, 2, 3]);
-        a.update_inplace(|nums| {
-            nums.push(10);
-            nums.push(20);
-            nums.push(30);
-        });
-
-        println!("{:?}", a);
-        println!("{:?}", sum_of_a);
-        println!("{:?}", three_times_sum_of_a);
+        assert_eq!(15, d.value());
     }
 
     #[test]
-    fn test_derived() {
-        let a: Reactive<Vec<i32>> = Default::default();
-        let sum_of_a = a.derive(|nums| nums.iter().sum());
-        let three_times_sum_of_a = sum_of_a.derive(|val| val * 3);
+    fn can_update() {
+        let r = Reactive::new(10);
+        let d = r.derive(|val| val + 5);
 
-        a.update(|_| vec![1, 2, 3]);
+        r.update(|_| 20);
 
-        println!("{:?}", a);
-        println!("{:?}", sum_of_a);
-        println!("{:?}", three_times_sum_of_a);
+        assert_eq!(25, d.value());
     }
 
     #[test]
-    fn test_reactive_with_vec() {
-        let x = Reactive::new(0);
-        let changes: Rc<RefCell<Vec<i32>>> = Default::default();
+    fn can_update_inplace() {
+        let r = Reactive::new(vec![1, 2, 3]);
+        let d = r.derive(|nums| nums.iter().sum::<i32>());
 
-        x.add_observer({
+        r.update_inplace(|nums| {
+            nums.push(4);
+            nums.push(5);
+            nums.push(6);
+        });
+
+        assert_eq!(21, d.value());
+    }
+
+    #[test]
+    fn can_add_observers() {
+        let r: Reactive<String> = Reactive::default();
+        let changes: Rc<RefCell<Vec<String>>> = Default::default();
+
+        r.add_observer({
             let changes = changes.clone();
             move |val| changes.borrow_mut().push(val.clone())
         });
 
-        x.update(|val| val + 10);
-        x.update(|val| val + 10);
-        x.update(|val| val + 10);
+        r.update(|_| String::from("a"));
+        r.update_inplace(|s| {
+            s.clear();
+            s.push('b');
+        });
 
-        println!("{:?}", x);
-        println!("{:?}", changes);
+        assert_eq!(
+            vec![String::from("a"), String::from("b")],
+            changes.borrow().clone()
+        );
     }
 }
