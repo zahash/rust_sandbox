@@ -11,13 +11,13 @@ impl<Node> AdjacencyList<Node> {
     }
 }
 
-impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
-    type V = Node;
-    type E = (Node, Node);
+impl<'node, Node: Hash + Eq> Graph for &'node AdjacencyList<Node> {
+    type V = &'node Node;
+    type E = (&'node Node, &'node Node);
 
     fn out_vertices(&self, node: &Self::V) -> Vec<Self::V> {
         match self.graph.get(node) {
-            Some(adj) => adj.clone(),
+            Some(adj) => adj.iter().collect(),
             None => vec![],
         }
     }
@@ -26,7 +26,7 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
         self.graph
             .iter()
             .filter(|(k, v)| v.contains(node))
-            .map(|(k, v)| k.clone())
+            .map(|(k, v)| k)
             .collect()
     }
 
@@ -34,7 +34,7 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
         let mut edges = vec![];
 
         for next_node in self.out_vertices(node) {
-            edges.push((node.clone(), next_node));
+            edges.push((*node, next_node));
         }
 
         edges
@@ -44,7 +44,7 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
         let mut edges = vec![];
 
         for next_node in self.in_vertices(node) {
-            edges.push((next_node, node.clone()));
+            edges.push((next_node, *node));
         }
 
         edges
@@ -54,12 +54,12 @@ impl<Node: Clone + Hash + Eq> Graph for AdjacencyList<Node> {
         self.out_edges(from)
             .iter()
             .filter(|(_, t)| t == to)
-            .cloned()
+            .map(|a| *a)
             .collect::<Vec<Self::E>>()
     }
 
     fn vertices(&self, edge: &Self::E) -> (Self::V, Self::V) {
-        edge.clone()
+        *edge
     }
 
     fn all_vertices(&self) -> Vec<Self::V> {
@@ -99,8 +99,8 @@ mod tests {
             ),
         ]));
 
-        if let Some(path) = breadth_first_search(&graph, &"DFW", |airport| airport == &"LA") {
-            println!("{:?}", Vec::<&str>::from(path));
+        if let Some(path) = breadth_first_search(&&graph, &&"DFW", |airport| airport == &&"LA") {
+            println!("{:?}", Vec::<&&str>::from(path));
         }
     }
 }
