@@ -161,3 +161,31 @@ macro_rules! fr {
         Frac::from($x)
     };
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn frac_arithmetic() {
+        assert_eq!(fr!(5, 4), fr!(1, 2) + fr!(3, 4));
+        assert_eq!(fr!(-1, 4), fr!(1, 2) - fr!(3, 4));
+        assert_eq!(fr!(3, 8), fr!(1, 2) * fr!(3, 4));
+        assert_eq!(fr!(2, 3), fr!(1, 2) / fr!(3, 4));
+    }
+
+    #[test]
+    fn frac_number_arithmetic() {
+        assert_eq!(fr!(3, 2), fr!(1, 2) + 1);
+        assert_eq!(fr!(3, 2), 1 + fr!(1, 2));
+
+        assert_eq!(fr!(-1, 2), fr!(1, 2) - 1);
+        assert_eq!(fr!(1, 2), 1 - fr!(1, 2));
+
+        assert_eq!(fr!(3, 2), fr!(1, 2) * 3);
+        assert_eq!(fr!(3, 2), 3 * fr!(1, 2));
+
+        assert_eq!(fr!(1, 6), fr!(1, 2) / 3);
+        assert_eq!(fr!(6), 3 / fr!(1, 2));
+    }
+}

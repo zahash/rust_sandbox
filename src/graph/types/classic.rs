@@ -85,7 +85,7 @@ impl<V, E> Mutable for Classic<V, E> {
 
 #[cfg(test)]
 mod tests {
-    use super::Classic;
+    // use super::Classic;
 
     #[test]
     fn test() {}
