@@ -11,9 +11,9 @@ impl<Node> AdjacencyList<Node> {
     }
 }
 
-impl<'node, Node: Hash + Eq> Graph for &'node AdjacencyList<Node> {
-    type V = &'node Node;
-    type E = (&'node Node, &'node Node);
+impl<'graph, Node: Hash + Eq> Graph for &'graph AdjacencyList<Node> {
+    type V = &'graph Node;
+    type E = (&'graph Node, &'graph Node);
 
     fn out_vertices(&self, node: &Self::V) -> Vec<Self::V> {
         match self.graph.get(node) {
