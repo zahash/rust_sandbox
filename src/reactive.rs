@@ -1,36 +1,37 @@
+//! Thread Safe Reactive Data Structure
+
 use std::{
-    cell::RefCell,
     collections::hash_map::DefaultHasher,
     fmt::Debug,
     hash::{Hash, Hasher},
-    rc::Rc,
+    sync::{Arc, Mutex},
 };
 
 #[derive(Clone, Default)]
 pub struct Reactive<T> {
-    inner: Rc<RefCell<ReactiveInner<T>>>,
+    inner: Arc<Mutex<ReactiveInner<T>>>,
 }
 
 impl<T> Reactive<T> {
     pub fn new(value: T) -> Self {
         Self {
-            inner: Rc::new(RefCell::new(ReactiveInner::new(value))),
+            inner: Arc::new(Mutex::new(ReactiveInner::new(value))),
         }
     }
 
-    pub fn add_observer(&self, f: impl FnMut(&T) + 'static) {
-        self.inner.borrow_mut().observers.push(Box::new(f));
+    pub fn add_observer(&self, f: impl FnMut(&T) + Send + 'static) {
+        self.inner.lock().unwrap().observers.push(Box::new(f));
     }
 }
 
 impl<T: Clone> Reactive<T> {
     pub fn value(&self) -> T {
-        self.inner.borrow().value.clone()
+        self.inner.lock().unwrap().value.clone()
     }
 
-    pub fn derive<U: Default + Clone + PartialEq + 'static>(
+    pub fn derive<U: Default + Clone + PartialEq + Send + 'static>(
         &self,
-        f: impl Fn(&T) -> U + 'static,
+        f: impl Fn(&T) -> U + Send + 'static,
     ) -> Reactive<U> {
         let derived_val = f(&self.value());
         let derived: Reactive<U> = Reactive::new(derived_val);
@@ -46,20 +47,20 @@ impl<T: Clone> Reactive<T> {
 
 impl<T: PartialEq> Reactive<T> {
     pub fn update(&self, f: impl Fn(&T) -> T) {
-        self.inner.borrow_mut().update(f);
+        self.inner.lock().unwrap().update(f);
     }
 }
 
 impl<T: Hash> Reactive<T> {
     pub fn update_inplace(&self, f: impl Fn(&mut T)) {
-        self.inner.borrow_mut().update_inplace(f);
+        self.inner.lock().unwrap().update_inplace(f);
     }
 }
 
 impl<T: Debug> Debug for Reactive<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("Reactive")
-            .field(&self.inner.borrow().value)
+            .field(&self.inner.lock().unwrap().value)
             .finish()
     }
 }
@@ -67,7 +68,7 @@ impl<T: Debug> Debug for Reactive<T> {
 #[derive(Default)]
 struct ReactiveInner<T> {
     value: T,
-    observers: Vec<Box<dyn FnMut(&T)>>,
+    observers: Vec<Box<dyn FnMut(&T) + Send>>,
 }
 
 impl<T> ReactiveInner<T> {
@@ -117,6 +118,8 @@ impl<T: Hash> ReactiveInner<T> {
 
 #[cfg(test)]
 mod tests {
+    use std::{thread, time::Duration};
+
     use super::*;
 
     #[test]
@@ -154,11 +157,11 @@ mod tests {
     #[test]
     fn can_add_observers() {
         let r: Reactive<String> = Reactive::default();
-        let changes: Rc<RefCell<Vec<String>>> = Default::default();
+        let changes: Arc<Mutex<Vec<String>>> = Default::default();
 
         r.add_observer({
             let changes = changes.clone();
-            move |val| changes.borrow_mut().push(val.clone())
+            move |val| changes.lock().unwrap().push(val.clone())
         });
 
         r.update(|_| String::from("a"));
@@ -169,7 +172,40 @@ mod tests {
 
         assert_eq!(
             vec![String::from("a"), String::from("b")],
-            changes.borrow().clone()
+            changes.lock().unwrap().clone()
         );
+    }
+
+    #[test]
+    fn is_threadsafe() {
+        let r: Reactive<String> = Reactive::default();
+
+        let handle = thread::spawn({
+            let r = r.clone();
+
+            move || {
+                for _ in 0..10 {
+                    r.update_inplace(|s| s.push('a'));
+                    thread::sleep(Duration::from_millis(1));
+                }
+            }
+        });
+
+        for _ in 0..10 {
+            r.update_inplace(|s| s.push('b'));
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        handle.join().unwrap();
+
+        println!("{:?}", r);
+
+        let value = r.value();
+        let num_a = value.matches("a").count();
+        let num_b = value.matches("b").count();
+
+        assert_eq!(20, value.len());
+        assert_eq!(10, num_a);
+        assert_eq!(10, num_b);
     }
 }
