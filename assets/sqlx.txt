@@ -1,0 +1,6 @@
+# --database-url not required if DATABASE_URL is exported
+# export DATABASE_URL="sqlite:assets/todos.db"
+
+sqlx database create --database-url sqlite:assets/sandbox.db
+sqlx migrate run --database-url sqlite:assets/sandbox.db --source assets/migrations
+cargo sqlx prepare --database-url sqlite:assets/sandbox.db

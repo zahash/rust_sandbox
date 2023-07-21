@@ -15,3 +15,8 @@ Cargo.lock
 
 # yew build files
 dist/
+
+.vscode/
+
+assets/sandbox.db-*
+sandbox.session.sql
