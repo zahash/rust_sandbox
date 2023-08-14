@@ -7,24 +7,26 @@ use std::{
 pub struct Frac(isize, isize);
 
 impl Frac {
-    pub fn new(n: isize, d: isize) -> Self {
+    pub const fn new(n: isize, d: isize) -> Self {
         let gcd = Self::gcd(n, d);
         Frac(n / gcd, d / gcd)
     }
 
-    pub fn n(&self) -> isize {
+    /// numerator
+    pub const fn n(&self) -> isize {
         self.0
     }
 
-    pub fn d(&self) -> isize {
+    /// denominator
+    pub const fn d(&self) -> isize {
         self.1
     }
 
-    pub fn eval(&self) -> f64 {
+    pub fn as_f64(&self) -> f64 {
         self.n() as f64 / self.d() as f64
     }
 
-    fn gcd(a: isize, b: isize) -> isize {
+    const fn gcd(a: isize, b: isize) -> isize {
         match b {
             0 => a,
             _ => Self::gcd(b, a % b),

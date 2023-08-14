@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+rayon = { version = "1" }
+static_assertions = { version = "1" }
+
+
 # serde
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1" }
@@ -30,3 +34,10 @@ reactivate = { version = "*" }
 axum = { version = "0.6" }
 sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"] }
 tokio = { version = "1", features = ["full"] }
+
+# ai
+ndarray = { version = "0" }
+ndarray-rand = { version = "0" }
+
+# sura
+image = { version = "0" }

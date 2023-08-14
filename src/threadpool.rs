@@ -43,8 +43,8 @@ where
 
         ThreadPool {
             workers,
-            job_sender: job_sender,
-            output_receiver: output_receiver,
+            job_sender,
+            output_receiver,
         }
     }
 
