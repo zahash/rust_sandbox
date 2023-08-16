@@ -3,8 +3,10 @@
 mod ai;
 mod api;
 mod chatgpt;
+mod yavd;
 mod fraction;
 mod graph;
+mod marker_invariants;
 mod nes;
 mod random_words;
 mod sat;

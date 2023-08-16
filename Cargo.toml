@@ -7,6 +7,14 @@ edition = "2021"
 rayon = { version = "1" }
 static_assertions = { version = "1" }
 
+# yavd
+uuid = { version = "1", features = ["v4"] }
+ordered-float = { version = "3.7" }
+
+# mine
+reactivate = { version = "*" }
+farid = { version = "*" }
+
 
 # serde
 serde = { version = "1", features = ["derive"] }
@@ -26,9 +34,6 @@ rand = { version = "0" }
 
 # cli
 clap = { version = "4", features = ["derive"] }
-
-# reactivate
-reactivate = { version = "*" }
 
 # api
 axum = { version = "0.6" }
