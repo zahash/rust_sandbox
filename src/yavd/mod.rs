@@ -48,6 +48,11 @@ impl<V> YAVD<V> {
 
         cluster_centres.sort_by_key(|(_, center)| OrderedFloat(params.distance_fn()(vec, center)));
 
+        // this is also fine
+        // cluster_centres.sort_by(|(_, center1), (_, center2)| {
+        //     params.distance_fn()(vec, center1).total_cmp(&params.distance_fn()(vec, center2))
+        // });
+
         let mut k = params.k_closest();
         let threshold = params.threshold();
 

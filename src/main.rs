@@ -3,8 +3,8 @@
 mod ai;
 mod api;
 mod chatgpt;
-mod yavd;
 mod fraction;
+mod game_of_life;
 mod graph;
 mod marker_invariants;
 mod nes;
@@ -18,6 +18,9 @@ mod ui;
 mod util;
 mod validation;
 mod vultus;
+mod yavd;
 
 #[tokio::main]
-async fn main() {}
+async fn main() {
+    game_of_life::run();
+}
