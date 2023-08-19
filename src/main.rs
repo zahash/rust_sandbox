@@ -1,26 +1,10 @@
-#![allow(dead_code, unused_variables)]
+use sandbox::*;
 
-mod ai;
-mod api;
-mod chatgpt;
-mod fraction;
-mod game_of_life;
-mod graph;
-mod marker_invariants;
-mod nes;
-mod random_words;
-mod sat;
-mod static_assert;
-mod sura;
-mod symrs;
-mod threadpool;
-mod ui;
-mod util;
-mod validation;
-mod vultus;
-mod yavd;
+use bitvec::prelude::*;
 
 #[tokio::main]
 async fn main() {
+    let arr = bitarr![usize, Lsb0; 0; 80];
+
     game_of_life::run();
 }

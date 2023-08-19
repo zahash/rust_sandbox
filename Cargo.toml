@@ -46,3 +46,14 @@ ndarray-rand = { version = "0" }
 
 # sura
 image = { version = "0" }
+
+# game of life
+bitvec = { version = "1" }
+
+
+[dev-dependencies]
+criterion = { version = "*", features = ["html_reports"] }
+
+[[bench]]
+name = "benchmark"
+harness = false

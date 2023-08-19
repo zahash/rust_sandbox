@@ -1,40 +1,52 @@
+use rayon::prelude::*;
+
 pub struct Game<const N: usize> {
     grid: [[bool; N]; N],
-    next: [[bool; N]; N],
 }
 
 impl<const N: usize> Game<N> {
     pub const fn new(start: [[bool; N]; N]) -> Self {
-        Self {
-            grid: start,
-            next: [[false; N]; N],
-        }
+        Self { grid: start }
     }
 
     pub const fn grid(&self) -> &[[bool; N]; N] {
         &self.grid
     }
 
-    pub fn update(&mut self) {
-        // needs parallelization
-        for r in 0..N {
-            for c in 0..N {
-                self.update_cell(r, c);
-            }
-        }
-        self.grid = self.next;
+    /// same as `update` but parallelized for large grids
+    pub fn par_update(&mut self) {
+        let mut next = [[false; N]; N];
+
+        next.par_iter_mut().enumerate().for_each(|(r, row)| {
+            row.par_iter_mut().enumerate().for_each(|(c, cell)| {
+                *cell = self.next(r, c);
+            });
+        });
+
+        self.grid = next;
     }
 
-    /// updates the next state
+    pub fn update(&mut self) {
+        let mut next = [[false; N]; N];
+
+        for r in 0..N {
+            for c in 0..N {
+                next[r][c] = self.next(r, c);
+            }
+        }
+
+        self.grid = next;
+    }
+
     #[inline]
-    fn update_cell(&mut self, r: usize, c: usize) {
+    fn next(&self, r: usize, c: usize) -> bool {
         match (self.grid[r][c], self.live_neighbors(r, c)) {
-            (true, n) if n < 2 => self.next[r][c] = false,
-            (true, n) if n == 2 || n == 3 => self.next[r][c] = true,
-            (true, n) if n > 3 => self.next[r][c] = false,
-            (false, n) if n == 3 => self.next[r][c] = true,
-            _ => self.next[r][c] = self.grid[r][c],
-        };
+            (true, n) if n < 2 => false,
+            (true, n) if n == 2 || n == 3 => true,
+            (true, n) if n > 3 => false,
+            (false, n) if n == 3 => true,
+            _ => self.grid[r][c],
+        }
     }
 
     #[inline]
@@ -53,14 +65,15 @@ impl<const N: usize> Game<N> {
     const fn wrap(i: usize, diff: isize) -> usize {
         match (i, diff) {
             (0, -1) => N - 1,
+            (_, 1) if i == N - 1 => 0,
             (_, -1) => i - 1,
-            (_, 1) => (i + 1) % N,
+            (_, 1) => i + 1,
             _ => unreachable!(),
         }
     }
 }
 
-const LIVE: char = '⬜'; // 🟩
+const LIVE: char = '⬜';
 const DEAD: char = '⬛';
 
 impl<const N: usize> From<&str> for Game<N> {
@@ -110,6 +123,8 @@ pub fn draw<const N: usize>(grid: &[[bool; N]; N]) {
 }
 
 pub fn run() {
+    // let mut game = Game::new([[true; 10_000]; 10_000]);
+
     // let mut game: Game<10> = Game::from(
     //     "
     //     ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
@@ -125,18 +140,24 @@ pub fn run() {
     //     ",
     // );
 
-    let mut game: Game<10> = Game::from(
+    let mut game: Game<16> = Game::from(
         "
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬛⬜⬛⬛⬜⬛⬛⬛
-        ⬛⬛⬜⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬜⬛⬛⬛⬜⬛⬛⬛
-        ⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
-        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬜⬛⬛⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬜⬛⬛⬛⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬜⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬜⬛⬛⬛⬜⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬜⬜⬜⬜⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
+        ⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛⬛
         ",
     );
 
@@ -144,6 +165,6 @@ pub fn run() {
         draw(game.grid());
         std::thread::sleep(std::time::Duration::from_millis(70));
         print!("\x1B[2J\x1B[1;1H"); // clear screen
-        game.update();
+        game.par_update();
     }
 }
