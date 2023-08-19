@@ -1,8 +1,6 @@
 use bitvec::vec::BitVec;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use sandbox::game_of_life;
-use sandbox::game_of_life_stack;
-use sandbox::game_of_life_vec;
+use sandbox::game_of_life::*;
 
 const GRID_SIZE: usize = 2000;
 
@@ -67,7 +65,6 @@ fn stack_benchmark(c: &mut Criterion) {
     let s = std::mem::size_of_val(g);
 
     println!("\n\n stack size {} \n\n", s);
-
 
     c.bench_function("stack", |b| {
         b.iter(|| {

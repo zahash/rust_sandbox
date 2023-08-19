@@ -5,8 +5,6 @@ pub mod api;
 pub mod chatgpt;
 pub mod fraction;
 pub mod game_of_life;
-pub mod game_of_life_stack;
-pub mod game_of_life_vec;
 pub mod graph;
 pub mod marker_invariants;
 pub mod nes;
