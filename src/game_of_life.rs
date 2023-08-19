@@ -1,37 +1,24 @@
-use rayon::prelude::*;
+use bitvec::prelude::*;
 
 pub struct Game<const N: usize> {
-    grid: [[bool; N]; N],
+    grid: BitVec,
 }
 
 impl<const N: usize> Game<N> {
-    pub const fn new(start: [[bool; N]; N]) -> Self {
+    pub const fn new(start: BitVec) -> Self {
         Self { grid: start }
     }
 
-    pub const fn grid(&self) -> &[[bool; N]; N] {
+    pub const fn grid(&self) -> &BitVec {
         &self.grid
     }
 
-    /// same as `update` but parallelized for large grids
-    pub fn par_update(&mut self) {
-        let mut next = [[false; N]; N];
-
-        next.par_iter_mut().enumerate().for_each(|(r, row)| {
-            row.par_iter_mut().enumerate().for_each(|(c, cell)| {
-                *cell = self.next(r, c);
-            });
-        });
-
-        self.grid = next;
-    }
-
     pub fn update(&mut self) {
-        let mut next = [[false; N]; N];
+        let mut next = BitVec::with_capacity(N * N);
 
         for r in 0..N {
             for c in 0..N {
-                next[r][c] = self.next(r, c);
+                next.push(self.next(r, c));
             }
         }
 
@@ -40,25 +27,30 @@ impl<const N: usize> Game<N> {
 
     #[inline]
     fn next(&self, r: usize, c: usize) -> bool {
-        match (self.grid[r][c], self.live_neighbors(r, c)) {
+        match (self.grid[Self::i(r, c)], self.live_neighbors(r, c)) {
             (true, n) if n < 2 => false,
             (true, n) if n == 2 || n == 3 => true,
             (true, n) if n > 3 => false,
             (false, n) if n == 3 => true,
-            _ => self.grid[r][c],
+            _ => self.grid[Self::i(r, c)],
         }
     }
 
     #[inline]
-    const fn live_neighbors(&self, r: usize, c: usize) -> u8 {
-        self.grid[Self::wrap(r, -1)][Self::wrap(c, -1)] as u8
-            + self.grid[Self::wrap(r, -1)][c] as u8
-            + self.grid[Self::wrap(r, -1)][Self::wrap(c, 1)] as u8
-            + self.grid[r][Self::wrap(c, -1)] as u8
-            + self.grid[r][Self::wrap(c, 1)] as u8
-            + self.grid[Self::wrap(r, 1)][Self::wrap(c, -1)] as u8
-            + self.grid[Self::wrap(r, 1)][c] as u8
-            + self.grid[Self::wrap(r, 1)][Self::wrap(c, 1)] as u8
+    fn live_neighbors(&self, r: usize, c: usize) -> u8 {
+        self.grid[Self::i(Self::wrap(r, -1), Self::wrap(c, -1))] as u8
+            + self.grid[Self::i(Self::wrap(r, -1), c)] as u8
+            + self.grid[Self::i(Self::wrap(r, -1), Self::wrap(c, 1))] as u8
+            + self.grid[Self::i(r, Self::wrap(c, -1))] as u8
+            + self.grid[Self::i(r, Self::wrap(c, 1))] as u8
+            + self.grid[Self::i(Self::wrap(r, 1), Self::wrap(c, -1))] as u8
+            + self.grid[Self::i(Self::wrap(r, 1), c)] as u8
+            + self.grid[Self::i(Self::wrap(r, 1), Self::wrap(c, 1))] as u8
+    }
+
+    #[inline]
+    const fn i(r: usize, c: usize) -> usize {
+        r * N + c
     }
 
     #[inline]
@@ -78,7 +70,7 @@ const DEAD: char = '⬛';
 
 impl<const N: usize> From<&str> for Game<N> {
     fn from(text: &str) -> Self {
-        let mut grid = [[false; N]; N];
+        let mut grid = BitVec::with_capacity(N * N);
 
         let text = text.trim();
 
@@ -99,8 +91,8 @@ impl<const N: usize> From<&str> for Game<N> {
 
             for (c, char) in line.chars().enumerate() {
                 match char {
-                    LIVE => grid[r][c] = true,
-                    DEAD => grid[r][c] = false,
+                    LIVE => grid.push(true),
+                    DEAD => grid.push(false),
                     _ => panic!("only {} and {} allowed", LIVE, DEAD),
                 }
             }
@@ -110,10 +102,10 @@ impl<const N: usize> From<&str> for Game<N> {
     }
 }
 
-pub fn draw<const N: usize>(grid: &[[bool; N]; N]) {
+pub fn draw<const N: usize>(game: &Game<N>) {
     for r in 0..N {
         for c in 0..N {
-            match grid[r][c] {
+            match game.grid[Game::<N>::i(r, c)] {
                 true => print!("{}", LIVE),
                 false => print!("{}", DEAD),
             }
@@ -162,9 +154,9 @@ pub fn run() {
     );
 
     loop {
-        draw(game.grid());
+        draw(&game);
         std::thread::sleep(std::time::Duration::from_millis(70));
         print!("\x1B[2J\x1B[1;1H"); // clear screen
-        game.par_update();
+        game.update();
     }
 }
