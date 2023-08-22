@@ -6,7 +6,7 @@ const GRID_SIZE: usize = 10_000;
 fn vec_benchmark(c: &mut Criterion) {
     let start = vec![vec![true; GRID_SIZE]; GRID_SIZE];
 
-    let mut game: game_of_life_vec::Game<GRID_SIZE, GRID_SIZE> = game_of_life_vec::Game::new(start);
+    let mut game: game_of_life_vec::Game = game_of_life_vec::Game::new(start);
 
     c.bench_function("vec", |b| {
         b.iter(|| {
