@@ -7,6 +7,10 @@ edition = "2021"
 rayon = { version = "1" }
 static_assertions = { version = "1" }
 
+# error
+anyhow = { version = "1" }
+thiserror = { version = "1" }
+
 # yavd
 uuid = { version = "1", features = ["v4"] }
 ordered-float = { version = "3.7" }

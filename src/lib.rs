@@ -10,6 +10,7 @@ pub mod marker_invariants;
 pub mod nes;
 pub mod random_words;
 pub mod sat;
+pub mod spice;
 pub mod static_assert;
 pub mod sura;
 pub mod symrs;
