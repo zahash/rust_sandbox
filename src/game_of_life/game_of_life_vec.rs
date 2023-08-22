@@ -14,27 +14,13 @@ impl<const R: usize, const C: usize> Game<R, C> {
     }
 
     pub fn par_update(&mut self) {
-        let mut next = vec![vec![false; R]; C];
+        let mut next = vec![vec![false; C]; R];
 
         next.par_iter_mut().enumerate().for_each(|(r, row)| {
             row.par_iter_mut().enumerate().for_each(|(c, cell)| {
                 *cell = self.next(r, c);
             });
         });
-
-        std::mem::swap(&mut self.grid, &mut next);
-    }
-
-    pub fn update(&mut self) {
-        let mut next: Vec<Vec<bool>> = Vec::with_capacity(R);
-
-        for r in 0..R {
-            let mut row: Vec<bool> = Vec::with_capacity(C);
-            for c in 0..C {
-                row.push(self.next(r, c));
-            }
-            next.push(row);
-        }
 
         std::mem::swap(&mut self.grid, &mut next);
     }
@@ -166,6 +152,6 @@ pub fn run() {
         draw(&game);
         std::thread::sleep(std::time::Duration::from_millis(70));
         print!("\x1B[2J\x1B[1;1H"); // clear screen
-        game.update();
+        game.par_update();
     }
 }
