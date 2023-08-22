@@ -79,3 +79,8 @@ pub fn Todo() -> Html {
         </>
     }
 }
+
+pub fn run() {
+    wasm_logger::init(wasm_logger::Config::default());
+    yew::Renderer::<Todo>::new().render();
+}

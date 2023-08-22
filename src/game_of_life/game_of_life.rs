@@ -1,12 +1,12 @@
 use rayon::prelude::*;
 
 pub struct Game<const R: usize, const C: usize> {
-    grid: [[bool; C]; R],
+    grid: Box<[[bool; C]; R]>,
 }
 
 impl<const R: usize, const C: usize> Game<R, C> {
-    pub const fn new(start: [[bool; C]; R]) -> Self {
-        Self { grid: start }
+    pub fn new(start: [[bool; C]; R]) -> Self {
+        Self { grid: Box::new(start) }
     }
 
     pub const fn grid(&self) -> &[[bool; C]; R] {
@@ -14,7 +14,7 @@ impl<const R: usize, const C: usize> Game<R, C> {
     }
 
     pub fn update(&mut self) {
-        let mut next = [[false; C]; R];
+        let mut next = Box::new([[false; C]; R]);
 
         next.par_iter_mut().enumerate().for_each(|(r, row)| {
             row.par_iter_mut().enumerate().for_each(|(c, cell)| {
