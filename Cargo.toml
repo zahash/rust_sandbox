@@ -26,8 +26,8 @@ serde_json = { version = "1" }
 serde_yaml = { version = "0" }
 
 # ui
-egui = { version = "0.22" }
 eframe = { version = "0.22" }
+env_logger = { version = "0.10" }
 
 yew = { version = "0.20", features = ["csr"] }
 wasm-bindgen = { version = "0.2" }

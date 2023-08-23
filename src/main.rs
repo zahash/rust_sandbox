@@ -2,5 +2,6 @@ use sandbox::*;
 
 #[tokio::main]
 async fn main() {
-    game_of_life::run();
+    // ui::chatgpt_grid::run();
+    // ui::grid::run();
 }
