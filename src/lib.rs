@@ -6,6 +6,8 @@ pub mod chatgpt;
 pub mod fraction;
 pub mod game_of_life;
 pub mod graph;
+pub mod lang;
+pub mod loc;
 pub mod marker_invariants;
 pub mod nes;
 pub mod random_words;

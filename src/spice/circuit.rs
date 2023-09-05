@@ -40,7 +40,7 @@ impl Circuit {
                         node_currents[component.nodes[1]] += current;
                     }
                     // Implement other component types here
-                    _ => {}
+                    // _ => {}
                 }
             }
 
