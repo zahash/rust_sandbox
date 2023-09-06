@@ -1,3 +1,15 @@
+#[derive(Debug, PartialEq, Clone)]
+pub enum Token<'ident> {
+    Ident(&'ident str),
+    Num(isize),
+    LParen,
+    RParen,
+    Plus,
+    Minus,
+    Mul,
+    Div,
+}
+
 #[derive(Debug)]
 pub enum Expr<'ident> {
     Add(Term<'ident>, Box<Expr<'ident>>),
@@ -19,68 +31,21 @@ pub enum Factor<'ident> {
     Ident(&'ident str),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token<'ident> {
-    Ident(&'ident str),
-    Num(isize),
-    LParen,
-    RParen,
-    Plus,
-    Minus,
-    Mul,
-    Div,
-}
-
-impl<'ident> std::fmt::Display for Expr<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
-            Expr::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
-            Expr::Term(term) => write!(f, "{}", term),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Term<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Term::Mul(lhs, rhs) => write!(f, "({} * {})", lhs, rhs),
-            Term::Div(lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
-            Term::Factor(factor) => write!(f, "{}", factor),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Factor<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Factor::Parens(expr) => write!(f, "({})", expr),
-            Factor::Num(num) => write!(f, "{}", num),
-            Factor::Ident(ident) => write!(f, "{}", ident),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Token<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Token::Ident(ident) => write!(f, "{}", ident),
-            Token::LParen => write!(f, "("),
-            Token::RParen => write!(f, ")"),
-            Token::Plus => write!(f, "+"),
-            Token::Minus => write!(f, "-"),
-            Token::Mul => write!(f, "*"),
-            Token::Div => write!(f, "/"),
-            Token::Num(n) => write!(f, "{}", n),
-        }
-    }
-}
-
 #[derive(Debug)]
 pub enum ParseError<'ident> {
     EmptyInput,
-    UnexpectedToken(Token<'ident>),
+    UnexpectedToken((usize, Token<'ident>)),
     MismatchedParentheses,
+    SyntaxError(usize),
+}
+
+pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
+    let (expr, pos) = parse_expr(tokens, 0)?;
+    if pos == tokens.len() {
+        Ok(expr)
+    } else {
+        Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
+    }
 }
 
 fn parse_expr<'ident>(
@@ -134,31 +99,85 @@ fn parse_factor<'ident>(
         }
         Some(&Token::Ident(ident)) => Ok((Factor::Ident(ident), pos + 1)),
         Some(&Token::Num(num)) => Ok((Factor::Num(num), pos + 1)),
-        _ => Err(ParseError::UnexpectedToken(tokens[pos].clone())),
+        None => Err(ParseError::SyntaxError(pos)),
+        _ => Err(ParseError::UnexpectedToken((pos, tokens[pos].clone()))),
     }
 }
 
-pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
-    let (expr, pos) = parse_expr(tokens, 0)?;
-    if pos == tokens.len() {
-        Ok(expr)
-    } else {
-        Err(ParseError::UnexpectedToken(tokens[pos].clone()))
+impl<'ident> std::fmt::Display for Expr<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Expr::Add(lhs, rhs) => write!(f, "({} + {})", lhs, rhs),
+            Expr::Sub(lhs, rhs) => write!(f, "({} - {})", lhs, rhs),
+            Expr::Term(term) => write!(f, "{}", term),
+        }
+    }
+}
+
+impl<'ident> std::fmt::Display for Term<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Term::Mul(lhs, rhs) => write!(f, "({} * {})", lhs, rhs),
+            Term::Div(lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
+            Term::Factor(factor) => write!(f, "{}", factor),
+        }
+    }
+}
+
+impl<'ident> std::fmt::Display for Factor<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Factor::Parens(expr) => write!(f, "({})", expr),
+            Factor::Num(num) => write!(f, "{}", num),
+            Factor::Ident(ident) => write!(f, "{}", ident),
+        }
+    }
+}
+
+impl<'ident> std::fmt::Display for Token<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Token::Ident(ident) => write!(f, "{}", ident),
+            Token::LParen => write!(f, "("),
+            Token::RParen => write!(f, ")"),
+            Token::Plus => write!(f, "+"),
+            Token::Minus => write!(f, "-"),
+            Token::Mul => write!(f, "*"),
+            Token::Div => write!(f, "/"),
+            Token::Num(n) => write!(f, "{}", n),
+        }
     }
 }
 
 pub fn run() {
-    // (a + b) * c
+    // a + b * c
+    // let tokens = [
+    //     Token::Ident("a"),
+    //     Token::Plus,
+    //     Token::Ident("b"),
+    //     Token::Mul,
+    //     Token::Ident("c"),
+    // ];
 
-    let tokens = vec![
-        Token::LParen,
-        Token::Ident("a"),
-        Token::Plus,
-        Token::Ident("b"),
-        Token::RParen,
-        Token::Mul,
-        Token::Ident("c"),
-    ];
+    // a * b + c
+    // let tokens = [
+    //     Token::Ident("a"),
+    //     Token::Mul,
+    //     Token::Ident("b"),
+    //     Token::Plus,
+    //     Token::Ident("c"),
+    // ];
+
+    // 8 / 4 / 2
+    // let tokens = [
+    //     Token::Num(8),
+    //     Token::Div,
+    //     Token::Num(4),
+    //     Token::Div,
+    //     Token::Num(2),
+    // ];
+
+    let tokens = [Token::Ident("a"), Token::Mul];
 
     for token in &tokens {
         print!("{}", token);
