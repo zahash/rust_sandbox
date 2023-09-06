@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "run",
     "ai",
     "api",
     "game_of_life",
