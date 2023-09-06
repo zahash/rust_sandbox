@@ -1,66 +1,25 @@
-[package]
-name = "sandbox"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rayon = { version = "1" }
-static_assertions = { version = "1" }
-
-# error
-anyhow = { version = "1" }
-thiserror = { version = "1" }
-
-# yavd
-uuid = { version = "1", features = ["v4"] }
-ordered-float = { version = "3.7" }
-
-# mine
-reactivate = { version = "*" }
-farid = { version = "*" }
-
-
-# serde
-serde = { version = "1", features = ["derive"] }
-serde_json = { version = "1" }
-serde_yaml = { version = "0" }
-
-# ui
-eframe = { version = "0.22" }
-env_logger = { version = "0.10" }
-
-yew = { version = "0.20", features = ["csr"] }
-wasm-bindgen = { version = "0.2" }
-web-sys = { version = "0.3" }
-log = { version = "0.4" }
-wasm-logger = { version = "0.2" }
-
-# rand
-getrandom = { version = "0.2", features = ["js"] }
-rand = { version = "0" }
-
-# cli
-clap = { version = "4", features = ["derive"] }
-
-# api
-axum = { version = "0.6" }
-sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio"] }
-tokio = { version = "1", features = ["full"] }
-
-# ai
-ndarray = { version = "0" }
-ndarray-rand = { version = "0" }
-
-# sura
-image = { version = "0" }
-
-# game of life
-bitvec = { version = "1" }
-
-
-[dev-dependencies]
-criterion = { version = "*", features = ["html_reports"] }
-
-[[bench]]
-name = "benchmark"
-harness = false
+[workspace]
+members = [
+    "ai",
+    "api",
+    "game_of_life",
+    "graph",
+    "nes",
+    "spice",
+    "sura",
+    "symrs",
+    "ui",
+    "vultus",
+    "yavd",
+    "chatgpt",
+    "fraction",
+    "lang",
+    "loc",
+    "marker_invariants",
+    "random_words",
+    "utils",
+    "static_assert",
+    "sat",
+    "threadpool",
+    "validation",
+]

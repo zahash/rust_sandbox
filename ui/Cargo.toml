@@ -1,0 +1,20 @@
+[package]
+name = "ui"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# egui
+eframe = { version = "0.22" }
+env_logger = { version = "0.10" }
+
+# yew
+yew = { version = "0.20", features = ["csr"] }
+wasm-bindgen = { version = "0.2" }
+web-sys = { version = "0.3" }
+log = { version = "0.4" }
+wasm-logger = { version = "0.2" }
+getrandom = { version = "0.2", features = ["js"] }
+rand = { version = "0" }
