@@ -1,274 +1,211 @@
-#[derive(Debug)]
-pub struct Tokens<'ident>(pub Vec<Token<'ident>>);
+pub mod lex;
+pub mod parse;
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token<'ident> {
-    Ident(&'ident str),
-    Num(isize),
-    LParen,
-    RParen,
-    Plus,
-    Hyphen,
-    Asterisk,
-    Slash,
-}
+// expression ::= equality-expression
+// equality-expression ::= additive-expression ( ( '==' | '!=' ) additive-expression ) *
+// additive-expression ::= multiplicative-expression ( ( '+' | '-' ) multiplicative-expression ) *
+// multiplicative-expression ::= primary ( ( '*' | '/' ) primary ) *
+// primary ::= '(' expression ')' | NUMBER | VARIABLE | '-' primary
 
-#[derive(Debug, PartialEq)]
-pub enum Expr<'ident> {
-    Add(Term<'ident>, Box<Expr<'ident>>),
-    Sub(Term<'ident>, Box<Expr<'ident>>),
-    Term(Term<'ident>),
-}
+// #[derive(Debug, PartialEq)]
+// pub enum Expr<'ident> {
 
-#[derive(Debug, PartialEq)]
-pub enum Term<'ident> {
-    Mul(Factor<'ident>, Box<Term<'ident>>),
-    Div(Factor<'ident>, Box<Term<'ident>>),
-    Factor(Factor<'ident>),
-}
+// }
 
-#[derive(Debug, PartialEq)]
-pub enum Factor<'ident> {
-    Parens(Box<Expr<'ident>>),
-    Num(isize),
-    Ident(&'ident str),
-}
+// #[derive(Debug)]
+// pub enum Expr<'ident> {
+//     Additive(Box<Expr<'ident>>, AdditiveExpr<'ident>),
+//     Assignment(&'ident str, Box<Expr<'ident>>),
+// }
 
-#[derive(Debug)]
-pub enum ParseError<'ident> {
-    EmptyInput,
-    UnexpectedToken((usize, Token<'ident>)),
-    MismatchedParentheses,
-    SyntaxError(usize),
-}
+// #[derive(Debug, PartialEq)]
+// pub enum AdditiveExpr<'ident> {
+//     Add(Box<AdditiveExpr<'ident>>, MultiplicativeExpr<'ident>),
+//     Sub(Box<AdditiveExpr<'ident>>, MultiplicativeExpr<'ident>),
+//     MultiplicativeExpr(MultiplicativeExpr<'ident>),
+// }
 
-#[derive(Debug)]
-pub enum LexError<'token> {
-    EmptyInput,
-    InvalidToken(&'token str),
-}
+// #[derive(Debug, PartialEq)]
+// pub enum MultiplicativeExpr<'ident> {
+//     Mul(Box<MultiplicativeExpr<'ident>>, Primary<'ident>),
+//     Div(Box<MultiplicativeExpr<'ident>>, Primary<'ident>),
+//     Primary(Primary<'ident>),
+// }
 
-pub fn lex<'token>(text: &'token str) -> Result<Tokens<'token>, LexError<'token>> {
-    match lex_token(text) {
-        Err(LexError::EmptyInput) => Ok(Tokens(vec![])),
-        Ok((token, text)) => {
-            let mut tokens = vec![token];
-            tokens.extend(lex(text)?.0);
-            Ok(Tokens(tokens))
-        }
-        Err(e) => Err(e),
-    }
-}
+// pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
+//     let (expr, pos) = parse_expr(tokens, 0)?;
+//     if pos == tokens.len() {
+//         Ok(expr)
+//     } else {
+//         Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
+//     }
+// }
 
-fn lex_token<'token>(text: &'token str) -> Result<(Token<'token>, &'token str), LexError<'token>> {
-    match text.is_empty() {
-        true => Err(LexError::EmptyInput),
-        false => lex_ident(text)
-            .or(lex_num(text))
-            .or(lex_lparen(text))
-            .or(lex_rparen(text))
-            .or(lex_plus(text))
-            .or(lex_hyphen(text))
-            .or(lex_asterisk(text))
-            .or(lex_slash(text))
-            .ok_or(LexError::InvalidToken(text.lines().next().unwrap())),
-    }
-}
+// fn parse_expr<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Result<(Expr<'ident>, usize), ParseError<'ident>> {
+//     let (lhs, pos) = parse_additive(tokens, pos)?;
+//     if let Some(token) = tokens.get(pos) {
+//         if token == &Token::Plus {
+//             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//             return Ok((Expr::Add(lhs, Box::new(rhs)), pos));
+//         }
+//         if token == &Token::Hyphen {
+//             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//             return Ok((Expr::Sub(lhs, Box::new(rhs)), pos));
+//         }
+//     }
 
-fn lex_ident<'token>(text: &'token str) -> Option<(Token<'token>, &'token str)> {
-    let text = text.trim();
-    match text.split_whitespace().next() {
-        Some(word) => {
-            let mut chars = word.chars();
-            match chars.next() {
-                Some(ch) if ch.is_alphabetic() => {
-                    let non_alpha_idx = chars
-                        .position(|ch| !ch.is_alphanumeric())
-                        .unwrap_or(word.len() - 1);
-                    Some((
-                        Token::Ident(word.get(..=non_alpha_idx).unwrap()),
-                        &text[non_alpha_idx + 1..text.len()],
-                    ))
-                }
-                _ => None,
-            }
-        }
-        _ => None,
-    }
-}
+//     Ok((Expr::MultiplicativeExpr(lhs), pos))
+// }
 
-fn lex_num<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    let text = text.trim();
-    match text.split_whitespace().next() {
-        Some(word) => match word.parse() {
-            Ok(num) => Some((Token::Num(num), &text[word.len()..text.len()])),
-            Err(_) => None,
-        },
-        _ => None,
-    }
-}
+// fn parse_additive<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Result<(AdditiveExpr<'ident>, usize), ParseError<'ident>> {
+//     let (lhs, pos) = parse_factor(tokens, pos)?;
+//     match tokens.get(pos) {
+//         Some(&Token::Asterisk) => {
+//             let (rhs, pos) = parse_term(tokens, pos + 1)?;
+//             Ok((MultiplicativeExpr::Mul(lhs, Box::new(rhs)), pos))
+//         }
+//         Some(&Token::Slash) => {
+//             let (rhs, pos) = parse_term(tokens, pos + 1)?;
+//             Ok((MultiplicativeExpr::Div(lhs, Box::new(rhs)), pos))
+//         }
+//         _ => Ok((MultiplicativeExpr::Primary(lhs), pos)),
+//     }
+// }
 
-fn lex_lparen<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char('(', Token::LParen, text)
-}
+// fn parse_primary<'ident>(
+//     tokens: &[Token<'ident>],
+// ) -> Result<(Primary<'ident>, usize), ParseError<'ident>> {
+//     //     let (lhs, pos) = parse_additive(tokens, pos)?;
+//     //     if let Some(token) = tokens.get(pos) {
+//     //         if token == &Token::Plus {
+//     //             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//     //             return Ok((Expr::Add(lhs, Box::new(rhs)), pos));
+//     //         }
+//     //         if token == &Token::Hyphen {
+//     //             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//     //             return Ok((Expr::Sub(lhs, Box::new(rhs)), pos));
+//     //         }
+//     //     }
 
-fn lex_rparen<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char(')', Token::RParen, text)
-}
+//     //     Ok((Expr::MultiplicativeExpr(lhs), pos))
 
-fn lex_plus<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char('+', Token::Plus, text)
-}
+//     match tokens.get(pos) {
+//         Some(&Token::LParen) => {
+//             let (expr, pos) = parse_expr(tokens, pos + 1)?;
+//             if tokens.get(pos) == Some(&Token::RParen) {
+//                 Ok((Primary::Parens(Box::new(expr)), pos + 1))
+//             } else {
+//                 Err(ParseError::MismatchedParentheses)
+//             }
+//         }
+//         Some(&Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
+//         Some(&Token::Num(num)) => Ok((Primary::Num(num), pos + 1)),
+//         None => Err(ParseError::SyntaxError(pos)),
+//         _ => Err(ParseError::UnexpectedToken((pos, tokens[pos].clone()))),
+//     }
+// }
 
-fn lex_hyphen<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char('-', Token::Hyphen, text)
-}
+// pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<AdditiveExpr<'ident>, ParseError<'ident>> {
+//     let (expr, pos) = parse_expr(tokens, 0)?;
+//     if pos == tokens.len() {
+//         Ok(expr)
+//     } else {
+//         Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
+//     }
+// }
 
-fn lex_asterisk<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char('*', Token::Asterisk, text)
-}
+// fn parse_expr<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Result<(AdditiveExpr<'ident>, usize), ParseError<'ident>> {
+//     let (lhs, pos) = parse_term(tokens, pos)?;
+//     if let Some(token) = tokens.get(pos) {
+//         if token == &Token::Plus {
+//             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//             return Ok((AdditiveExpr::Add(lhs, Box::new(rhs)), pos));
+//         }
+//         if token == &Token::Hyphen {
+//             let (rhs, pos) = parse_expr(tokens, pos + 1)?;
+//             return Ok((AdditiveExpr::Sub(lhs, Box::new(rhs)), pos));
+//         }
+//     }
 
-fn lex_slash<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
-    lex_single_char('/', Token::Slash, text)
-}
+//     Ok((AdditiveExpr::MultiplicativeExpr(lhs), pos))
+// }
 
-fn lex_single_char<'token>(
-    ch: char,
-    token: Token<'token>,
-    text: &'token str,
-) -> Option<(Token<'token>, &'token str)> {
-    let mut chars = text.trim().chars();
+// fn parse_term<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Result<(MultiplicativeExpr<'ident>, usize), ParseError<'ident>> {
+//     let (lhs, pos) = parse_factor(tokens, pos)?;
+//     match tokens.get(pos) {
+//         Some(&Token::Asterisk) => {
+//             let (rhs, pos) = parse_term(tokens, pos + 1)?;
+//             Ok((MultiplicativeExpr::Mul(lhs, Box::new(rhs)), pos))
+//         }
+//         Some(&Token::Slash) => {
+//             let (rhs, pos) = parse_term(tokens, pos + 1)?;
+//             Ok((MultiplicativeExpr::Div(lhs, Box::new(rhs)), pos))
+//         }
+//         _ => Ok((MultiplicativeExpr::Primary(lhs), pos)),
+//     }
+// }
 
-    match chars.next() {
-        Some(_ch) if _ch == ch => Some((token, chars.as_str())),
-        _ => None,
-    }
-}
+// fn parse_factor<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Result<(Primary<'ident>, usize), ParseError<'ident>> {
+//     match tokens.get(pos) {
+//         Some(&Token::LParen) => {
+//             let (expr, pos) = parse_expr(tokens, pos + 1)?;
+//             if tokens.get(pos) == Some(&Token::RParen) {
+//                 Ok((Primary::Parens(Box::new(expr)), pos + 1))
+//             } else {
+//                 Err(ParseError::MismatchedParentheses)
+//             }
+//         }
+//         Some(&Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
+//         Some(&Token::Num(num)) => Ok((Primary::Num(num), pos + 1)),
+//         None => Err(ParseError::SyntaxError(pos)),
+//         _ => Err(ParseError::UnexpectedToken((pos, tokens[pos].clone()))),
+//     }
+// }
 
-pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
-    let (expr, pos) = parse_expr(tokens, 0)?;
-    if pos == tokens.len() {
-        Ok(expr)
-    } else {
-        Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
-    }
-}
+// impl<'ident> std::fmt::Display for AdditiveExpr<'ident> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             AdditiveExpr::Add(lhs, rhs) => write!(f, "({}+{})", lhs, rhs),
+//             AdditiveExpr::Sub(lhs, rhs) => write!(f, "({}-{})", lhs, rhs),
+//             AdditiveExpr::MultiplicativeExpr(term) => write!(f, "{}", term),
+//         }
+//     }
+// }
 
-fn parse_expr<'ident>(
-    tokens: &[Token<'ident>],
-    pos: usize,
-) -> Result<(Expr<'ident>, usize), ParseError<'ident>> {
-    let (lhs, pos) = parse_term(tokens, pos)?;
-    if let Some(token) = tokens.get(pos) {
-        if token == &Token::Plus {
-            let (rhs, pos) = parse_expr(tokens, pos + 1)?;
-            return Ok((Expr::Add(lhs, Box::new(rhs)), pos));
-        }
-        if token == &Token::Hyphen {
-            let (rhs, pos) = parse_expr(tokens, pos + 1)?;
-            return Ok((Expr::Sub(lhs, Box::new(rhs)), pos));
-        }
-    }
+// impl<'ident> std::fmt::Display for MultiplicativeExpr<'ident> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             MultiplicativeExpr::Mul(lhs, rhs) => write!(f, "({}*{})", lhs, rhs),
+//             MultiplicativeExpr::Div(lhs, rhs) => write!(f, "({}/{})", lhs, rhs),
+//             MultiplicativeExpr::Primary(factor) => write!(f, "{}", factor),
+//         }
+//     }
+// }
 
-    Ok((Expr::Term(lhs), pos))
-}
-
-fn parse_term<'ident>(
-    tokens: &[Token<'ident>],
-    pos: usize,
-) -> Result<(Term<'ident>, usize), ParseError<'ident>> {
-    let (lhs, pos) = parse_factor(tokens, pos)?;
-    match tokens.get(pos) {
-        Some(&Token::Asterisk) => {
-            let (rhs, pos) = parse_term(tokens, pos + 1)?;
-            Ok((Term::Mul(lhs, Box::new(rhs)), pos))
-        }
-        Some(&Token::Slash) => {
-            let (rhs, pos) = parse_term(tokens, pos + 1)?;
-            Ok((Term::Div(lhs, Box::new(rhs)), pos))
-        }
-        _ => Ok((Term::Factor(lhs), pos)),
-    }
-}
-
-fn parse_factor<'ident>(
-    tokens: &[Token<'ident>],
-    pos: usize,
-) -> Result<(Factor<'ident>, usize), ParseError<'ident>> {
-    match tokens.get(pos) {
-        Some(&Token::LParen) => {
-            let (expr, pos) = parse_expr(tokens, pos + 1)?;
-            if tokens.get(pos) == Some(&Token::RParen) {
-                Ok((Factor::Parens(Box::new(expr)), pos + 1))
-            } else {
-                Err(ParseError::MismatchedParentheses)
-            }
-        }
-        Some(&Token::Ident(ident)) => Ok((Factor::Ident(ident), pos + 1)),
-        Some(&Token::Num(num)) => Ok((Factor::Num(num), pos + 1)),
-        None => Err(ParseError::SyntaxError(pos)),
-        _ => Err(ParseError::UnexpectedToken((pos, tokens[pos].clone()))),
-    }
-}
-
-impl<'ident> std::fmt::Display for Expr<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::Add(lhs, rhs) => write!(f, "({}+{})", lhs, rhs),
-            Expr::Sub(lhs, rhs) => write!(f, "({}-{})", lhs, rhs),
-            Expr::Term(term) => write!(f, "{}", term),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Term<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Term::Mul(lhs, rhs) => write!(f, "({}*{})", lhs, rhs),
-            Term::Div(lhs, rhs) => write!(f, "({}/{})", lhs, rhs),
-            Term::Factor(factor) => write!(f, "{}", factor),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Factor<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Factor::Parens(expr) => write!(f, "({})", expr),
-            Factor::Num(num) => write!(f, "{}", num),
-            Factor::Ident(ident) => write!(f, "{}", ident),
-        }
-    }
-}
-
-impl<'ident> std::fmt::Display for Tokens<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .iter()
-                .map(|token| token.to_string())
-                .collect::<Vec<String>>()
-                .join("")
-        )
-    }
-}
-
-impl<'ident> std::fmt::Display for Token<'ident> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Token::Ident(ident) => write!(f, "{}", ident),
-            Token::LParen => write!(f, "("),
-            Token::RParen => write!(f, ")"),
-            Token::Plus => write!(f, "+"),
-            Token::Hyphen => write!(f, "-"),
-            Token::Asterisk => write!(f, "*"),
-            Token::Slash => write!(f, "/"),
-            Token::Num(n) => write!(f, "{}", n),
-        }
-    }
-}
+// impl<'ident> std::fmt::Display for Primary<'ident> {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Primary::Parens(expr) => write!(f, "({})", expr),
+//             Primary::Num(num) => write!(f, "{}", num),
+//             Primary::Ident(ident) => write!(f, "{}", ident),
+//         }
+//     }
+// }
 
 pub fn run() {
     // a + b * c
@@ -298,6 +235,8 @@ pub fn run() {
     //     Token::Num(2),
     // ];
 
+    use lex::*;
+
     let tokens = [Token::Ident("a"), Token::Asterisk];
 
     for token in &tokens {
@@ -307,8 +246,8 @@ pub fn run() {
 
     println!("{:?}", tokens);
 
-    match parse(&tokens) {
-        Ok(expr) => println!("{}", expr),
-        Err(e) => eprintln!("{:?}", e),
-    }
+    // match parse(&tokens) {
+    //     Ok(expr) => println!("{}", expr),
+    //     Err(e) => eprintln!("{:?}", e),
+    // }
 }
