@@ -81,8 +81,14 @@ fn lex_ident<'token>(text: &'token str) -> Option<(Token<'token>, &'token str)> 
         Some(word) => {
             let mut chars = word.chars();
             match chars.next() {
-                Some(ch) if ch.is_alphabetic() && chars.all(|ch| ch.is_alphanumeric()) => {
-                    Some((Token::Ident(word), &text[word.len()..text.len()]))
+                Some(ch) if ch.is_alphabetic() => {
+                    let non_alpha_idx = chars
+                        .position(|ch| !ch.is_alphanumeric())
+                        .unwrap_or(word.len() - 1);
+                    Some((
+                        Token::Ident(word.get(..=non_alpha_idx).unwrap()),
+                        &text[non_alpha_idx + 1..text.len()],
+                    ))
                 }
                 _ => None,
             }

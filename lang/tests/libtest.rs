@@ -2,7 +2,8 @@ use lang::*;
 
 #[test]
 fn test_lexer() {
-    let text = "  a  +  (b  * 10  )  ";
+    // let text = "  a  +  (b  * 10  )  ";
+    let text = "a + b****c";
     let a = lex(text);
     println!("{}", text);
     println!("{:?}", a);
