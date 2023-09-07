@@ -52,8 +52,7 @@ pub fn lex<'token>(text: &'token str) -> Result<Tokens<'token>, LexError<'token>
     match lex_token(text) {
         Err(LexError::EmptyInput) => Ok(Tokens(vec![])),
         Ok((token, text)) => {
-            let mut tokens = vec![];
-            tokens.push(token);
+            let mut tokens = vec![token];
             tokens.extend(lex(text)?.0);
             Ok(Tokens(tokens))
         }
@@ -92,7 +91,7 @@ fn lex_ident<'token>(text: &'token str) -> Option<(Token<'token>, &'token str)> 
     }
 }
 
-fn lex_num<'token>(text: &'token str) -> Option<(Token<'token>, &'token str)> {
+fn lex_num<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
     let text = text.trim();
     match text.split_whitespace().next() {
         Some(word) => match word.parse() {
