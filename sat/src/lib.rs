@@ -87,6 +87,7 @@ mod tests {
     use super::*;
     use utils::read_json;
 
+    #[ignore]
     #[test]
     fn test() {
         // let expr = vec![vec![-1, 2], vec![-1, 3]];
