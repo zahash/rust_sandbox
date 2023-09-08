@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::lex::*;
 use crate::parse::*;
 
+#[derive(Debug)]
 pub struct State {
     variables: HashMap<String, f64>,
 }
@@ -115,7 +116,8 @@ mod tests {
     fn test_eval() {
         let mut state = State::new();
 
-        let result = eval("8/a * 2", &mut state).unwrap();
+        let result = eval("a=3-4/7", &mut state).unwrap();
         println!("{}", result);
+        println!("{:?}", state);
     }
 }

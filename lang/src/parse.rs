@@ -80,13 +80,6 @@ fn parse_assignment<'ident>(
     Ok((AssignmentExpr::AdditiveExpr(expr), pos))
 }
 
-fn parse_ident<'ident>(
-    tokens: &[Token<'ident>],
-    pos: usize,
-) -> Result<(AssignmentExpr<'ident>, usize), ParseError> {
-    todo!()
-}
-
 fn parse_additive<'ident>(
     tokens: &[Token<'ident>],
     pos: usize,
