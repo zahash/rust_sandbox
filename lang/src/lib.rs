@@ -1,6 +1,7 @@
+pub mod eval;
 pub mod lex;
 pub mod parse;
-pub mod eval;
+pub mod prompt;
 
 // expression ::= equality-expression
 // equality-expression ::= additive-expression ( ( '==' | '!=' ) additive-expression ) *
@@ -207,48 +208,3 @@ pub mod eval;
 //         }
 //     }
 // }
-
-pub fn run() {
-    // a + b * c
-    // let tokens = [
-    //     Token::Ident("a"),
-    //     Token::Plus,
-    //     Token::Ident("b"),
-    //     Token::Mul,
-    //     Token::Ident("c"),
-    // ];
-
-    // a * b + c
-    // let tokens = [
-    //     Token::Ident("a"),
-    //     Token::Mul,
-    //     Token::Ident("b"),
-    //     Token::Plus,
-    //     Token::Ident("c"),
-    // ];
-
-    // 8 / 4 / 2
-    // let tokens = [
-    //     Token::Num(8),
-    //     Token::Div,
-    //     Token::Num(4),
-    //     Token::Div,
-    //     Token::Num(2),
-    // ];
-
-    use lex::*;
-
-    let tokens = [Token::Ident("a"), Token::Asterisk];
-
-    for token in &tokens {
-        print!("{}", token);
-    }
-    println!("");
-
-    println!("{:?}", tokens);
-
-    // match parse(&tokens) {
-    //     Ok(expr) => println!("{}", expr),
-    //     Err(e) => eprintln!("{:?}", e),
-    // }
-}

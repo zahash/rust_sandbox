@@ -1,6 +1,15 @@
 use crate::lex::*;
 
 #[derive(Debug, PartialEq)]
+pub enum AssignmentExpr<'ident> {
+    Assign(Ident<'ident>, Box<AssignmentExpr<'ident>>),
+    AdditiveExpr(AdditiveExpr<'ident>),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Ident<'ident>(pub &'ident str);
+
+#[derive(Debug, PartialEq)]
 pub enum AdditiveExpr<'ident> {
     Add(Box<AdditiveExpr<'ident>>, MultiplicativeExpr<'ident>),
     Sub(Box<AdditiveExpr<'ident>>, MultiplicativeExpr<'ident>),
@@ -22,8 +31,8 @@ pub enum ExponentialExpr<'ident> {
 
 #[derive(Debug, PartialEq)]
 pub enum Primary<'ident> {
-    Parens(Box<AdditiveExpr<'ident>>),
-    Num(isize),
+    Parens(Box<AssignmentExpr<'ident>>),
+    Num(f64),
     Ident(&'ident str),
 }
 
@@ -35,16 +44,7 @@ pub enum ParseError {
     SyntaxError(usize),
 }
 
-// pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
-//     let (expr, pos) = parse_expr(tokens, 0)?;
-//     if pos == tokens.len() {
-//         Ok(expr)
-//     } else {
-//         Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
-//     }
-// }
-
-pub fn parse<'ident>(tokens: &Tokens<'ident>) -> Result<AdditiveExpr<'ident>, ParseError> {
+pub fn parse<'ident>(tokens: &Tokens<'ident>) -> Result<AssignmentExpr<'ident>, ParseError> {
     let tokens = &tokens.0;
     match tokens.is_empty() {
         true => Err(ParseError::EmptyInput),
@@ -61,8 +61,30 @@ pub fn parse<'ident>(tokens: &Tokens<'ident>) -> Result<AdditiveExpr<'ident>, Pa
 fn parse_expr<'ident>(
     tokens: &[Token<'ident>],
     pos: usize,
-) -> Result<(AdditiveExpr<'ident>, usize), ParseError> {
-    parse_additive(tokens, pos)
+) -> Result<(AssignmentExpr<'ident>, usize), ParseError> {
+    parse_assignment(tokens, pos)
+}
+
+fn parse_assignment<'ident>(
+    tokens: &[Token<'ident>],
+    pos: usize,
+) -> Result<(AssignmentExpr<'ident>, usize), ParseError> {
+    if let Some(&Token::Ident(ident)) = tokens.get(pos) {
+        if let Some(&Token::Equals) = tokens.get(pos + 1) {
+            let (rhs, pos) = parse_assignment(tokens, pos + 2)?;
+            return Ok((AssignmentExpr::Assign(Ident(ident), Box::new(rhs)), pos));
+        }
+    }
+
+    let (expr, pos) = parse_additive(tokens, pos)?;
+    Ok((AssignmentExpr::AdditiveExpr(expr), pos))
+}
+
+fn parse_ident<'ident>(
+    tokens: &[Token<'ident>],
+    pos: usize,
+) -> Result<(AssignmentExpr<'ident>, usize), ParseError> {
+    todo!()
 }
 
 fn parse_additive<'ident>(
@@ -146,44 +168,20 @@ fn parse_primary<'ident>(
     }
 }
 
-// fn parse_primary<'ident>(tokens: &[Token<'ident>], pos: usize) -> Option<(Primary<'ident>, usize)> {
-//     parse_primary_parens(tokens, pos)
-//         .or(parse_primary_ident(tokens, pos))
-//         .or(parse_primary_num(tokens, pos))
-// }
+impl<'ident> std::fmt::Display for AssignmentExpr<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AssignmentExpr::Assign(lhs, rhs) => write!(f, "({}={})", lhs, rhs),
+            AssignmentExpr::AdditiveExpr(expr) => write!(f, "{}", expr),
+        }
+    }
+}
 
-// fn parse_primary_parens<'ident>(
-//     tokens: &[Token<'ident>],
-//     pos: usize,
-// ) -> Option<(Primary<'ident>, usize)> {
-//     if let Some(&Token::LParen) = tokens.get(pos) {
-//         let (primary, pos) = parse_expr(tokens, pos + 1)?;
-//         if tokens.get(pos)? == &Token::RParen {
-//             return Some((Primary::Parens(Box::new(primary)), pos + 1));
-//         }
-//     }
-//     None
-// }
-
-// fn parse_primary_ident<'ident>(
-//     tokens: &[Token<'ident>],
-//     pos: usize,
-// ) -> Option<(Primary<'ident>, usize)> {
-//     match tokens.get(pos) {
-//         Some(&Token::Ident(ident)) => Some((Primary::Ident(ident), pos + 1)),
-//         _ => None,
-//     }
-// }
-
-// fn parse_primary_num<'ident>(
-//     tokens: &[Token<'ident>],
-//     pos: usize,
-// ) -> Option<(Primary<'ident>, usize)> {
-//     match tokens.get(pos) {
-//         Some(&Token::Num(n)) => Some((Primary::Num(n), pos + 1)),
-//         _ => None,
-//     }
-// }
+impl<'ident> std::fmt::Display for Ident<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl<'ident> std::fmt::Display for AdditiveExpr<'ident> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

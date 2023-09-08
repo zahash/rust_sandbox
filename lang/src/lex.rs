@@ -4,7 +4,7 @@ pub struct Tokens<'ident>(pub Vec<Token<'ident>>);
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token<'ident> {
     Ident(&'ident str),
-    Num(isize),
+    Num(f64),
     LParen,
     RParen,
     Plus,
@@ -12,6 +12,7 @@ pub enum Token<'ident> {
     Asterisk,
     Slash,
     Caret,
+    Equals,
 }
 
 #[derive(Debug)]
@@ -44,6 +45,7 @@ fn lex_token<'token>(text: &'token str) -> Result<(Token<'token>, &'token str), 
             .or(lex_asterisk(text))
             .or(lex_slash(text))
             .or(lex_caret(text))
+            .or(lex_equals(text))
             .ok_or(LexError::InvalidToken(text.lines().next().unwrap())),
     }
 }
@@ -115,6 +117,10 @@ fn lex_caret<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
     lex_single_char('^', Token::Caret, text)
 }
 
+fn lex_equals<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
+    lex_single_char('=', Token::Equals, text)
+}
+
 fn lex_single_char<'token>(
     ch: char,
     token: Token<'token>,
@@ -154,6 +160,7 @@ impl<'ident> std::fmt::Display for Token<'ident> {
             Token::Slash => write!(f, "/"),
             Token::Caret => write!(f, "^"),
             Token::Num(n) => write!(f, "{}", n),
+            Token::Equals => write!(f, "="),
         }
     }
 }
