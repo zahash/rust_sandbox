@@ -1,5 +1,18 @@
 use crate::lex::*;
 
+// ** Precedence Climbing **
+// assignment-expr (right assoc)::= additive-expr | ident = assignment-expr
+// additive-expr (left assoc) ::= multiplicative-expr
+//                              | additive-expr + multiplicative-expr
+//                              | additive-expr - multiplicative-expr
+// multiplicative-expr (left assoc) ::= exponential-expr
+//                                    | multiplicative-expr * exponential-expr
+//                                    | multiplicative-expr / exponential-expr
+// exponential-expr (right assoc) ::= primary | primary ^ exponential-expr
+// primary ::= ( assignment-expr ) | num | ident
+// ident ::= [A-Za-z][A-Za-z0-9]*
+// num ::= [0-9]+
+
 #[derive(Debug, PartialEq)]
 pub enum AssignmentExpr<'ident> {
     Assign(Ident<'ident>, Box<AssignmentExpr<'ident>>),
