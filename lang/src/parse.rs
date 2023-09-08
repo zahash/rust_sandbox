@@ -235,10 +235,11 @@ mod tests {
 
     #[test]
     fn test_parse() {
-        let tokens = lex("a*b^c").unwrap();
+        let tokens = lex("2 ^ 3 * 4").unwrap();
         println!("{:?}", tokens);
-        let expr = parse_additive(&tokens.0, 0).unwrap();
-        println!("{} {}", expr.0, expr.1);
+        let expr = parse(&tokens).unwrap();
+        println!("{}", expr);
+        println!("{:?}", expr);
     }
 
     #[test]

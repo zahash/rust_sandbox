@@ -1,4 +1,6 @@
+use lang::prompt::*;
+
 #[tokio::main]
 async fn main() {
-    println!("Hello, world!");
+    run();
 }
