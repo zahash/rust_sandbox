@@ -9,16 +9,16 @@ pub enum AdditiveExpr<'ident> {
 
 #[derive(Debug, PartialEq)]
 pub enum MultiplicativeExpr<'ident> {
-    Mul(Box<MultiplicativeExpr<'ident>>, Primary<'ident>),
-    Div(Box<MultiplicativeExpr<'ident>>, Primary<'ident>),
-    Primary(Primary<'ident>),
+    Mul(Box<MultiplicativeExpr<'ident>>, ExponentialExpr<'ident>),
+    Div(Box<MultiplicativeExpr<'ident>>, ExponentialExpr<'ident>),
+    ExponentialExpr(ExponentialExpr<'ident>),
 }
 
-// #[derive(Debug, PartialEq)]
-// pub enum ExponentialExpr<'ident> {
-//     Pow(Primary<'ident>, Box<ExponentialExpr<'ident>>),
-//     Primary(Primary<'ident>),
-// }
+#[derive(Debug, PartialEq)]
+pub enum ExponentialExpr<'ident> {
+    Pow(Primary<'ident>, Box<ExponentialExpr<'ident>>),
+    Primary(Primary<'ident>),
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Primary<'ident> {
@@ -28,17 +28,47 @@ pub enum Primary<'ident> {
 }
 
 #[derive(Debug)]
-pub enum ParseError<'ident> {
+pub enum ParseError {
     EmptyInput,
-    UnexpectedToken((usize, Token<'ident>)),
-    MismatchedParentheses,
+    UnexpectedToken(usize),
+    MismatchedParentheses(usize),
     SyntaxError(usize),
 }
 
-fn parse_additive<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
+// pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError<'ident>> {
+//     let (expr, pos) = parse_expr(tokens, 0)?;
+//     if pos == tokens.len() {
+//         Ok(expr)
+//     } else {
+//         Err(ParseError::UnexpectedToken((pos, tokens[pos].clone())))
+//     }
+// }
+
+pub fn parse<'ident>(tokens: &Tokens<'ident>) -> Result<AdditiveExpr<'ident>, ParseError> {
+    let tokens = &tokens.0;
+    match tokens.is_empty() {
+        true => Err(ParseError::EmptyInput),
+        false => {
+            let (expr, pos) = parse_expr(&tokens, 0)?;
+            match pos == tokens.len() {
+                true => Ok(expr),
+                false => Err(ParseError::SyntaxError(pos)),
+            }
+        }
+    }
+}
+
+fn parse_expr<'ident>(
+    tokens: &[Token<'ident>],
     pos: usize,
-) -> Option<(AdditiveExpr<'ident>, usize)> {
+) -> Result<(AdditiveExpr<'ident>, usize), ParseError> {
+    parse_additive(tokens, pos)
+}
+
+fn parse_additive<'ident>(
+    tokens: &[Token<'ident>],
+    pos: usize,
+) -> Result<(AdditiveExpr<'ident>, usize), ParseError> {
     let (lhs, mut pos) = parse_multiplicative(tokens, pos)?;
     let mut lhs = AdditiveExpr::MultiplicativeExpr(lhs);
     while let Some(token) = tokens.get(pos) {
@@ -56,81 +86,111 @@ fn parse_additive<'ident, 'tokens>(
             _ => break,
         }
     }
-    Some((lhs, pos))
+    Ok((lhs, pos))
 }
 
-fn parse_multiplicative<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
+fn parse_multiplicative<'ident>(
+    tokens: &[Token<'ident>],
     pos: usize,
-) -> Option<(MultiplicativeExpr<'ident>, usize)> {
-    let (lhs, mut pos) = parse_primary(tokens, pos)?;
-    let mut lhs = MultiplicativeExpr::Primary(lhs);
+) -> Result<(MultiplicativeExpr<'ident>, usize), ParseError> {
+    let (lhs, mut pos) = parse_exponential(tokens, pos)?;
+    let mut lhs = MultiplicativeExpr::ExponentialExpr(lhs);
     while let Some(token) = tokens.get(pos) {
         match token {
             &Token::Asterisk => {
-                let (rhs, next_pos) = parse_primary(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_exponential(tokens, pos + 1)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Mul(Box::new(lhs), rhs);
             }
             &Token::Slash => {
-                let (rhs, next_pos) = parse_primary(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_exponential(tokens, pos + 1)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Div(Box::new(lhs), rhs);
             }
             _ => break,
         }
     }
-    Some((lhs, pos))
+    Ok((lhs, pos))
 }
 
-fn parse_primary<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
+fn parse_exponential<'ident>(
+    tokens: &[Token<'ident>],
     pos: usize,
-) -> Option<(Primary<'ident>, usize)> {
-    parse_primary_parens(tokens, pos)
-        .or(parse_primary_ident(tokens, pos))
-        .or(parse_primary_num(tokens, pos))
-}
-
-fn parse_primary_parens<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
-    pos: usize,
-) -> Option<(Primary<'ident>, usize)> {
-    if let Some(&Token::LParen) = tokens.get(pos) {
-        let (primary, pos) = parse_additive(tokens, pos + 1)?;
-        if tokens.get(pos)? == &Token::RParen {
-            return Some((Primary::Parens(Box::new(primary)), pos + 1));
+) -> Result<(ExponentialExpr<'ident>, usize), ParseError> {
+    let (lhs, pos) = parse_primary(tokens, pos)?;
+    if let Some(token) = tokens.get(pos) {
+        if token == &Token::Caret {
+            let (rhs, pos) = parse_exponential(tokens, pos + 1)?;
+            return Ok((ExponentialExpr::Pow(lhs, Box::new(rhs)), pos));
         }
     }
-    None
+    Ok((ExponentialExpr::Primary(lhs), pos))
 }
 
-fn parse_primary_ident<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
+fn parse_primary<'ident>(
+    tokens: &[Token<'ident>],
     pos: usize,
-) -> Option<(Primary<'ident>, usize)> {
+) -> Result<(Primary<'ident>, usize), ParseError> {
     match tokens.get(pos) {
-        Some(&Token::Ident(ident)) => Some((Primary::Ident(ident), pos + 1)),
-        _ => None,
+        Some(&Token::LParen) => {
+            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            match tokens.get(pos) == Some(&Token::RParen) {
+                true => Ok((Primary::Parens(Box::new(expr)), pos + 1)),
+                false => Err(ParseError::MismatchedParentheses(pos)),
+            }
+        }
+        Some(&Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
+        Some(&Token::Num(num)) => Ok((Primary::Num(num), pos + 1)),
+        None => Err(ParseError::SyntaxError(pos)),
+        _ => Err(ParseError::UnexpectedToken(pos)),
     }
 }
 
-fn parse_primary_num<'ident, 'tokens>(
-    tokens: &'tokens [Token<'ident>],
-    pos: usize,
-) -> Option<(Primary<'ident>, usize)> {
-    match tokens.get(pos) {
-        Some(&Token::Num(n)) => Some((Primary::Num(n), pos + 1)),
-        _ => None,
-    }
-}
+// fn parse_primary<'ident>(tokens: &[Token<'ident>], pos: usize) -> Option<(Primary<'ident>, usize)> {
+//     parse_primary_parens(tokens, pos)
+//         .or(parse_primary_ident(tokens, pos))
+//         .or(parse_primary_num(tokens, pos))
+// }
+
+// fn parse_primary_parens<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Option<(Primary<'ident>, usize)> {
+//     if let Some(&Token::LParen) = tokens.get(pos) {
+//         let (primary, pos) = parse_expr(tokens, pos + 1)?;
+//         if tokens.get(pos)? == &Token::RParen {
+//             return Some((Primary::Parens(Box::new(primary)), pos + 1));
+//         }
+//     }
+//     None
+// }
+
+// fn parse_primary_ident<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Option<(Primary<'ident>, usize)> {
+//     match tokens.get(pos) {
+//         Some(&Token::Ident(ident)) => Some((Primary::Ident(ident), pos + 1)),
+//         _ => None,
+//     }
+// }
+
+// fn parse_primary_num<'ident>(
+//     tokens: &[Token<'ident>],
+//     pos: usize,
+// ) -> Option<(Primary<'ident>, usize)> {
+//     match tokens.get(pos) {
+//         Some(&Token::Num(n)) => Some((Primary::Num(n), pos + 1)),
+//         _ => None,
+//     }
+// }
 
 impl<'ident> std::fmt::Display for AdditiveExpr<'ident> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AdditiveExpr::Add(lhs, rhs) => write!(f, "({}+{})", lhs, rhs),
             AdditiveExpr::Sub(lhs, rhs) => write!(f, "({}-{})", lhs, rhs),
-            AdditiveExpr::MultiplicativeExpr(factor) => write!(f, "{}", factor),
+            AdditiveExpr::MultiplicativeExpr(expr) => write!(f, "{}", expr),
         }
     }
 }
@@ -140,7 +200,16 @@ impl<'ident> std::fmt::Display for MultiplicativeExpr<'ident> {
         match self {
             MultiplicativeExpr::Mul(lhs, rhs) => write!(f, "({}*{})", lhs, rhs),
             MultiplicativeExpr::Div(lhs, rhs) => write!(f, "({}/{})", lhs, rhs),
-            MultiplicativeExpr::Primary(factor) => write!(f, "{}", factor),
+            MultiplicativeExpr::ExponentialExpr(expr) => write!(f, "{}", expr),
+        }
+    }
+}
+
+impl<'ident> std::fmt::Display for ExponentialExpr<'ident> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExponentialExpr::Pow(lhs, rhs) => write!(f, "({}^{})", lhs, rhs),
+            ExponentialExpr::Primary(primary) => write!(f, "{}", primary),
         }
     }
 }
@@ -159,6 +228,14 @@ impl<'ident> std::fmt::Display for Primary<'ident> {
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn test_parse() {
+        let tokens = lex("a*b^c").unwrap();
+        println!("{:?}", tokens);
+        let expr = parse_additive(&tokens.0, 0).unwrap();
+        println!("{} {}", expr.0, expr.1);
+    }
 
     #[test]
     fn test_parse_primary_ident() {

@@ -11,6 +11,7 @@ pub enum Token<'ident> {
     Hyphen,
     Asterisk,
     Slash,
+    Caret,
 }
 
 #[derive(Debug)]
@@ -42,6 +43,7 @@ fn lex_token<'token>(text: &'token str) -> Result<(Token<'token>, &'token str), 
             .or(lex_hyphen(text))
             .or(lex_asterisk(text))
             .or(lex_slash(text))
+            .or(lex_caret(text))
             .ok_or(LexError::InvalidToken(text.lines().next().unwrap())),
     }
 }
@@ -109,6 +111,10 @@ fn lex_slash<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
     lex_single_char('/', Token::Slash, text)
 }
 
+fn lex_caret<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
+    lex_single_char('^', Token::Caret, text)
+}
+
 fn lex_single_char<'token>(
     ch: char,
     token: Token<'token>,
@@ -146,6 +152,7 @@ impl<'ident> std::fmt::Display for Token<'ident> {
             Token::Hyphen => write!(f, "-"),
             Token::Asterisk => write!(f, "*"),
             Token::Slash => write!(f, "/"),
+            Token::Caret => write!(f, "^"),
             Token::Num(n) => write!(f, "{}", n),
         }
     }

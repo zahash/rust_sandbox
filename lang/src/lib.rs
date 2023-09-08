@@ -1,5 +1,6 @@
 pub mod lex;
 pub mod parse;
+pub mod eval;
 
 // expression ::= equality-expression
 // equality-expression ::= additive-expression ( ( '==' | '!=' ) additive-expression ) *
