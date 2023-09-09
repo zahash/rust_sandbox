@@ -29,7 +29,15 @@ impl From<ParseError> for EvaluatorError<'_> {
 impl State {
     pub fn new() -> Self {
         Self {
-            variables: HashMap::new(),
+            variables: {
+                use std::f64::consts::*;
+
+                let mut map = HashMap::new();
+                map.insert("PI".to_string(), PI);
+                map.insert("TAU".to_string(), TAU);
+                map.insert("E".to_string(), E);
+                map
+            },
         }
     }
 
