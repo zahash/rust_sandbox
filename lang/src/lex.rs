@@ -75,10 +75,18 @@ fn lex_num<'token>(text: &'token str) -> Option<(Token<'_>, &'token str)> {
     let text = text.trim();
     match text.split_whitespace().next() {
         Some(word) => {
-            let first_non_digit_idx = word
+            let mut first_non_digit_idx = word
                 .chars()
                 .position(|ch| !ch.is_digit(10))
                 .unwrap_or(word.len());
+
+            if let Some(".") = word.get(first_non_digit_idx..first_non_digit_idx + 1) {
+                first_non_digit_idx = word
+                    .chars()
+                    .skip(first_non_digit_idx + 1)
+                    .position(|ch| !ch.is_digit(10))
+                    .unwrap_or(word.len());
+            }
 
             match word[..first_non_digit_idx].parse() {
                 Ok(num) => Some((Token::Num(num), &text[first_non_digit_idx..text.len()])),

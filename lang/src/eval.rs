@@ -98,11 +98,12 @@ impl<'ident> Eval for Primary<'ident> {
     fn eval(&self, state: &mut State) -> f64 {
         match self {
             Primary::Parens(expr) => expr.eval(state),
-            Primary::Num(n) => *n as f64,
+            Primary::Num(n) => *n,
             Primary::Ident(ident) => match state.value_of(ident) {
                 Some(val) => val,
                 None => panic!("** variable '{}' not found", ident),
             },
+            Primary::UnarySub(n) => -n.eval(state),
         }
     }
 }

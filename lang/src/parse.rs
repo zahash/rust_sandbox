@@ -46,6 +46,7 @@ pub enum ExponentialExpr<'ident> {
 pub enum Primary<'ident> {
     Parens(Box<AssignmentExpr<'ident>>),
     Num(f64),
+    UnarySub(Box<Primary<'ident>>),
     Ident(&'ident str),
 }
 
@@ -169,6 +170,10 @@ fn parse_primary<'ident>(
         }
         Some(&Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
         Some(&Token::Num(num)) => Ok((Primary::Num(num), pos + 1)),
+        Some(&Token::Hyphen) => {
+            let (expr, pos) = parse_primary(tokens, pos + 1)?;
+            Ok((Primary::UnarySub(Box::new(expr)), pos))
+        }
         None => Err(ParseError::SyntaxError(pos)),
         _ => Err(ParseError::UnexpectedToken(pos)),
     }
@@ -224,6 +229,7 @@ impl<'ident> std::fmt::Display for Primary<'ident> {
             Primary::Parens(expr) => write!(f, "({})", expr),
             Primary::Num(num) => write!(f, "{}", num),
             Primary::Ident(ident) => write!(f, "{}", ident),
+            Primary::UnarySub(num) => write!(f, "{}", num),
         }
     }
 }
