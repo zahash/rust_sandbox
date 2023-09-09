@@ -1,7 +1,8 @@
 use regex::Regex;
 
 #[derive(Debug, PartialEq)]
-pub enum Token {
+pub enum Token<'ident> {
+    Ident(&'ident str),
     Num(f64),
     LParen,
     RParen,
@@ -38,11 +39,18 @@ pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
     }
 }
 
-pub fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
-    lex_num(text, pos)
+fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
+    lex_ident(text, pos)
+        .or(lex_num(text, pos))
         .or(lex_lparen(text, pos))
         .or(lex_rparen(text, pos))
         .ok_or(InvalidToken { pos })
+}
+
+fn lex_ident(text: &str, pos: usize) -> Option<(Token, usize)> {
+    let pat = Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*").unwrap();
+    let (token, pos) = lex_pattern(text, pos, &pat)?;
+    Some((Token::Ident(token), pos))
 }
 
 fn lex_num(text: &str, pos: usize) -> Option<(Token, usize)> {
