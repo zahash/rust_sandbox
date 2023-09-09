@@ -23,4 +23,5 @@ members = [
     "sat",
     "threadpool",
     "validation",
+    "tinylisp",
 ]
