@@ -1,4 +1,4 @@
-use lang::prompt::*;
+use calc::prompt::*;
 
 #[tokio::main]
 async fn main() {

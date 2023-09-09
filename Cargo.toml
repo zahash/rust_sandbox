@@ -14,7 +14,7 @@ members = [
     "yavd",
     "chatgpt",
     "fraction",
-    "lang",
+    "calc",
     "loc",
     "marker_invariants",
     "random_words",

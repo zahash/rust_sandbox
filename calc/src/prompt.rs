@@ -24,13 +24,3 @@ fn ask() -> String {
     std::io::stdin().read_line(&mut input).unwrap();
     input
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn run_prompt() {
-        run();
-    }
-}
