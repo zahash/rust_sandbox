@@ -10,6 +10,7 @@ pub fn json(text: &str) -> Result<Expr, JsonError> {
     Ok(expr)
 }
 
+#[derive(Debug)]
 pub enum JsonError {
     LexError(InvalidToken),
     ParseError(ParseError),
