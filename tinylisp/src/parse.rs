@@ -15,7 +15,7 @@ pub enum ParseError {
 
 pub fn parse<'symbol>(tokens: &[Token<'symbol>]) -> Result<Expr<'symbol>, ParseError> {
     let (expr, pos) = parse_expr(&tokens, 0)?;
-    match pos == tokens.len() {
+    match pos >= tokens.len() {
         true => Ok(expr),
         false => Err(ParseError::SyntaxError(pos)),
     }

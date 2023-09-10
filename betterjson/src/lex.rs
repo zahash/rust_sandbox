@@ -4,6 +4,8 @@ use regex::Regex;
 pub enum Token<'text> {
     String(&'text str),
     Num(&'text str),
+    Bool(bool),
+    Null,
     LCurly,
     RCurly,
     LSquare,
@@ -46,6 +48,8 @@ pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
 fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
     lex_string(text, pos)
         .or(lex_num(text, pos))
+        .or(lex_bool(text, pos))
+        .or(lex_null(text, pos))
         .or(lex_lcurly(text, pos))
         .or(lex_rcurly(text, pos))
         .or(lex_lsquare(text, pos))
@@ -58,6 +62,11 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
 fn lex_string(text: &str, pos: usize) -> Option<(Token, usize)> {
     let pat = Regex::new(r#"^"[^"\n]+""#).unwrap();
     let (token, pos) = lex_pattern(text, pos, &pat)?;
+    let token = token
+        .strip_prefix("\"")
+        .unwrap()
+        .strip_suffix("\"")
+        .unwrap();
     Some((Token::String(token), pos))
 }
 
@@ -65,6 +74,18 @@ fn lex_num(text: &str, pos: usize) -> Option<(Token, usize)> {
     let pat = Regex::new(r"^(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))").unwrap();
     let (token, pos) = lex_pattern(text, pos, &pat)?;
     Some((Token::Num(token), pos))
+}
+
+fn lex_bool(text: &str, pos: usize) -> Option<(Token, usize)> {
+    let pat = Regex::new(r"^(true|false)").unwrap();
+    let (token, pos) = lex_pattern(text, pos, &pat)?;
+    Some((Token::Bool(token.parse().ok()?), pos))
+}
+
+fn lex_null(text: &str, pos: usize) -> Option<(Token, usize)> {
+    let pat = Regex::new(r"^null").unwrap();
+    let (_, pos) = lex_pattern(text, pos, &pat)?;
+    Some((Token::Null, pos))
 }
 
 fn lex_lcurly(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -129,9 +150,10 @@ mod tests {
         {
             "name": "zahash",
             "age": 24,
-            "hobbies": ["🦀", 42],
+            "hobbies": ["🦀", 42, false],
             "nested": {
-                "life": "42"
+                "life": "42",
+                "not_found": null,
             }
         }
         "#)?
