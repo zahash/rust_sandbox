@@ -1,10 +1,11 @@
 use crate::lex::*;
 
-#[derive(Debug, PartialEq)]
-pub enum Expr<'symbol> {
+#[derive(Debug, PartialEq, Clone)]
+pub enum Expr<'text> {
     Num(f64),
-    Symbol(&'symbol str),
-    List(Vec<Expr<'symbol>>),
+    String(&'text str),
+    Ident(&'text str),
+    List(Vec<Expr<'text>>),
 }
 
 #[derive(Debug)]
@@ -13,7 +14,7 @@ pub enum ParseError {
     SyntaxError(usize),
 }
 
-pub fn parse<'symbol>(tokens: &[Token<'symbol>]) -> Result<Expr<'symbol>, ParseError> {
+pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<Expr<'text>, ParseError> {
     let (expr, pos) = parse_expr(&tokens, 0)?;
     match pos >= tokens.len() {
         true => Ok(expr),
@@ -21,10 +22,10 @@ pub fn parse<'symbol>(tokens: &[Token<'symbol>]) -> Result<Expr<'symbol>, ParseE
     }
 }
 
-fn parse_expr<'symbol>(
-    tokens: &[Token<'symbol>],
+fn parse_expr<'text>(
+    tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Expr<'symbol>, usize), ParseError> {
+) -> Result<(Expr<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(&Token::LParen) => {
             let (exprs, pos) = parse_list(tokens, pos + 1)?;
@@ -33,16 +34,17 @@ fn parse_expr<'symbol>(
                 false => Err(ParseError::MismatchedParentheses(pos)),
             }
         }
-        Some(&Token::Ident(ident)) => Ok((Expr::Symbol(ident), pos + 1)),
+        Some(&Token::Ident(ident)) => Ok((Expr::Ident(ident), pos + 1)),
+        Some(&Token::String(s)) => Ok((Expr::String(s), pos + 1)),
         Some(&Token::Num(n)) => Ok((Expr::Num(n), pos + 1)),
         _ => Err(ParseError::SyntaxError(pos)),
     }
 }
 
-fn parse_list<'symbol>(
-    tokens: &[Token<'symbol>],
+fn parse_list<'text>(
+    tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Vec<Expr<'symbol>>, usize), ParseError> {
+) -> Result<(Vec<Expr<'text>>, usize), ParseError> {
     let mut expressions = Vec::new();
     let mut new_pos = pos;
     while let Some(token) = tokens.get(new_pos) {
