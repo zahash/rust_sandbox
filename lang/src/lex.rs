@@ -7,8 +7,9 @@ use regex::Regex;
 pub enum Token<'text> {
     Ident(&'text str),
     String(&'text str),
+    Char(char),
     Whole(usize),
-    Float(f64),
+    Decimal(f64),
     Bool(bool),
     Null,
     LCurly,
@@ -21,16 +22,23 @@ pub enum Token<'text> {
     Colon,
     SemiColon,
     Plus,
+    PlusPlus,
     Hyphen,
+    HyphenHyphen,
     Asterisk,
     Slash,
+    Percent,
     Caret,
     Equals,
+    Ampersand,
+    Exclamation,
+    Tilde,
 }
 
 lazy_static! {
     static ref IDENT_REGEX: Regex = Regex::new(r#"^[A-Za-z_][A-Za-z0-9_]*"#).unwrap();
     static ref STRING_REGEX: Regex = Regex::new(r#"^"[^"\n]+""#).unwrap();
+    static ref CHAR_REGEX: Regex = Regex::new(r#"^'.'"#).unwrap();
     static ref WHOLE_REGEX: Regex = Regex::new(r"^[0-9]+").unwrap();
     static ref FLOAT_REGEX: Regex = Regex::new(r"^([0-9]+\.[0-9]+|[0-9]+\.|\.[0-9]+)").unwrap();
     static ref BOOL_REGEX: Regex = Regex::new(r"^(true|false)").unwrap();
@@ -79,7 +87,8 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_null(text, pos))
         .or(lex_ident(text, pos))
         .or(lex_string(text, pos))
-        .or(lex_float(text, pos))
+        .or(lex_char(text, pos))
+        .or(lex_decimal(text, pos))
         .or(lex_whole(text, pos))
         .or(lex_lcurly(text, pos))
         .or(lex_rcurly(text, pos))
@@ -90,12 +99,18 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_comma(text, pos))
         .or(lex_colon(text, pos))
         .or(lex_semicolon(text, pos))
+        .or(lex_plus_plus(text, pos))
         .or(lex_plus(text, pos))
+        .or(lex_hyphen_hyphen(text, pos))
         .or(lex_hyphen(text, pos))
         .or(lex_asterisk(text, pos))
         .or(lex_slash(text, pos))
+        .or(lex_percent(text, pos))
         .or(lex_caret(text, pos))
         .or(lex_equals(text, pos))
+        .or(lex_ampersand(text, pos))
+        .or(lex_exclamation(text, pos))
+        .or(lex_tilde(text, pos))
         .ok_or(InvalidToken { text, pos })
 }
 
@@ -114,14 +129,20 @@ fn lex_string(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::String(token), pos))
 }
 
+fn lex_char(text: &str, pos: usize) -> Option<(Token, usize)> {
+    let (token, pos) = lex_with_pattern(text, pos, &CHAR_REGEX)?;
+    let token = token.strip_prefix("'").unwrap().strip_suffix("'").unwrap();
+    Some((Token::Char(token.parse().ok()?), pos))
+}
+
 fn lex_whole(text: &str, pos: usize) -> Option<(Token, usize)> {
     let (token, pos) = lex_with_pattern(text, pos, &WHOLE_REGEX)?;
     Some((Token::Whole(token.parse().ok()?), pos))
 }
 
-fn lex_float(text: &str, pos: usize) -> Option<(Token, usize)> {
+fn lex_decimal(text: &str, pos: usize) -> Option<(Token, usize)> {
     let (token, pos) = lex_with_pattern(text, pos, &FLOAT_REGEX)?;
-    Some((Token::Float(token.parse().ok()?), pos))
+    Some((Token::Decimal(token.parse().ok()?), pos))
 }
 
 fn lex_bool(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -173,8 +194,16 @@ fn lex_plus(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Plus, lex_with_prefix(text, pos, "+")?))
 }
 
+fn lex_plus_plus(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::PlusPlus, lex_with_prefix(text, pos, "++")?))
+}
+
 fn lex_hyphen(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Hyphen, lex_with_prefix(text, pos, "-")?))
+}
+
+fn lex_hyphen_hyphen(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::HyphenHyphen, lex_with_prefix(text, pos, "--")?))
 }
 
 fn lex_asterisk(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -185,12 +214,28 @@ fn lex_slash(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Slash, lex_with_prefix(text, pos, "/")?))
 }
 
+fn lex_percent(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Percent, lex_with_prefix(text, pos, "%")?))
+}
+
 fn lex_caret(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Caret, lex_with_prefix(text, pos, "^")?))
 }
 
 fn lex_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Equals, lex_with_prefix(text, pos, "=")?))
+}
+
+fn lex_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Ampersand, lex_with_prefix(text, pos, "&")?))
+}
+
+fn lex_exclamation(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Exclamation, lex_with_prefix(text, pos, "!")?))
+}
+
+fn lex_tilde(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Tilde, lex_with_prefix(text, pos, "~")?))
 }
 
 fn lex_with_prefix<'text>(text: &'text str, pos: usize, prefix: &str) -> Option<usize> {
@@ -224,9 +269,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test() {
+    fn test_all() {
         let src = r#"
-        idEnt_123"🦀"123 123. .123 123.123 true false NULL{}[](),:;+-*/^=
+        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^=&!~
         "#;
 
         use Token::*;
@@ -237,10 +282,11 @@ mod tests {
                 vec![
                     Ident("idEnt_123"),
                     String("🦀"),
+                    Char('c'),
                     Whole(123),
-                    Float(123.0),
-                    Float(0.123),
-                    Float(123.123),
+                    Decimal(123.0),
+                    Decimal(0.123),
+                    Decimal(123.123),
                     Bool(true),
                     Bool(false),
                     Null,
@@ -253,14 +299,36 @@ mod tests {
                     Comma,
                     Colon,
                     SemiColon,
+                    PlusPlus,
                     Plus,
+                    HyphenHyphen,
                     Hyphen,
                     Asterisk,
                     Slash,
+                    Percent,
                     Caret,
-                    Equals
+                    Equals,
+                    Ampersand,
+                    Exclamation,
+                    Tilde
                 ]
             ),
+            Err(e) => assert!(false, "{}", e),
+        }
+    }
+
+    #[test]
+    fn test_c() {
+        let src = r#"
+
+        int main() {
+            char name[] = "zahash";
+            int age = 42;
+        }
+
+        "#;
+        match lex(src) {
+            Ok(tokens) => println!("{:#?}", tokens),
             Err(e) => assert!(false, "{}", e),
         }
     }
