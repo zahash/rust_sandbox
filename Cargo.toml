@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "ai",
     "api",
@@ -8,6 +9,7 @@ members = [
     "fraction",
     "game_of_life",
     "graph",
+    "lang",
     "loc",
     "marker_invariants",
     "nes",

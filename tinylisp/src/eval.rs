@@ -7,6 +7,7 @@ pub struct State<'text> {
     fns: HashMap<&'text str, Box<dyn Fn(&Expr<'text>) -> Expr<'text>>>,
 }
 
+#[allow(dead_code)]
 impl<'text> State<'text> {
     pub fn new() -> Self {
         Self {
@@ -42,12 +43,12 @@ impl<'text> Expr<'text> {
         match self {
             Expr::Ident(ident) => state.value_of(ident).ok_or(EvalError::IdentNotFound(ident)),
             Expr::List(list) => match list.as_slice() {
-                [Expr::Ident("lambda"), ] => todo!(),
+                [Expr::Ident("lambda")] => todo!(),
 
                 [Expr::Ident("define"), Expr::Ident(ident), val] => {
                     state.set_var(ident, val.clone());
                     Ok(val.clone())
-                },
+                }
 
                 [Expr::Ident(ident)] => {
                     state.value_of(ident).ok_or(EvalError::IdentNotFound(ident))
