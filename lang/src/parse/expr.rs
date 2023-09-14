@@ -1,17 +1,17 @@
 use crate::lex::*;
 
-pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError> {
-    match tokens.is_empty() {
-        true => Ok(Primary::Int(0).into()),
-        false => {
-            let (expr, pos) = parse_expr(&tokens, 0)?;
-            match pos == tokens.len() {
-                true => Ok(expr),
-                false => Err(ParseError::SyntaxError(pos)),
-            }
-        }
-    }
-}
+// pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError> {
+//     match tokens.is_empty() {
+//         true => Ok(Primary::Int(0).into()),
+//         false => {
+//             let (expr, pos) = parse_expr(&tokens, 0)?;
+//             match pos == tokens.len() {
+//                 true => Ok(expr),
+//                 false => Err(ParseError::SyntaxError(pos)),
+//             }
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub enum ParseError {
@@ -198,7 +198,7 @@ impl<'text> std::fmt::Display for ConditionalExpr<'text> {
         match self {
             ConditionalExpr::LogicalOrExpr(expr) => write!(f, "{}", expr),
             ConditionalExpr::Ternary { test, pass, fail } => {
-                write!(f, "( {} ? {} : {} )", test, pass, fail)
+                write!(f, "({} ? {} : {})", test, pass, fail)
             }
         }
     }
@@ -750,25 +750,6 @@ pub fn parse_postfix_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(PostfixExpr<'text>, usize), ParseError> {
-    // let (expr, mut pos) = parse_primary_expr(tokens, pos)?;
-    // let mut expr = expr.into();
-
-    // while let Some(token) = tokens.get(pos) {
-    //     match token {
-    //         Token::PlusPlus => {
-    //             expr = PostfixExpr::PostIncr(Box::new(expr));
-    //             pos += 1;
-    //         }
-    //         Token::HyphenHyphen => {
-    //             expr = PostfixExpr::PostDecr(Box::new(expr));
-    //             pos += 1;
-    //         }
-    //         _ => break,
-    //     }
-    // }
-
-    // Ok((expr, pos))
-
     let (expr, pos) = parse_primary_expr(tokens, pos)?;
 
     match tokens.get(pos) {
@@ -845,7 +826,7 @@ mod tests {
     #[test]
     fn test_all() {
         let tokens = lex(r#"
-            a >> 10
+            a = b == c ? d : e
         "#)
         .expect("** LEX ERROR");
 
