@@ -65,7 +65,61 @@ pub fn parse_assignment_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
-    todo!()
+    if let Ok((unary, pos)) = parse_unary_expr(tokens, pos) {
+        if let Some(op) = tokens.get(pos) {
+            let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+
+            let unary = unary.into();
+            let rhs = Box::new(rhs);
+
+            if op == &Token::Equals {
+                return Ok((AssignmentExpr::Assign(unary, rhs), pos));
+            }
+
+            if op == &Token::AsteriskEquals {
+                return Ok((AssignmentExpr::MulAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::SlashEquals {
+                return Ok((AssignmentExpr::DivAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::PercentEquals {
+                return Ok((AssignmentExpr::ModAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::PlusEquals {
+                return Ok((AssignmentExpr::AddAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::HyphenEquals {
+                return Ok((AssignmentExpr::SubAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::LTLTEquals {
+                return Ok((AssignmentExpr::ShiftLeftAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::GTGTEquals {
+                return Ok((AssignmentExpr::ShiftRightAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::AmpersandEquals {
+                return Ok((AssignmentExpr::BitAndAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::CaretEquals {
+                return Ok((AssignmentExpr::XORAssign(unary, rhs), pos));
+            }
+
+            if op == &Token::PipeEquals {
+                return Ok((AssignmentExpr::BitOrAssign(unary, rhs), pos));
+            }
+        }
+    }
+
+    let (expr, pos) = parse_conditional_expr(tokens, pos)?;
+    Ok((expr.into(), pos))
 }
 
 impl<'text> From<ConditionalExpr<'text>> for AssignmentExpr<'text> {
@@ -109,7 +163,28 @@ pub fn parse_conditional_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(ConditionalExpr<'text>, usize), ParseError> {
-    todo!()
+    let (test, mut pos) = parse_logicalor_expr(tokens, pos)?;
+
+    if let Some(Token::Question) = tokens.get(pos) {
+        let (pass, next_pos) = parse_expr(tokens, pos + 1)?;
+        pos = next_pos;
+
+        if let Some(Token::Colon) = tokens.get(pos) {
+            let (fail, next_pos) = parse_conditional_expr(tokens, pos + 1)?;
+            pos = next_pos;
+
+            return Ok((
+                ConditionalExpr::Ternary {
+                    test,
+                    pass: Box::new(pass),
+                    fail: Box::new(fail),
+                },
+                pos,
+            ));
+        }
+    }
+
+    Ok((test.into(), pos))
 }
 
 impl<'text> From<LogicalOrExpr<'text>> for ConditionalExpr<'text> {
@@ -139,7 +214,19 @@ pub fn parse_logicalor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(LogicalOrExpr<'text>, usize), ParseError> {
-    todo!()
+    let (lhs, mut pos) = parse_logicaland_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::PipePipe => {
+                let (rhs, next_pos) = parse_logicaland_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = LogicalOrExpr::LogicalOr(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<LogicalAndExpr<'text>> for LogicalOrExpr<'text> {
@@ -167,7 +254,19 @@ pub fn parse_logicaland_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(LogicalAndExpr<'text>, usize), ParseError> {
-    todo!()
+    let (lhs, mut pos) = parse_bitor_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::AmpersandAmpersand => {
+                let (rhs, next_pos) = parse_bitor_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = LogicalAndExpr::LogicalAnd(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<BitOrExpr<'text>> for LogicalAndExpr<'text> {
@@ -746,192 +845,15 @@ mod tests {
     #[test]
     fn test_all() {
         let tokens = lex(r#"
-            --ab--
+            a >> 10
         "#)
         .expect("** LEX ERROR");
 
         println!("{:?}", tokens);
 
-        match parse_unary_expr(&tokens, 0) {
-            Ok((expr, pos)) => println!("{} {} {:?}", tokens.len(), pos, expr),
+        match parse_expr(&tokens, 0) {
+            Ok((expr, pos)) => println!("{} {} {}", tokens.len(), pos, expr),
             Err(e) => assert!(false, "{:?}", e),
         }
     }
 }
-
-// ==================================================================================================================
-
-// pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<AssignmentExpr<'text>, ParseError> {
-//     match tokens.is_empty() {
-//         true => Err(ParseError::EmptyInput),
-//         false => {
-//             let (expr, pos) = parse_expr(&tokens, 0)?;
-//             match pos == tokens.len() {
-//                 true => Ok(expr),
-//                 false => Err(ParseError::SyntaxError(pos)),
-//             }
-//         }
-//     }
-// }
-
-// fn parse_expr<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
-//     parse_assignment(tokens, pos)
-// }
-
-// fn parse_assignment<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
-//     if let Some(&Token::Ident(ident)) = tokens.get(pos) {
-//         if let Some(&Token::Equals) = tokens.get(pos + 1) {
-//             let (rhs, pos) = parse_assignment(tokens, pos + 2)?;
-//             return Ok((AssignmentExpr::Assign(Ident(ident), Box::new(rhs)), pos));
-//         }
-//     }
-
-//     let (expr, pos) = parse_additive(tokens, pos)?;
-//     Ok((AssignmentExpr::AdditiveExpr(expr), pos))
-// }
-
-// fn parse_additive<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(AdditiveExpr<'text>, usize), ParseError> {
-//     let (lhs, mut pos) = parse_multiplicative(tokens, pos)?;
-//     let mut lhs = AdditiveExpr::MultiplicativeExpr(lhs);
-//     while let Some(token) = tokens.get(pos) {
-//         match token {
-//             &Token::Plus => {
-//                 let (rhs, next_pos) = parse_multiplicative(tokens, pos + 1)?;
-//                 pos = next_pos;
-//                 lhs = AdditiveExpr::Add(Box::new(lhs), rhs);
-//             }
-//             &Token::Hyphen => {
-//                 let (rhs, next_pos) = parse_multiplicative(tokens, pos + 1)?;
-//                 pos = next_pos;
-//                 lhs = AdditiveExpr::Sub(Box::new(lhs), rhs);
-//             }
-//             _ => break,
-//         }
-//     }
-//     Ok((lhs, pos))
-// }
-
-// fn parse_multiplicative<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(MultiplicativeExpr<'text>, usize), ParseError> {
-//     let (lhs, mut pos) = parse_exponential(tokens, pos)?;
-//     let mut lhs = MultiplicativeExpr::ExponentialExpr(lhs);
-//     while let Some(token) = tokens.get(pos) {
-//         match token {
-//             &Token::Asterisk => {
-//                 let (rhs, next_pos) = parse_exponential(tokens, pos + 1)?;
-//                 pos = next_pos;
-//                 lhs = MultiplicativeExpr::Mul(Box::new(lhs), rhs);
-//             }
-//             &Token::Slash => {
-//                 let (rhs, next_pos) = parse_exponential(tokens, pos + 1)?;
-//                 pos = next_pos;
-//                 lhs = MultiplicativeExpr::Div(Box::new(lhs), rhs);
-//             }
-//             _ => break,
-//         }
-//     }
-//     Ok((lhs, pos))
-// }
-
-// fn parse_exponential<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(ExponentialExpr<'text>, usize), ParseError> {
-//     let (lhs, pos) = parse_primary(tokens, pos)?;
-//     if let Some(token) = tokens.get(pos) {
-//         if token == &Token::Caret {
-//             let (rhs, pos) = parse_exponential(tokens, pos + 1)?;
-//             return Ok((ExponentialExpr::Pow(lhs, Box::new(rhs)), pos));
-//         }
-//     }
-//     Ok((ExponentialExpr::Primary(lhs), pos))
-// }
-
-// fn parse_primary<'text>(
-//     tokens: &[Token<'text>],
-//     pos: usize,
-// ) -> Result<(Primary<'text>, usize), ParseError> {
-//     match tokens.get(pos) {
-//         Some(&Token::LParen) => {
-//             let (expr, pos) = parse_expr(tokens, pos + 1)?;
-//             match tokens.get(pos) == Some(&Token::RParen) {
-//                 true => Ok((Primary::Parens(Box::new(expr)), pos + 1)),
-//                 false => Err(ParseError::MismatchedParentheses(pos)),
-//             }
-//         }
-//         Some(&Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
-//         Some(&Token::Float(num)) => Ok((Primary::Num(num), pos + 1)),
-//         Some(&Token::Hyphen) => {
-//             let (expr, pos) = parse_primary(tokens, pos + 1)?;
-//             Ok((Primary::UnarySub(Box::new(expr)), pos))
-//         }
-//         None => Err(ParseError::SyntaxError(pos)),
-//         _ => Err(ParseError::UnexpectedToken(pos)),
-//     }
-// }
-
-// impl<'text> std::fmt::Display for AssignmentExpr<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             AssignmentExpr::Assign(lhs, rhs) => write!(f, "({}={})", lhs, rhs),
-//             AssignmentExpr::AdditiveExpr(expr) => write!(f, "{}", expr),
-//         }
-//     }
-// }
-
-// impl<'text> std::fmt::Display for Ident<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         write!(f, "{}", self.0)
-//     }
-// }
-
-// impl<'text> std::fmt::Display for AdditiveExpr<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             AdditiveExpr::Add(lhs, rhs) => write!(f, "({}+{})", lhs, rhs),
-//             AdditiveExpr::Sub(lhs, rhs) => write!(f, "({}-{})", lhs, rhs),
-//             AdditiveExpr::MultiplicativeExpr(expr) => write!(f, "{}", expr),
-//         }
-//     }
-// }
-
-// impl<'text> std::fmt::Display for MultiplicativeExpr<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             MultiplicativeExpr::Mul(lhs, rhs) => write!(f, "({}*{})", lhs, rhs),
-//             MultiplicativeExpr::Div(lhs, rhs) => write!(f, "({}/{})", lhs, rhs),
-//             MultiplicativeExpr::ExponentialExpr(expr) => write!(f, "{}", expr),
-//         }
-//     }
-// }
-
-// impl<'text> std::fmt::Display for ExponentialExpr<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             ExponentialExpr::Pow(lhs, rhs) => write!(f, "({}^{})", lhs, rhs),
-//             ExponentialExpr::Primary(primary) => write!(f, "{}", primary),
-//         }
-//     }
-// }
-
-// impl<'text> std::fmt::Display for Primary<'text> {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             Primary::Parens(expr) => write!(f, "({})", expr),
-//             Primary::Num(num) => write!(f, "{}", num),
-//             Primary::Ident(ident) => write!(f, "{}", ident),
-//             Primary::UnarySub(num) => write!(f, "{}", num),
-//         }
-//     }
-// }

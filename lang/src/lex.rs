@@ -28,11 +28,22 @@ pub enum Token<'text> {
     Percent,
     Caret,
     Equals,
+    AsteriskEquals,
+    SlashEquals,
+    PercentEquals,
+    PlusEquals,
+    HyphenEquals,
+    LTLTEquals,
+    GTGTEquals,
+    AmpersandEquals,
+    CaretEquals,
+    PipeEquals,
     Ampersand,
     AmpersandAmpersand,
     Pipe,
     PipePipe,
     Exclamation,
+    Question,
     Tilde,
     LT,
     GT,
@@ -102,23 +113,34 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_colon(text, pos))
         .or(lex_semicolon(text, pos))
         .or(lex_plus_plus(text, pos))
+        .or(lex_plus_equals(text, pos))
         .or(lex_plus(text, pos))
         .or(lex_hyphen_hyphen(text, pos))
+        .or(lex_hyphen_equals(text, pos))
         .or(lex_hyphen(text, pos))
+        .or(lex_asterisk_equals(text, pos))
         .or(lex_asterisk(text, pos))
+        .or(lex_slash_equals(text, pos))
         .or(lex_slash(text, pos))
+        .or(lex_percent_equals(text, pos))
         .or(lex_percent(text, pos))
+        .or(lex_caret_equals(text, pos))
         .or(lex_caret(text, pos))
         .or(lex_eq(text, pos))
         .or(lex_ne(text, pos))
         .or(lex_equals(text, pos))
         .or(lex_ampersand_ampersand(text, pos))
+        .or(lex_ampersand_equals(text, pos))
         .or(lex_ampersand(text, pos))
         .or(lex_pipe_pipe(text, pos))
+        .or(lex_pipe_equals(text, pos))
         .or(lex_pipe(text, pos))
         .or(lex_exclamation(text, pos))
+        .or(lex_question(text, pos))
         .or(lex_tilde(text, pos))
+        .or(lex_ltlt_equals(text, pos))
         .or(lex_ltlt(text, pos))
+        .or(lex_gtgt_equals(text, pos))
         .or(lex_gtgt(text, pos))
         .or(lex_le(text, pos))
         .or(lex_ge(text, pos))
@@ -239,6 +261,46 @@ fn lex_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Equals, lex_with_prefix(text, pos, "=")?))
 }
 
+fn lex_asterisk_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::AsteriskEquals, lex_with_prefix(text, pos, "*=")?))
+}
+
+fn lex_slash_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::SlashEquals, lex_with_prefix(text, pos, "/=")?))
+}
+
+fn lex_percent_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::PercentEquals, lex_with_prefix(text, pos, "%=")?))
+}
+
+fn lex_plus_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::PlusEquals, lex_with_prefix(text, pos, "+=")?))
+}
+
+fn lex_hyphen_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::HyphenEquals, lex_with_prefix(text, pos, "-=")?))
+}
+
+fn lex_ltlt_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::LTLTEquals, lex_with_prefix(text, pos, "<<=")?))
+}
+
+fn lex_gtgt_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::GTGTEquals, lex_with_prefix(text, pos, ">>=")?))
+}
+
+fn lex_ampersand_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::AmpersandEquals, lex_with_prefix(text, pos, "&=")?))
+}
+
+fn lex_caret_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::CaretEquals, lex_with_prefix(text, pos, "^=")?))
+}
+
+fn lex_pipe_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::PipeEquals, lex_with_prefix(text, pos, "|=")?))
+}
+
 fn lex_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Ampersand, lex_with_prefix(text, pos, "&")?))
 }
@@ -257,6 +319,10 @@ fn lex_pipe_pipe(text: &str, pos: usize) -> Option<(Token, usize)> {
 
 fn lex_exclamation(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Exclamation, lex_with_prefix(text, pos, "!")?))
+}
+
+fn lex_question(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Question, lex_with_prefix(text, pos, "?")?))
 }
 
 fn lex_tilde(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -311,7 +377,7 @@ fn lex_with_pattern<'text>(
         if let Some(m) = pat.find(slice) {
             assert!(
                 m.start() == 0,
-                "put carat ^ to match the text from the `pos` (text is sliced to start from pos)"
+                "put caret ^ to match the text from the `pos` (text is sliced to start from pos)"
             );
             return Some((m.as_str(), pos + m.end()));
         }
@@ -324,19 +390,18 @@ fn lex_with_pattern<'text>(
 mod tests {
 
     use super::*;
-    // use pretty_assertions::assert_eq;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_all() {
         let src = r#"
-        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^!====&&&|||!~<><=>=<<>>
+        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
 
         use Token::*;
 
         match lex(src) {
             Ok(tokens) => assert_eq!(
-                tokens,
                 vec![
                     Ident("idEnt_123"),
                     String("🦀"),
@@ -367,20 +432,32 @@ mod tests {
                     Caret,
                     NE,
                     EQ,
+                    AsteriskEquals,
+                    SlashEquals,
+                    PercentEquals,
+                    PlusEquals,
+                    HyphenEquals,
+                    AmpersandEquals,
+                    CaretEquals,
+                    PipeEquals,
                     Equals,
                     AmpersandAmpersand,
                     Ampersand,
                     PipePipe,
                     Pipe,
                     Exclamation,
+                    Question,
                     Tilde,
-                    LT,
-                    GT,
-                    LE,
-                    GE,
                     LTLT,
+                    LTLTEquals,
+                    LE,
+                    LT,
+                    GTGTEquals,
                     GTGT,
-                ]
+                    GE,
+                    GT
+                ],
+                tokens
             ),
 
             Err(e) => assert!(false, "{}", &src[e.pos..]),
