@@ -1,6 +1,33 @@
 use crate::lex::*;
 
+pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError> {
+    match tokens.is_empty() {
+        true => Ok(Primary::Int(0).into()),
+        false => {
+            let (expr, pos) = parse_expr(&tokens, 0)?;
+            match pos == tokens.len() {
+                true => Ok(expr),
+                false => Err(ParseError::SyntaxError(pos)),
+            }
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    UnexpectedToken(usize),
+    MismatchedParentheses(usize),
+    SyntaxError(usize),
+}
+
 type Expr<'text> = AssignmentExpr<'text>;
+
+pub fn parse_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Expr<'text>, usize), ParseError> {
+    parse_assignment_expr(tokens, pos)
+}
 
 impl<'text> From<Primary<'text>> for Expr<'text> {
     fn from(value: Primary<'text>) -> Self {
@@ -32,6 +59,13 @@ pub enum AssignmentExpr<'text> {
     BitAndAssign(UnaryExpr<'text>, Box<AssignmentExpr<'text>>),
     XORAssign(UnaryExpr<'text>, Box<AssignmentExpr<'text>>),
     BitOrAssign(UnaryExpr<'text>, Box<AssignmentExpr<'text>>),
+}
+
+pub fn parse_assignment_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
+    todo!()
 }
 
 impl<'text> From<ConditionalExpr<'text>> for AssignmentExpr<'text> {
@@ -71,6 +105,13 @@ pub enum ConditionalExpr<'text> {
     },
 }
 
+pub fn parse_conditional_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ConditionalExpr<'text>, usize), ParseError> {
+    todo!()
+}
+
 impl<'text> From<LogicalOrExpr<'text>> for ConditionalExpr<'text> {
     fn from(value: LogicalOrExpr<'text>) -> Self {
         ConditionalExpr::LogicalOrExpr(value)
@@ -94,6 +135,13 @@ pub enum LogicalOrExpr<'text> {
     LogicalOr(Box<LogicalOrExpr<'text>>, LogicalAndExpr<'text>),
 }
 
+pub fn parse_logicalor_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(LogicalOrExpr<'text>, usize), ParseError> {
+    todo!()
+}
+
 impl<'text> From<LogicalAndExpr<'text>> for LogicalOrExpr<'text> {
     fn from(value: LogicalAndExpr<'text>) -> Self {
         LogicalOrExpr::LogicalAndExpr(value)
@@ -113,6 +161,13 @@ impl<'text> std::fmt::Display for LogicalOrExpr<'text> {
 pub enum LogicalAndExpr<'text> {
     BitOrExpr(BitOrExpr<'text>),
     LogicalAnd(Box<LogicalAndExpr<'text>>, BitOrExpr<'text>),
+}
+
+pub fn parse_logicaland_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(LogicalAndExpr<'text>, usize), ParseError> {
+    todo!()
 }
 
 impl<'text> From<BitOrExpr<'text>> for LogicalAndExpr<'text> {
@@ -136,6 +191,25 @@ pub enum BitOrExpr<'text> {
     BitOr(Box<BitOrExpr<'text>>, XORExpr<'text>),
 }
 
+pub fn parse_bitor_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(BitOrExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_xor_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::Pipe => {
+                let (rhs, next_pos) = parse_xor_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = BitOrExpr::BitOr(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
+}
+
 impl<'text> From<XORExpr<'text>> for BitOrExpr<'text> {
     fn from(value: XORExpr<'text>) -> Self {
         BitOrExpr::XORExpr(value)
@@ -155,6 +229,25 @@ impl<'text> std::fmt::Display for BitOrExpr<'text> {
 pub enum XORExpr<'text> {
     BitAndExpr(BitAndExpr<'text>),
     XOR(Box<XORExpr<'text>>, BitAndExpr<'text>),
+}
+
+pub fn parse_xor_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(XORExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_bitand_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::Caret => {
+                let (rhs, next_pos) = parse_bitand_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = XORExpr::XOR(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<BitAndExpr<'text>> for XORExpr<'text> {
@@ -178,6 +271,25 @@ pub enum BitAndExpr<'text> {
     BitAnd(Box<BitAndExpr<'text>>, EqualityExpr<'text>),
 }
 
+pub fn parse_bitand_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(BitAndExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_equality_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::Ampersand => {
+                let (rhs, next_pos) = parse_equality_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = BitAndExpr::BitAnd(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
+}
+
 impl<'text> From<EqualityExpr<'text>> for BitAndExpr<'text> {
     fn from(value: EqualityExpr<'text>) -> Self {
         BitAndExpr::EqualityExpr(value)
@@ -198,6 +310,30 @@ pub enum EqualityExpr<'text> {
     ComparisionExpr(ComparisionExpr<'text>),
     EQ(Box<EqualityExpr<'text>>, ComparisionExpr<'text>),
     NE(Box<EqualityExpr<'text>>, ComparisionExpr<'text>),
+}
+
+pub fn parse_equality_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(EqualityExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_comparision_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::EQ => {
+                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = EqualityExpr::EQ(Box::new(lhs), rhs);
+            }
+            Token::NE => {
+                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = EqualityExpr::NE(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<ComparisionExpr<'text>> for EqualityExpr<'text> {
@@ -225,6 +361,40 @@ pub enum ComparisionExpr<'text> {
     GE(Box<ComparisionExpr<'text>>, ShiftExpr<'text>),
 }
 
+pub fn parse_comparision_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ComparisionExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_shift_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::LT => {
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ComparisionExpr::LT(Box::new(lhs), rhs);
+            }
+            Token::GT => {
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ComparisionExpr::GT(Box::new(lhs), rhs);
+            }
+            Token::LE => {
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ComparisionExpr::LE(Box::new(lhs), rhs);
+            }
+            Token::GE => {
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ComparisionExpr::GE(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
+}
+
 impl<'text> From<ShiftExpr<'text>> for ComparisionExpr<'text> {
     fn from(value: ShiftExpr<'text>) -> Self {
         ComparisionExpr::ShiftExpr(value)
@@ -250,6 +420,30 @@ pub enum ShiftExpr<'text> {
     ShiftRight(Box<ShiftExpr<'text>>, AdditiveExpr<'text>),
 }
 
+pub fn parse_shift_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ShiftExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_additive_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::LTLT => {
+                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ShiftExpr::ShiftLeft(Box::new(lhs), rhs);
+            }
+            Token::GTGT => {
+                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = ShiftExpr::ShiftRight(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
+}
+
 impl<'text> From<AdditiveExpr<'text>> for ShiftExpr<'text> {
     fn from(value: AdditiveExpr<'text>) -> Self {
         ShiftExpr::AdditiveExpr(value)
@@ -271,6 +465,30 @@ pub enum AdditiveExpr<'text> {
     MultiplicativeExpr(MultiplicativeExpr<'text>),
     Add(Box<AdditiveExpr<'text>>, MultiplicativeExpr<'text>),
     Sub(Box<AdditiveExpr<'text>>, MultiplicativeExpr<'text>),
+}
+
+pub fn parse_additive_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(AdditiveExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_multiplicative_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::Plus => {
+                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = AdditiveExpr::Add(Box::new(lhs), rhs);
+            }
+            Token::Hyphen => {
+                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = AdditiveExpr::Sub(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<MultiplicativeExpr<'text>> for AdditiveExpr<'text> {
@@ -295,6 +513,35 @@ pub enum MultiplicativeExpr<'text> {
     Mul(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
     Div(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
     Mod(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
+}
+
+pub fn parse_multiplicative_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(MultiplicativeExpr<'text>, usize), ParseError> {
+    let (lhs, mut pos) = parse_unary_expr(tokens, pos)?;
+    let mut lhs = lhs.into();
+    while let Some(token) = tokens.get(pos) {
+        match token {
+            Token::Asterisk => {
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = MultiplicativeExpr::Mul(Box::new(lhs), rhs);
+            }
+            Token::Slash => {
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = MultiplicativeExpr::Div(Box::new(lhs), rhs);
+            }
+            Token::Percent => {
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                pos = next_pos;
+                lhs = MultiplicativeExpr::Mod(Box::new(lhs), rhs);
+            }
+            _ => break,
+        }
+    }
+    Ok((lhs, pos))
 }
 
 impl<'text> From<UnaryExpr<'text>> for MultiplicativeExpr<'text> {
@@ -327,6 +574,50 @@ pub enum UnaryExpr<'text> {
     Not(Box<UnaryExpr<'text>>),
 }
 
+pub fn parse_unary_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(UnaryExpr<'text>, usize), ParseError> {
+    match tokens.get(pos) {
+        Some(Token::PlusPlus) => {
+            let (expr, pos) = parse_postfix_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::PreIncr(Box::new(expr.into())), pos))
+        }
+        Some(Token::HyphenHyphen) => {
+            let (expr, pos) = parse_postfix_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::PreDecr(Box::new(expr.into())), pos))
+        }
+        Some(Token::Ampersand) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::Ref(Box::new(expr)), pos))
+        }
+        Some(Token::Asterisk) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::Deref(Box::new(expr)), pos))
+        }
+        Some(Token::Plus) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::UnaryAdd(Box::new(expr)), pos))
+        }
+        Some(Token::Hyphen) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::UnarySub(Box::new(expr)), pos))
+        }
+        Some(Token::Tilde) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::OnesComplement(Box::new(expr)), pos))
+        }
+        Some(Token::Exclamation) => {
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            Ok((UnaryExpr::Not(Box::new(expr)), pos))
+        }
+        _ => {
+            let (expr, pos) = parse_postfix_expr(tokens, pos)?;
+            Ok((expr.into(), pos))
+        }
+    }
+}
+
 impl<'text> From<PostfixExpr<'text>> for UnaryExpr<'text> {
     fn from(value: PostfixExpr<'text>) -> Self {
         UnaryExpr::PostfixExpr(value)
@@ -341,7 +632,7 @@ impl<'text> std::fmt::Display for UnaryExpr<'text> {
             UnaryExpr::PreDecr(expr) => write!(f, "--{}", expr),
             UnaryExpr::Ref(expr) => write!(f, "&{}", expr),
             UnaryExpr::Deref(expr) => write!(f, "*{}", expr),
-            UnaryExpr::UnaryAdd(expr) => write!(f, "+{}", expr),
+            UnaryExpr::UnaryAdd(expr) => write!(f, "{}", expr),
             UnaryExpr::UnarySub(expr) => write!(f, "-{}", expr),
             UnaryExpr::OnesComplement(expr) => write!(f, "~{}", expr),
             UnaryExpr::Not(expr) => write!(f, "!{}", expr),
@@ -354,6 +645,38 @@ pub enum PostfixExpr<'text> {
     Primary(Primary<'text>),
     PostIncr(Box<PostfixExpr<'text>>),
     PostDecr(Box<PostfixExpr<'text>>),
+}
+
+pub fn parse_postfix_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(PostfixExpr<'text>, usize), ParseError> {
+    // let (expr, mut pos) = parse_primary_expr(tokens, pos)?;
+    // let mut expr = expr.into();
+
+    // while let Some(token) = tokens.get(pos) {
+    //     match token {
+    //         Token::PlusPlus => {
+    //             expr = PostfixExpr::PostIncr(Box::new(expr));
+    //             pos += 1;
+    //         }
+    //         Token::HyphenHyphen => {
+    //             expr = PostfixExpr::PostDecr(Box::new(expr));
+    //             pos += 1;
+    //         }
+    //         _ => break,
+    //     }
+    // }
+
+    // Ok((expr, pos))
+
+    let (expr, pos) = parse_primary_expr(tokens, pos)?;
+
+    match tokens.get(pos) {
+        Some(Token::PlusPlus) => Ok((PostfixExpr::PostIncr(Box::new(expr.into())), pos + 1)),
+        Some(Token::HyphenHyphen) => Ok((PostfixExpr::PostDecr(Box::new(expr.into())), pos + 1)),
+        _ => Ok((expr.into(), pos)),
+    }
 }
 
 impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
@@ -382,47 +705,7 @@ pub enum Primary<'text> {
     Parens(Box<Expr<'text>>),
 }
 
-impl<'text> std::fmt::Display for Primary<'text> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Primary::Ident(ident) => write!(f, "{}", ident),
-            Primary::Int(n) => write!(f, "{}", n),
-            Primary::Char(c) => write!(f, "'{}'", c),
-            Primary::Float(n) => write!(f, "{}", n),
-            Primary::String(s) => write!(f, "\"{}\"", s),
-            Primary::Parens(expr) => write!(f, "({})", expr),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ParseError {
-    UnexpectedToken(usize),
-    MismatchedParentheses(usize),
-    SyntaxError(usize),
-}
-
-pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError> {
-    match tokens.is_empty() {
-        true => Ok(Primary::Int(0).into()),
-        false => {
-            let (expr, pos) = parse_expr(&tokens, 0)?;
-            match pos == tokens.len() {
-                true => Ok(expr),
-                false => Err(ParseError::SyntaxError(pos)),
-            }
-        }
-    }
-}
-
-pub fn parse_expr<'text>(
-    _tokens: &[Token<'text>],
-    _pos: usize,
-) -> Result<(Expr<'text>, usize), ParseError> {
-    todo!()
-}
-
-pub fn parse_primary<'text>(
+pub fn parse_primary_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(Primary<'text>, usize), ParseError> {
@@ -443,6 +726,19 @@ pub fn parse_primary<'text>(
     }
 }
 
+impl<'text> std::fmt::Display for Primary<'text> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Primary::Ident(ident) => write!(f, "{}", ident),
+            Primary::Int(n) => write!(f, "{}", n),
+            Primary::Char(c) => write!(f, "'{}'", c),
+            Primary::Float(n) => write!(f, "{}", n),
+            Primary::String(s) => write!(f, "\"{}\"", s),
+            Primary::Parens(expr) => write!(f, "({})", expr),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -450,11 +746,14 @@ mod tests {
     #[test]
     fn test_all() {
         let tokens = lex(r#"
-            10
+            --ab--
         "#)
         .expect("** LEX ERROR");
-        match parse_primary(&tokens, 0) {
-            Ok(expr) => println!("{:?}", expr),
+
+        println!("{:?}", tokens);
+
+        match parse_unary_expr(&tokens, 0) {
+            Ok((expr, pos)) => println!("{} {} {:?}", tokens.len(), pos, expr),
             Err(e) => assert!(false, "{:?}", e),
         }
     }

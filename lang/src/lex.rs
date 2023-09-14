@@ -29,8 +29,19 @@ pub enum Token<'text> {
     Caret,
     Equals,
     Ampersand,
+    AmpersandAmpersand,
+    Pipe,
+    PipePipe,
     Exclamation,
     Tilde,
+    LT,
+    GT,
+    LE,
+    GE,
+    EQ,
+    NE,
+    LTLT,
+    GTGT,
 }
 
 lazy_static! {
@@ -98,10 +109,21 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_slash(text, pos))
         .or(lex_percent(text, pos))
         .or(lex_caret(text, pos))
+        .or(lex_eq(text, pos))
+        .or(lex_ne(text, pos))
         .or(lex_equals(text, pos))
+        .or(lex_ampersand_ampersand(text, pos))
         .or(lex_ampersand(text, pos))
+        .or(lex_pipe_pipe(text, pos))
+        .or(lex_pipe(text, pos))
         .or(lex_exclamation(text, pos))
         .or(lex_tilde(text, pos))
+        .or(lex_ltlt(text, pos))
+        .or(lex_gtgt(text, pos))
+        .or(lex_le(text, pos))
+        .or(lex_ge(text, pos))
+        .or(lex_lt(text, pos))
+        .or(lex_gt(text, pos))
         .ok_or(InvalidToken { pos })
 }
 
@@ -221,12 +243,56 @@ fn lex_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Ampersand, lex_with_prefix(text, pos, "&")?))
 }
 
+fn lex_ampersand_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::AmpersandAmpersand, lex_with_prefix(text, pos, "&&")?))
+}
+
+fn lex_pipe(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Pipe, lex_with_prefix(text, pos, "|")?))
+}
+
+fn lex_pipe_pipe(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::PipePipe, lex_with_prefix(text, pos, "||")?))
+}
+
 fn lex_exclamation(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Exclamation, lex_with_prefix(text, pos, "!")?))
 }
 
 fn lex_tilde(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Tilde, lex_with_prefix(text, pos, "~")?))
+}
+
+fn lex_lt(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::LT, lex_with_prefix(text, pos, "<")?))
+}
+
+fn lex_gt(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::GT, lex_with_prefix(text, pos, ">")?))
+}
+
+fn lex_le(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::LE, lex_with_prefix(text, pos, "<=")?))
+}
+
+fn lex_ge(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::GE, lex_with_prefix(text, pos, ">=")?))
+}
+
+fn lex_eq(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::EQ, lex_with_prefix(text, pos, "==")?))
+}
+
+fn lex_ne(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::NE, lex_with_prefix(text, pos, "!=")?))
+}
+
+fn lex_ltlt(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::LTLT, lex_with_prefix(text, pos, "<<")?))
+}
+
+fn lex_gtgt(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::GTGT, lex_with_prefix(text, pos, ">>")?))
 }
 
 fn lex_with_prefix<'text>(text: &'text str, pos: usize, prefix: &str) -> Option<usize> {
@@ -258,12 +324,12 @@ fn lex_with_pattern<'text>(
 mod tests {
 
     use super::*;
-    use pretty_assertions::assert_eq;
+    // use pretty_assertions::assert_eq;
 
     #[test]
     fn test_all() {
         let src = r#"
-        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^=&!~
+        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^!====&&&|||!~<><=>=<<>>
         "#;
 
         use Token::*;
@@ -299,10 +365,21 @@ mod tests {
                     Slash,
                     Percent,
                     Caret,
+                    NE,
+                    EQ,
                     Equals,
+                    AmpersandAmpersand,
                     Ampersand,
+                    PipePipe,
+                    Pipe,
                     Exclamation,
-                    Tilde
+                    Tilde,
+                    LT,
+                    GT,
+                    LE,
+                    GE,
+                    LTLT,
+                    GTGT,
                 ]
             ),
 
