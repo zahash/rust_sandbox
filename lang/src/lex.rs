@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use lazy_static::lazy_static;
 use regex::Regex;
 
@@ -45,15 +43,8 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct InvalidToken<'text> {
-    pub text: &'text str,
+pub struct InvalidToken {
     pub pos: usize,
-}
-
-impl<'text> Display for InvalidToken<'text> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.text[self.pos..])
-    }
 }
 
 pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
@@ -111,7 +102,7 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_ampersand(text, pos))
         .or(lex_exclamation(text, pos))
         .or(lex_tilde(text, pos))
-        .ok_or(InvalidToken { text, pos })
+        .ok_or(InvalidToken { pos })
 }
 
 fn lex_ident(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -267,6 +258,7 @@ fn lex_with_pattern<'text>(
 mod tests {
 
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_all() {
@@ -313,7 +305,8 @@ mod tests {
                     Tilde
                 ]
             ),
-            Err(e) => assert!(false, "{}", e),
+
+            Err(e) => assert!(false, "{}", &src[e.pos..]),
         }
     }
 
@@ -329,7 +322,7 @@ mod tests {
         "#;
         match lex(src) {
             Ok(tokens) => println!("{:#?}", tokens),
-            Err(e) => assert!(false, "{}", e),
+            Err(e) => assert!(false, "{}", &src[e.pos..]),
         }
     }
 }

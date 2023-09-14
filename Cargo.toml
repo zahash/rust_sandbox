@@ -13,6 +13,7 @@ members = [
     "loc",
     "marker_invariants",
     "nes",
+    "padlock",
     "random_words",
     "run",
     "sat",
