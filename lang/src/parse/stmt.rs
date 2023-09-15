@@ -7,9 +7,9 @@ use std::{
 
 #[derive(Debug)]
 pub enum Stmt<'text> {
+    Labeled(LabeledStmt<'text>),
     EmptyStmt,
     Expr(Expr<'text>),
-    Labeled(LabeledStmt<'text>),
     Compound(Vec<Stmt<'text>>),
     Selection(SelectionStmt<'text>),
     Iteration(IterationStmt<'text>),
@@ -21,6 +21,7 @@ pub fn parse_stmt<'text>(
     pos: usize,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     for parser in [
+        parse_labeled_ident_stmt,
         parse_empty_stmt,
         parse_expr_stmt,
         parse_compound_stmt,
@@ -41,6 +42,24 @@ pub fn parse_stmt<'text>(
     }
 
     Err(ParseError::InvalidStatement(pos))
+}
+
+#[derive(Debug)]
+pub enum LabeledStmt<'text> {
+    Ident(&'text str, Box<Stmt<'text>>),
+}
+
+fn parse_labeled_ident_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    if let Some(Token::Ident(ident)) = tokens.get(pos) {
+        if let Some(Token::Colon) = tokens.get(pos + 1) {
+            let (stmt, pos) = parse_stmt(tokens, pos + 2)?;
+            return Ok((LabeledStmt::Ident(ident, Box::new(stmt)).into(), pos));
+        }
+    }
+    Err(ParserCombinatorError::IncorrectParser)
 }
 
 fn parse_empty_stmt<'text>(
@@ -67,11 +86,6 @@ fn parse_expr_stmt<'text>(
     };
 
     Ok((Stmt::Expr(expr), pos + 1))
-}
-
-#[derive(Debug)]
-pub enum LabeledStmt<'text> {
-    Ident(&'text str, Box<Stmt<'text>>),
 }
 
 fn parse_compound_stmt<'text>(
@@ -337,7 +351,7 @@ fn parse_jump_break_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos + 1).into());
     };
 
-    Ok((JumpStmt::Continue.into(), pos + 2))
+    Ok((JumpStmt::Break.into(), pos + 2))
 }
 
 fn parse_jump_return_stmt<'text>(
@@ -420,14 +434,17 @@ impl<'text> Display for IterationStmt<'text> {
             } => {
                 write!(f, "for (")?;
                 if let Some(expr) = init {
-                    write!(f, "{}; ", expr)?;
+                    write!(f, "{}", expr)?;
                 }
+                write!(f, "; ")?;
                 if let Some(expr) = test {
-                    write!(f, "{}; ", expr)?;
+                    write!(f, "{}", expr)?;
                 }
+                write!(f, "; ")?;
                 if let Some(expr) = update {
-                    write!(f, "{}) ", expr)?;
+                    write!(f, "{}", expr)?;
                 }
+                write!(f, ") ")?;
                 write!(f, "{}", body)
             }
         }
@@ -487,20 +504,51 @@ mod tests {
     fn test_all() {
         let tokens = lex(r#"
             {
+                ;
+                {}
                 a++;
-                b++;
+                { a++; }
 
-                for (i = 0; i < 10; i++) {
-                    a += 1;
-                }
+                a : ;
+                a : {}
+                a : b;
+                a : { b; }
 
-                if (a == 1) {
-                    b++;
-                } else if (a == 2) {
-                    b--;
-                } else {
-                    b;
-                }
+                if (a) ;
+                if (a) b;
+                if (a) b; else c;
+                if (a) b; else if (c) d;
+                if (a) b; else if (c) d; else e;
+
+                if (a) {}
+                if (a) { b; }
+                if (a) { b; } else { c; }
+                if (a) { b; } else if (c) { d; }
+                if (a) { b; } else if (c) { d; } else { e; }
+
+                while (a) ;
+                while (a) {}
+                while (a > 0) { a--; }
+
+                do ; while (a);
+                do {} while (a);
+                do { a++; } while (a < 10);
+
+                for (;;) ;
+                for (;;) {}
+                for (a;;) ;
+                for (;a;) ;
+                for (;;a) ;
+                for (a;a;a) ;
+                for (a;a;a) {}
+                for (i=0; i<10; i++) { a++; }
+
+                goto a;
+                continue;
+                break;
+                return;
+                return a;
+
             }
         "#)
         .expect("** LEX ERROR");
