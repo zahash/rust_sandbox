@@ -64,57 +64,57 @@ pub fn parse_assignment_expr<'text>(
 
             if op == &Token::Equals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::Assign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::Assign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::AsteriskEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::MulAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::MulAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::SlashEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::DivAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::DivAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PercentEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::ModAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::ModAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PlusEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::AddAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::AddAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::HyphenEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::SubAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::SubAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::LTLTEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::ShiftLeftAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::ShiftLeftAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::GTGTEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::ShiftRightAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::ShiftRightAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::AmpersandEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::BitAndAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::BitAndAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::CaretEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::XORAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::XORAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PipeEquals {
                 let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-                return Ok((AssignmentExpr::BitOrAssign(unary.into(), Box::new(rhs)), pos));
+                return Ok((AssignmentExpr::BitOrAssign(unary, Box::new(rhs)), pos));
             }
         }
     }

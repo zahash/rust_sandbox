@@ -7,4 +7,5 @@ pub enum ParseError {
     ExpectedSemicolon(usize),
     ExpectedLParen(usize),
     ExpectedRParen(usize),
+    ExpectedRCurly(usize),
 }

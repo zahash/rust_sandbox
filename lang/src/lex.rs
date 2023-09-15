@@ -57,7 +57,7 @@ pub enum Token<'text> {
 }
 
 lazy_static! {
-    static ref KEYWORD_REGEX: Regex = Regex::new(r#"^(if|else)"#).unwrap();
+    static ref KEYWORD_REGEX: Regex = Regex::new(r#"^(if|else|for|while|do)"#).unwrap();
     static ref IDENT_REGEX: Regex = Regex::new(r#"^[A-Za-z_][A-Za-z0-9_]*"#).unwrap();
     static ref STRING_REGEX: Regex = Regex::new(r#"^"[^"\n]+""#).unwrap();
     static ref CHAR_REGEX: Regex = Regex::new(r#"^'.'"#).unwrap();
@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn test_all() {
         let src = r#"
-        if else
+        if else for while do
         idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
         ,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
@@ -424,6 +424,9 @@ mod tests {
                 vec![
                     Keyword("if"),
                     Keyword("else"),
+                    Keyword("for"),
+                    Keyword("while"),
+                    Keyword("do"),
                     Ident("idEnt_123"),
                     String("🦀"),
                     Char('c'),
