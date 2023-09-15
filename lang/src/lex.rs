@@ -67,11 +67,11 @@ lazy_static! {
 }
 
 #[derive(Debug)]
-pub struct InvalidToken {
-    pub pos: usize,
+pub enum LexError {
+    InvalidToken { pos: usize },
 }
 
-pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
+pub fn lex(text: &str) -> Result<Vec<Token>, LexError> {
     match text.is_empty() {
         true => Ok(vec![]),
         false => {
@@ -97,7 +97,7 @@ pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
     }
 }
 
-fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
+fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
     lex_keyword(text, pos)
         .or(lex_bool(text, pos))
         .or(lex_null(text, pos))
@@ -149,7 +149,7 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_ge(text, pos))
         .or(lex_lt(text, pos))
         .or(lex_gt(text, pos))
-        .ok_or(InvalidToken { pos })
+        .ok_or(LexError::InvalidToken { pos })
 }
 
 fn lex_keyword(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -484,7 +484,7 @@ mod tests {
                 tokens
             ),
 
-            Err(e) => assert!(false, "{}", &src[e.pos..]),
+            Err(LexError::InvalidToken { pos }) => assert!(false, "{}", &src[pos..]),
         }
     }
 
@@ -500,7 +500,7 @@ mod tests {
         "#;
         match lex(src) {
             Ok(tokens) => println!("{:#?}", tokens),
-            Err(e) => assert!(false, "{}", &src[e.pos..]),
+            Err(LexError::InvalidToken { pos }) => assert!(false, "{}", &src[pos..]),
         }
     }
 }

@@ -1,2 +1,5 @@
-pub mod lex;
-pub mod parse;
+mod lex;
+mod parse;
+
+pub use lex::*;
+pub use parse::*;
