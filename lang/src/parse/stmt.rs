@@ -13,6 +13,7 @@ pub enum Stmt<'text> {
     Compound(Vec<Stmt<'text>>),
     Selection(SelectionStmt<'text>),
     Iteration(IterationStmt<'text>),
+    Jump(JumpStmt<'text>),
 }
 
 #[derive(Debug)]
@@ -49,6 +50,14 @@ pub enum IterationStmt<'text> {
         update: Option<Expr<'text>>,
         body: Box<Stmt<'text>>,
     },
+}
+
+#[derive(Debug)]
+pub enum JumpStmt<'text> {
+    Goto(&'text str),
+    Continue,
+    Break,
+    Return(Option<Expr<'text>>),
 }
 
 pub fn parse_stmt<'text>(
@@ -132,8 +141,6 @@ pub fn parse_stmt<'text>(
 
     // Iteration Statement -- DoWhile
     if let Some(Token::Keyword("do")) = tokens.get(pos) {
-        // do <statement> while ( <expression> ) ;
-
         let (body, pos) = parse_stmt(tokens, pos + 1)?;
         let body = Box::new(body);
 
@@ -215,6 +222,54 @@ pub fn parse_stmt<'text>(
         ));
     }
 
+    // Jump Statement -- Goto
+    if let Some(Token::Keyword("goto")) = tokens.get(pos) {
+        let Some(Token::Ident(ident)) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedIdentifier(pos + 1));
+        };
+
+        let Some(Token::SemiColon) = tokens.get(pos + 2) else {
+            return Err(ParseError::ExpectedSemicolon(pos + 2));
+        };
+
+        return Ok((JumpStmt::Goto(ident).into(), pos + 3));
+    }
+
+    // Jump Statement -- Continue
+    if let Some(Token::Keyword("continue")) = tokens.get(pos) {
+        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedSemicolon(pos + 1));
+        };
+
+        return Ok((JumpStmt::Continue.into(), pos + 2));
+    }
+
+    // Jump Statement -- Break
+    if let Some(Token::Keyword("break")) = tokens.get(pos) {
+        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedSemicolon(pos + 1));
+        };
+
+        return Ok((JumpStmt::Continue.into(), pos + 2));
+    }
+
+    // Jump Statement -- Return
+    if let Some(Token::Keyword("return")) = tokens.get(pos) {
+        let (expr, pos) = match tokens.get(pos + 1) {
+            Some(Token::SemiColon) => (None, pos + 1),
+            _ => {
+                let (expr, pos) = parse_expr(tokens, pos + 1)?;
+                (Some(expr), pos)
+            }
+        };
+
+        let Some(Token::SemiColon) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedSemicolon(pos));
+        };
+
+        return Ok((JumpStmt::Return(expr).into(), pos + 1));
+    }
+
     Err(ParseError::InvalidStatement(pos))
 }
 
@@ -233,6 +288,7 @@ impl<'text> Display for Stmt<'text> {
             }
             Stmt::Selection(stmt) => write!(f, "{}", stmt),
             Stmt::Iteration(stmt) => write!(f, "{}", stmt),
+            Stmt::Jump(stmt) => write!(f, "{}", stmt),
         }
     }
 }
@@ -283,6 +339,20 @@ impl<'text> Display for IterationStmt<'text> {
     }
 }
 
+impl<'text> Display for JumpStmt<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            JumpStmt::Goto(ident) => write!(f, "goto {};", ident),
+            JumpStmt::Continue => write!(f, "continue;"),
+            JumpStmt::Break => write!(f, "break;"),
+            JumpStmt::Return(expr) => match expr {
+                Some(expr) => write!(f, "return {};", expr),
+                None => write!(f, "return;"),
+            },
+        }
+    }
+}
+
 impl<'text> From<LabeledStmt<'text>> for Stmt<'text> {
     fn from(value: LabeledStmt<'text>) -> Self {
         Stmt::Labeled(value)
@@ -298,6 +368,12 @@ impl<'text> From<SelectionStmt<'text>> for Stmt<'text> {
 impl<'text> From<IterationStmt<'text>> for Stmt<'text> {
     fn from(value: IterationStmt<'text>) -> Self {
         Stmt::Iteration(value)
+    }
+}
+
+impl<'text> From<JumpStmt<'text>> for Stmt<'text> {
+    fn from(value: JumpStmt<'text>) -> Self {
+        Stmt::Jump(value)
     }
 }
 

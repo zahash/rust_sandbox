@@ -30,4 +30,5 @@ pub enum ParseError {
     ExpectedRParen(usize),
     ExpectedRCurly(usize),
     ExpectedKeyword(&'static str, usize),
+    ExpectedIdentifier(usize),
 }
