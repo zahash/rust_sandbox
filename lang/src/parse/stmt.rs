@@ -55,7 +55,7 @@ pub fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
-    // Expty Statement
+    // Empty Statement
     if let Some(Token::SemiColon) = tokens.get(pos) {
         return Ok((Stmt::EmptyStmt, pos + 1));
     }
@@ -110,6 +110,24 @@ pub fn parse_stmt<'text>(
         let fail = Box::new(fail);
 
         return Ok((SelectionStmt::IfElse { test, pass, fail }.into(), pos));
+    }
+
+    // Iteration Statement -- While
+    if let Some(Token::Keyword("while")) = tokens.get(pos) {
+        let Some(Token::LParen) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedLParen(pos + 1));
+        };
+
+        let (test, pos) = parse_expr(tokens, pos + 2)?;
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRParen(pos));
+        };
+
+        let (body, pos) = parse_stmt(tokens, pos + 1)?;
+        let body = Box::new(body);
+
+        return Ok((IterationStmt::While { test, body }.into(), pos));
     }
 
     // Iteration Statement -- For
