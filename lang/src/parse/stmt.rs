@@ -16,9 +16,90 @@ pub enum Stmt<'text> {
     Jump(JumpStmt<'text>),
 }
 
+pub fn parse_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParseError> {
+    for parser in [
+        parse_empty_stmt,
+        parse_expr_stmt,
+        parse_compound_stmt,
+        parse_selection_stmt,
+        parse_iteration_while_stmt,
+        parse_iteration_do_while_stmt,
+        parse_iteration_for_stmt,
+        parse_jump_goto_stmt,
+        parse_jump_continue_stmt,
+        parse_jump_break_stmt,
+        parse_jump_return_stmt,
+    ] {
+        match parser(tokens, pos) {
+            Err(ParserCombinatorError::IncorrectParser) => continue,
+            Err(ParserCombinatorError::ParseError(e)) => return Err(e),
+            Ok((stmt, pos)) => return Ok((stmt, pos)),
+        };
+    }
+
+    Err(ParseError::InvalidStatement(pos))
+}
+
+fn parse_empty_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    Ok((Stmt::EmptyStmt, pos + 1))
+}
+
+fn parse_expr_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Ok((expr, pos)) = parse_expr(tokens, pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
+
+    Ok((Stmt::Expr(expr), pos + 1))
+}
+
 #[derive(Debug)]
 pub enum LabeledStmt<'text> {
     Ident(&'text str, Box<Stmt<'text>>),
+}
+
+fn parse_compound_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::LCurly) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let mut stmts = Vec::new();
+    let mut pos = pos + 1;
+
+    while let Some(token) = tokens.get(pos) {
+        if token == &Token::RCurly {
+            return Ok((Stmt::Compound(stmts), pos + 1));
+        }
+
+        match parse_stmt(tokens, pos) {
+            Ok((stmt, next_pos)) => {
+                pos = next_pos;
+                stmts.push(stmt);
+            }
+            Err(e) => return Err(e.into()),
+        };
+    }
+
+    Err(ParseError::ExpectedRCurly(pos).into())
 }
 
 #[derive(Debug)]
@@ -32,6 +113,37 @@ pub enum SelectionStmt<'text> {
         pass: Box<Stmt<'text>>,
         fail: Box<Stmt<'text>>,
     },
+}
+
+fn parse_selection_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("if")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::LParen) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedLParen(pos + 1).into());
+    };
+
+    let (test, pos) = parse_expr(tokens, pos + 2)?;
+
+    let Some(Token::RParen) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedRParen(pos).into());
+    };
+
+    let (pass, pos) = parse_stmt(tokens, pos + 1)?;
+    let pass = Box::new(pass);
+
+    let Some(Token::Keyword("else")) = tokens.get(pos) else {
+        return Ok((SelectionStmt::If { test, pass }.into(), pos));
+    };
+
+    let (fail, pos) = parse_stmt(tokens, pos + 1)?;
+    let fail = Box::new(fail);
+
+    Ok((SelectionStmt::IfElse { test, pass, fail }.into(), pos))
 }
 
 #[derive(Debug)]
@@ -52,6 +164,125 @@ pub enum IterationStmt<'text> {
     },
 }
 
+fn parse_iteration_while_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("while")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::LParen) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedLParen(pos + 1).into());
+    };
+
+    let (test, pos) = parse_expr(tokens, pos + 2)?;
+
+    let Some(Token::RParen) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedRParen(pos).into());
+    };
+
+    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let body = Box::new(body);
+
+    Ok((IterationStmt::While { test, body }.into(), pos))
+}
+
+fn parse_iteration_do_while_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("do")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let body = Box::new(body);
+
+    let Some(Token::Keyword("while")) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedKeyword("while", pos).into());
+    };
+
+    let Some(Token::LParen) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedLParen(pos + 1).into());
+    };
+
+    let (test, pos) = parse_expr(tokens, pos + 2)?;
+
+    let Some(Token::RParen) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedRParen(pos).into());
+    };
+
+    let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+    };
+
+    Ok((IterationStmt::DoWhile { test, body }.into(), pos + 2))
+}
+
+fn parse_iteration_for_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("for")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::LParen) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedLParen(pos + 1).into());
+    };
+
+    let (init, pos) = match tokens.get(pos + 2) {
+        Some(Token::SemiColon) => (None, pos + 2),
+        _ => {
+            let (expr, pos) = parse_expr(tokens, pos + 2)?;
+            (Some(expr), pos)
+        }
+    };
+
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
+
+    let (test, pos) = match tokens.get(pos + 1) {
+        Some(Token::SemiColon) => (None, pos + 1),
+        _ => {
+            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            (Some(expr), pos)
+        }
+    };
+
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
+
+    let (update, pos) = match tokens.get(pos + 1) {
+        Some(Token::RParen) => (None, pos + 1),
+        _ => {
+            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            (Some(expr), pos)
+        }
+    };
+
+    let Some(Token::RParen) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedRParen(pos).into());
+    };
+
+    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let body = Box::new(body);
+
+    Ok((
+        IterationStmt::For {
+            init,
+            test,
+            update,
+            body,
+        }
+        .into(),
+        pos,
+    ))
+}
+
 #[derive(Debug)]
 pub enum JumpStmt<'text> {
     Goto(&'text str),
@@ -60,217 +291,81 @@ pub enum JumpStmt<'text> {
     Return(Option<Expr<'text>>),
 }
 
-pub fn parse_stmt<'text>(
+fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParseError> {
-    // Empty Statement
-    if let Some(Token::SemiColon) = tokens.get(pos) {
-        return Ok((Stmt::EmptyStmt, pos + 1));
-    }
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("goto")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
 
-    // Expression Statement
-    if let Ok((expr, pos)) = parse_expr(tokens, pos) {
-        return match tokens.get(pos) {
-            Some(Token::SemiColon) => Ok((Stmt::Expr(expr), pos + 1)),
-            _ => Err(ParseError::ExpectedSemicolon(pos)),
-        };
-    }
+    let Some(Token::Ident(ident)) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedIdentifier(pos + 1).into());
+    };
 
-    // Compound Statement
-    if let Some(Token::LCurly) = tokens.get(pos) {
-        let mut stmts = Vec::new();
-        let mut pos = pos + 1;
+    let Some(Token::SemiColon) = tokens.get(pos + 2) else {
+        return Err(ParseError::ExpectedSemicolon(pos + 2).into());
+    };
 
-        while let Some(token) = tokens.get(pos) {
-            if token == &Token::RCurly {
-                return Ok((Stmt::Compound(stmts), pos + 1));
-            }
+    Ok((JumpStmt::Goto(ident).into(), pos + 3))
+}
 
-            let (stmt, next_pos) = parse_stmt(tokens, pos)?;
-            pos = next_pos;
+fn parse_jump_continue_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("continue")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
 
-            stmts.push(stmt);
+    let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+    };
+
+    Ok((JumpStmt::Continue.into(), pos + 2))
+}
+
+fn parse_jump_break_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("break")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+    };
+
+    Ok((JumpStmt::Continue.into(), pos + 2))
+}
+
+fn parse_jump_return_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Keyword("return")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let (expr, pos) = match tokens.get(pos + 1) {
+        Some(Token::SemiColon) => (None, pos + 1),
+        _ => {
+            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            (Some(expr), pos)
         }
+    };
 
-        return Err(ParseError::ExpectedRCurly(pos));
-    }
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
 
-    // Selection Statement
-    if let Some(Token::Keyword("if")) = tokens.get(pos) {
-        let Some(Token::LParen) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedLParen(pos + 1));
-        };
+    return Ok((JumpStmt::Return(expr).into(), pos + 1));
+}
 
-        let (test, pos) = parse_expr(tokens, pos + 2)?;
-
-        let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
-        };
-
-        let (pass, pos) = parse_stmt(tokens, pos + 1)?;
-        let pass = Box::new(pass);
-
-        let Some(Token::Keyword("else")) = tokens.get(pos) else {
-            return Ok((SelectionStmt::If { test, pass }.into(), pos));
-        };
-
-        let (fail, pos) = parse_stmt(tokens, pos + 1)?;
-        let fail = Box::new(fail);
-
-        return Ok((SelectionStmt::IfElse { test, pass, fail }.into(), pos));
-    }
-
-    // Iteration Statement -- While
-    if let Some(Token::Keyword("while")) = tokens.get(pos) {
-        let Some(Token::LParen) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedLParen(pos + 1));
-        };
-
-        let (test, pos) = parse_expr(tokens, pos + 2)?;
-
-        let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
-        };
-
-        let (body, pos) = parse_stmt(tokens, pos + 1)?;
-        let body = Box::new(body);
-
-        return Ok((IterationStmt::While { test, body }.into(), pos));
-    }
-
-    // Iteration Statement -- DoWhile
-    if let Some(Token::Keyword("do")) = tokens.get(pos) {
-        let (body, pos) = parse_stmt(tokens, pos + 1)?;
-        let body = Box::new(body);
-
-        let Some(Token::Keyword("while")) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedKeyword("while", pos));
-        };
-
-        let Some(Token::LParen) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedLParen(pos + 1));
-        };
-
-        let (test, pos) = parse_expr(tokens, pos + 2)?;
-
-        let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
-        };
-
-        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedSemicolon(pos + 1));
-        };
-
-        return Ok((IterationStmt::DoWhile { test, body }.into(), pos + 2));
-    }
-
-    // Iteration Statement -- For
-    if let Some(Token::Keyword("for")) = tokens.get(pos) {
-        let Some(Token::LParen) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedLParen(pos + 1));
-        };
-
-        let (init, pos) = match tokens.get(pos + 2) {
-            Some(Token::SemiColon) => (None, pos + 2),
-            _ => {
-                let (expr, pos) = parse_expr(tokens, pos + 2)?;
-                (Some(expr), pos)
-            }
-        };
-
-        let Some(Token::SemiColon) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedSemicolon(pos));
-        };
-
-        let (test, pos) = match tokens.get(pos + 1) {
-            Some(Token::SemiColon) => (None, pos + 1),
-            _ => {
-                let (expr, pos) = parse_expr(tokens, pos + 1)?;
-                (Some(expr), pos)
-            }
-        };
-
-        let Some(Token::SemiColon) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedSemicolon(pos));
-        };
-
-        let (update, pos) = match tokens.get(pos + 1) {
-            Some(Token::RParen) => (None, pos + 1),
-            _ => {
-                let (expr, pos) = parse_expr(tokens, pos + 1)?;
-                (Some(expr), pos)
-            }
-        };
-
-        let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
-        };
-
-        let (body, pos) = parse_stmt(tokens, pos + 1)?;
-        let body = Box::new(body);
-
-        return Ok((
-            IterationStmt::For {
-                init,
-                test,
-                update,
-                body,
-            }
-            .into(),
-            pos,
-        ));
-    }
-
-    // Jump Statement -- Goto
-    if let Some(Token::Keyword("goto")) = tokens.get(pos) {
-        let Some(Token::Ident(ident)) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedIdentifier(pos + 1));
-        };
-
-        let Some(Token::SemiColon) = tokens.get(pos + 2) else {
-            return Err(ParseError::ExpectedSemicolon(pos + 2));
-        };
-
-        return Ok((JumpStmt::Goto(ident).into(), pos + 3));
-    }
-
-    // Jump Statement -- Continue
-    if let Some(Token::Keyword("continue")) = tokens.get(pos) {
-        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedSemicolon(pos + 1));
-        };
-
-        return Ok((JumpStmt::Continue.into(), pos + 2));
-    }
-
-    // Jump Statement -- Break
-    if let Some(Token::Keyword("break")) = tokens.get(pos) {
-        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-            return Err(ParseError::ExpectedSemicolon(pos + 1));
-        };
-
-        return Ok((JumpStmt::Continue.into(), pos + 2));
-    }
-
-    // Jump Statement -- Return
-    if let Some(Token::Keyword("return")) = tokens.get(pos) {
-        let (expr, pos) = match tokens.get(pos + 1) {
-            Some(Token::SemiColon) => (None, pos + 1),
-            _ => {
-                let (expr, pos) = parse_expr(tokens, pos + 1)?;
-                (Some(expr), pos)
-            }
-        };
-
-        let Some(Token::SemiColon) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedSemicolon(pos));
-        };
-
-        return Ok((JumpStmt::Return(expr).into(), pos + 1));
-    }
-
-    Err(ParseError::InvalidStatement(pos))
+enum ParserCombinatorError {
+    ParseError(ParseError),
+    IncorrectParser,
 }
 
 impl<'text> Display for Stmt<'text> {
@@ -374,6 +469,12 @@ impl<'text> From<IterationStmt<'text>> for Stmt<'text> {
 impl<'text> From<JumpStmt<'text>> for Stmt<'text> {
     fn from(value: JumpStmt<'text>) -> Self {
         Stmt::Jump(value)
+    }
+}
+
+impl From<ParseError> for ParserCombinatorError {
+    fn from(value: ParseError) -> Self {
+        ParserCombinatorError::ParseError(value)
     }
 }
 
