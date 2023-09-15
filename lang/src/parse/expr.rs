@@ -1,4 +1,5 @@
 use crate::lex::*;
+use crate::parse::ParseError;
 
 // pub fn parse<'ident>(tokens: &[Token<'ident>]) -> Result<Expr<'ident>, ParseError> {
 //     match tokens.is_empty() {
@@ -13,14 +14,7 @@ use crate::lex::*;
 //     }
 // }
 
-#[derive(Debug)]
-pub enum ParseError {
-    UnexpectedToken(usize),
-    MismatchedParentheses(usize),
-    SyntaxError(usize),
-}
-
-type Expr<'text> = AssignmentExpr<'text>;
+pub type Expr<'text> = AssignmentExpr<'text>;
 
 pub fn parse_expr<'text>(
     tokens: &[Token<'text>],
@@ -67,53 +61,60 @@ pub fn parse_assignment_expr<'text>(
 ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
     if let Ok((unary, pos)) = parse_unary_expr(tokens, pos) {
         if let Some(op) = tokens.get(pos) {
-            let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
-
-            let unary = unary.into();
-            let rhs = Box::new(rhs);
 
             if op == &Token::Equals {
-                return Ok((AssignmentExpr::Assign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::Assign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::AsteriskEquals {
-                return Ok((AssignmentExpr::MulAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::MulAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::SlashEquals {
-                return Ok((AssignmentExpr::DivAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::DivAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::PercentEquals {
-                return Ok((AssignmentExpr::ModAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::ModAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::PlusEquals {
-                return Ok((AssignmentExpr::AddAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::AddAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::HyphenEquals {
-                return Ok((AssignmentExpr::SubAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::SubAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::LTLTEquals {
-                return Ok((AssignmentExpr::ShiftLeftAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::ShiftLeftAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::GTGTEquals {
-                return Ok((AssignmentExpr::ShiftRightAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::ShiftRightAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::AmpersandEquals {
-                return Ok((AssignmentExpr::BitAndAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::BitAndAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::CaretEquals {
-                return Ok((AssignmentExpr::XORAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::XORAssign(unary.into(), Box::new(rhs)), pos));
             }
 
             if op == &Token::PipeEquals {
-                return Ok((AssignmentExpr::BitOrAssign(unary, rhs), pos));
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                return Ok((AssignmentExpr::BitOrAssign(unary.into(), Box::new(rhs)), pos));
             }
         }
     }

@@ -17,6 +17,7 @@ Cargo.lock
 dist/
 
 .vscode/
+.idea/
 
 assets/sandbox.db-*
 sandbox.session.sql

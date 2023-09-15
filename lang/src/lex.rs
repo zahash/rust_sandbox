@@ -3,6 +3,7 @@ use regex::Regex;
 
 #[derive(Debug, PartialEq)]
 pub enum Token<'text> {
+    Keyword(&'text str),
     Ident(&'text str),
     String(&'text str),
     Char(char),
@@ -56,6 +57,7 @@ pub enum Token<'text> {
 }
 
 lazy_static! {
+    static ref KEYWORD_REGEX: Regex = Regex::new(r#"^(if|else)"#).unwrap();
     static ref IDENT_REGEX: Regex = Regex::new(r#"^[A-Za-z_][A-Za-z0-9_]*"#).unwrap();
     static ref STRING_REGEX: Regex = Regex::new(r#"^"[^"\n]+""#).unwrap();
     static ref CHAR_REGEX: Regex = Regex::new(r#"^'.'"#).unwrap();
@@ -96,7 +98,8 @@ pub fn lex(text: &str) -> Result<Vec<Token>, InvalidToken> {
 }
 
 fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
-    lex_bool(text, pos)
+    lex_keyword(text, pos)
+        .or(lex_bool(text, pos))
         .or(lex_null(text, pos))
         .or(lex_ident(text, pos))
         .or(lex_string(text, pos))
@@ -147,6 +150,11 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), InvalidToken> {
         .or(lex_lt(text, pos))
         .or(lex_gt(text, pos))
         .ok_or(InvalidToken { pos })
+}
+
+fn lex_keyword(text: &str, pos: usize) -> Option<(Token, usize)> {
+    let (token, pos) = lex_with_pattern(text, pos, &KEYWORD_REGEX)?;
+    Some((Token::Keyword(token), pos))
 }
 
 fn lex_ident(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -392,10 +400,21 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    // auto        double      int         struct
+    // break       else        long        switch
+    // case        enum        register    typedef
+    // char        extern      return      union
+    // const       float       short       unsigned
+    // continue    for         signed      void
+    // default     goto        sizeof      volatile
+    // do          if          static      while
+
     #[test]
     fn test_all() {
         let src = r#"
-        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[](),:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
+        if else
+        idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
+        ,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
 
         use Token::*;
@@ -403,6 +422,8 @@ mod tests {
         match lex(src) {
             Ok(tokens) => assert_eq!(
                 vec![
+                    Keyword("if"),
+                    Keyword("else"),
                     Ident("idEnt_123"),
                     String("🦀"),
                     Char('c'),
