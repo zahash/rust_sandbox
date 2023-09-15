@@ -1,7 +1,52 @@
 use crate::lex::*;
 use crate::parse::expr::*;
 use crate::parse::ParseError;
-use std::fmt::Formatter;
+
+#[derive(Debug)]
+pub enum Stmt<'text> {
+    EmptyStmt,
+    Expr(Expr<'text>),
+    Labeled(LabeledStmt<'text>),
+    Compound(Vec<Stmt<'text>>),
+    Selection(SelectionStmt<'text>),
+    Iteration(IterationStmt<'text>),
+}
+
+#[derive(Debug)]
+pub enum LabeledStmt<'text> {
+    Ident(&'text str, Box<Stmt<'text>>),
+}
+
+#[derive(Debug)]
+pub enum SelectionStmt<'text> {
+    If {
+        test: Expr<'text>,
+        pass: Box<Stmt<'text>>,
+    },
+    IfElse {
+        test: Expr<'text>,
+        pass: Box<Stmt<'text>>,
+        fail: Box<Stmt<'text>>,
+    },
+}
+
+#[derive(Debug)]
+pub enum IterationStmt<'text> {
+    While {
+        test: Expr<'text>,
+        body: Box<Stmt<'text>>,
+    },
+    DoWhile {
+        test: Expr<'text>,
+        body: Box<Stmt<'text>>,
+    },
+    For {
+        init: Option<Expr<'text>>,
+        test: Option<Expr<'text>>,
+        update: Option<Expr<'text>>,
+        body: Box<Stmt<'text>>,
+    },
+}
 
 pub fn parse_stmt<'text>(
     tokens: &[Token<'text>],
@@ -122,135 +167,6 @@ pub fn parse_stmt<'text>(
     }
 
     Err(ParseError::InvalidStatement(pos))
-}
-
-#[derive(Debug)]
-pub enum Stmt<'text> {
-    EmptyStmt,
-    Expr(Expr<'text>),
-    Labeled(LabeledStmt<'text>),
-    Compound(Vec<Stmt<'text>>),
-    Selection(SelectionStmt<'text>),
-    Iteration(IterationStmt<'text>),
-}
-
-impl<'text> std::fmt::Display for Stmt<'text> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Stmt::EmptyStmt => write!(f, ";"),
-            Stmt::Expr(stmt) => write!(f, "{};", stmt),
-            Stmt::Labeled(stmt) => write!(f, "{}", stmt),
-            Stmt::Compound(stmts) => {
-                write!(f, "{{ ")?;
-                for stmt in stmts {
-                    write!(f, "{} ", stmt)?;
-                }
-                write!(f, "}}")
-            }
-            Stmt::Selection(stmt) => write!(f, "{}", stmt),
-            Stmt::Iteration(stmt) => write!(f, "{}", stmt),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum LabeledStmt<'text> {
-    Ident(&'text str, Box<Stmt<'text>>),
-}
-
-impl<'text> From<LabeledStmt<'text>> for Stmt<'text> {
-    fn from(value: LabeledStmt<'text>) -> Self {
-        Stmt::Labeled(value)
-    }
-}
-
-impl<'text> std::fmt::Display for LabeledStmt<'text> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LabeledStmt::Ident(ident, stmt) => write!(f, "{} : {}", ident, stmt),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum SelectionStmt<'text> {
-    If {
-        test: Expr<'text>,
-        pass: Box<Stmt<'text>>,
-    },
-    IfElse {
-        test: Expr<'text>,
-        pass: Box<Stmt<'text>>,
-        fail: Box<Stmt<'text>>,
-    },
-}
-
-impl<'text> From<SelectionStmt<'text>> for Stmt<'text> {
-    fn from(value: SelectionStmt<'text>) -> Self {
-        Stmt::Selection(value)
-    }
-}
-
-impl<'text> std::fmt::Display for SelectionStmt<'text> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SelectionStmt::If { test, pass } => write!(f, "if ({}) {}", test, pass),
-            SelectionStmt::IfElse { test, pass, fail } => {
-                write!(f, "if ({}) {} else {}", test, pass, fail)
-            }
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum IterationStmt<'text> {
-    While {
-        test: Expr<'text>,
-        body: Box<Stmt<'text>>,
-    },
-    DoWhile {
-        test: Expr<'text>,
-        body: Box<Stmt<'text>>,
-    },
-    For {
-        init: Option<Expr<'text>>,
-        test: Option<Expr<'text>>,
-        update: Option<Expr<'text>>,
-        body: Box<Stmt<'text>>,
-    },
-}
-
-impl<'text> From<IterationStmt<'text>> for Stmt<'text> {
-    fn from(value: IterationStmt<'text>) -> Self {
-        Stmt::Iteration(value)
-    }
-}
-
-impl<'text> std::fmt::Display for IterationStmt<'text> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            IterationStmt::While { test, body } => write!(f, "while ({}) {}", test, body),
-            IterationStmt::DoWhile { test, body } => write!(f, "do {} while ({});", body, test),
-            IterationStmt::For {
-                init,
-                test,
-                update,
-                body,
-            } => {
-                write!(f, "for (")?;
-                if let Some(expr) = init {
-                    write!(f, "{}; ", expr)?;
-                }
-                if let Some(expr) = test {
-                    write!(f, "{}; ", expr)?;
-                }
-                if let Some(expr) = update {
-                    write!(f, "{}) ", expr)?;
-                }
-                write!(f, "{}", body)
-            }
-        }
-    }
 }
 
 #[cfg(test)]
