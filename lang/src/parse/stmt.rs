@@ -130,6 +130,34 @@ pub fn parse_stmt<'text>(
         return Ok((IterationStmt::While { test, body }.into(), pos));
     }
 
+    // Iteration Statement -- DoWhile
+    if let Some(Token::Keyword("do")) = tokens.get(pos) {
+        // do <statement> while ( <expression> ) ;
+
+        let (body, pos) = parse_stmt(tokens, pos + 1)?;
+        let body = Box::new(body);
+
+        let Some(Token::Keyword("while")) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedKeyword("while", pos));
+        };
+
+        let Some(Token::LParen) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedLParen(pos + 1));
+        };
+
+        let (test, pos) = parse_expr(tokens, pos + 2)?;
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRParen(pos));
+        };
+
+        let Some(Token::SemiColon) = tokens.get(pos + 1) else {
+            return Err(ParseError::ExpectedSemicolon(pos + 1));
+        };
+
+        return Ok((IterationStmt::DoWhile { test, body }.into(), pos + 2));
+    }
+
     // Iteration Statement -- For
     if let Some(Token::Keyword("for")) = tokens.get(pos) {
         let Some(Token::LParen) = tokens.get(pos + 1) else {
