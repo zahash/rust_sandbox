@@ -1,6 +1,5 @@
-use crate::lex::*;
-use crate::parse::expr::*;
-use crate::parse::ParseError;
+use super::expr::{parse_expr, Expr};
+use crate::{ParseError, Token};
 use std::{
     fmt,
     fmt::{Display, Formatter},
@@ -258,7 +257,8 @@ impl<'text> From<IterationStmt<'text>> for Stmt<'text> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::parse_stmt;
+    use crate::lex;
 
     #[test]
     fn test_all() {

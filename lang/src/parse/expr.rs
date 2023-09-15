@@ -1,5 +1,4 @@
-use crate::lex::*;
-use crate::parse::ParseError;
+use crate::{ParseError, Token};
 use std::{
     fmt,
     fmt::{Display, Formatter},
@@ -795,7 +794,8 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::parse_expr;
+    use crate::lex;
 
     #[test]
     fn test_all() {
