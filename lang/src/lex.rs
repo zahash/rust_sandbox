@@ -57,7 +57,7 @@ pub enum Token<'text> {
 }
 
 lazy_static! {
-    static ref KEYWORD_REGEX: Regex = Regex::new(r#"^(if|else|for|while|do|goto|continue|break|return)\b"#).unwrap();
+    static ref KEYWORD_REGEX: Regex = Regex::new(r#"^(auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|int|long|register|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while)\b"#).unwrap();
     static ref IDENT_REGEX: Regex = Regex::new(r#"^[A-Za-z_][A-Za-z0-9_]*"#).unwrap();
     static ref STRING_REGEX: Regex = Regex::new(r#"^"[^"\n]+""#).unwrap();
     static ref CHAR_REGEX: Regex = Regex::new(r#"^'.'"#).unwrap();
@@ -400,34 +400,15 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // auto
-    // case
-    // char
-    // const
-    // default
-    // double
-    // enum
-    // extern
-    // float
-    // int
-    // long
-    // register
-    // short
-    // signed
-    // sizeof
-    // static
-    // struct
-    // switch
-    // typedef
-    // union
-    // unsigned
-    // void
-    // volatile
-
     #[test]
     fn test_all() {
         let src = r#"
-        if else for while do goto continue break return
+
+        auto break case char const continue default do double 
+        else enum extern float for goto if int long register 
+        return short signed sizeof static struct switch typedef 
+        union unsigned void volatile while
+
         idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
         ,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
@@ -437,15 +418,38 @@ mod tests {
         match lex(src) {
             Ok(tokens) => assert_eq!(
                 vec![
-                    Keyword("if"),
-                    Keyword("else"),
-                    Keyword("for"),
-                    Keyword("while"),
-                    Keyword("do"),
-                    Keyword("goto"),
-                    Keyword("continue"),
+                    Keyword("auto"),
                     Keyword("break"),
+                    Keyword("case"),
+                    Keyword("char"),
+                    Keyword("const"),
+                    Keyword("continue"),
+                    Keyword("default"),
+                    Keyword("do"),
+                    Keyword("double"),
+                    Keyword("else"),
+                    Keyword("enum"),
+                    Keyword("extern"),
+                    Keyword("float"),
+                    Keyword("for"),
+                    Keyword("goto"),
+                    Keyword("if"),
+                    Keyword("int"),
+                    Keyword("long"),
+                    Keyword("register"),
                     Keyword("return"),
+                    Keyword("short"),
+                    Keyword("signed"),
+                    Keyword("sizeof"),
+                    Keyword("static"),
+                    Keyword("struct"),
+                    Keyword("switch"),
+                    Keyword("typedef"),
+                    Keyword("union"),
+                    Keyword("unsigned"),
+                    Keyword("void"),
+                    Keyword("volatile"),
+                    Keyword("while"),
                     Ident("idEnt_123"),
                     String("🦀"),
                     Char('c'),
