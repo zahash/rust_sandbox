@@ -60,6 +60,7 @@ pub enum TypeSpecifier<'text> {
     TypeDefName(&'text str),
 }
 
+#[derive(Debug)]
 pub enum TypeQualifier {
     Const,
     Volatile,
@@ -79,29 +80,56 @@ pub enum Stmt<'text> {
 fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParseError> {
-    for parser in [
-        parse_labeled_ident_stmt,
-        parse_empty_stmt,
-        parse_expr_stmt,
-        parse_compound_stmt,
-        parse_selection_stmt,
-        parse_iteration_while_stmt,
-        parse_iteration_do_while_stmt,
-        parse_iteration_for_stmt,
-        parse_jump_goto_stmt,
-        parse_jump_continue_stmt,
-        parse_jump_break_stmt,
-        parse_jump_return_stmt,
-    ] {
-        match parser(tokens, pos) {
+) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+    let parsers: &[Box<dyn StmtParser<'text>>] = &[
+        Box::new(parse_labeled_ident_stmt),
+        Box::new(parse_empty_stmt),
+        Box::new(parse_expr_stmt),
+        Box::new(parse_compound_stmt),
+        Box::new(parse_selection_stmt),
+        Box::new(parse_iteration_while_stmt),
+        Box::new(parse_iteration_do_while_stmt),
+        Box::new(parse_iteration_for_stmt),
+        Box::new(parse_jump_goto_stmt),
+        Box::new(parse_jump_continue_stmt),
+        Box::new(parse_jump_break_stmt),
+        Box::new(parse_jump_return_stmt),
+    ];
+
+    for parser in parsers {
+        match parser.parse(tokens, pos) {
             Err(ParserCombinatorError::IncorrectParser) => continue,
-            Err(ParserCombinatorError::ParseError(e)) => return Err(e),
-            Ok((stmt, pos)) => return Ok((stmt, pos)),
+            Err(e) => return Err(e),
+            Ok((stmt, next_pos)) => return Ok((stmt, next_pos)),
         };
     }
 
-    Err(ParseError::InvalidStatement(pos))
+    Err(ParserCombinatorError::IncorrectParser)
+}
+
+trait StmtParser<'text> {
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(Stmt<'text>, usize), ParserCombinatorError>;
+}
+
+impl<'text, T, F> StmtParser<'text> for F
+where
+    T: Into<Stmt<'text>>,
+    F: Fn(&[Token<'text>], usize) -> Result<(T, usize), ParserCombinatorError>,
+{
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+        match self(tokens, pos) {
+            Ok((stmt, pos)) => Ok((stmt.into(), pos)),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -112,11 +140,11 @@ pub enum LabeledStmt<'text> {
 fn parse_labeled_ident_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(LabeledStmt<'text>, usize), ParserCombinatorError> {
     if let Some(Token::Ident(ident)) = tokens.get(pos) {
         if let Some(Token::Colon) = tokens.get(pos + 1) {
             let (stmt, pos) = parse_stmt(tokens, pos + 2)?;
-            return Ok((LabeledStmt::Ident(ident, Box::new(stmt)).into(), pos));
+            return Ok((LabeledStmt::Ident(ident, Box::new(stmt)), pos));
         }
     }
     Err(ParserCombinatorError::IncorrectParser)
@@ -192,7 +220,7 @@ pub enum SelectionStmt<'text> {
 fn parse_selection_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(SelectionStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("if")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -211,13 +239,13 @@ fn parse_selection_stmt<'text>(
     let pass = Box::new(pass);
 
     let Some(Token::Keyword("else")) = tokens.get(pos) else {
-        return Ok((SelectionStmt::If { test, pass }.into(), pos));
+        return Ok((SelectionStmt::If { test, pass }, pos));
     };
 
     let (fail, pos) = parse_stmt(tokens, pos + 1)?;
     let fail = Box::new(fail);
 
-    Ok((SelectionStmt::IfElse { test, pass, fail }.into(), pos))
+    Ok((SelectionStmt::IfElse { test, pass, fail }, pos))
 }
 
 #[derive(Debug)]
@@ -241,7 +269,7 @@ pub enum IterationStmt<'text> {
 fn parse_iteration_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -259,13 +287,13 @@ fn parse_iteration_while_stmt<'text>(
     let (body, pos) = parse_stmt(tokens, pos + 1)?;
     let body = Box::new(body);
 
-    Ok((IterationStmt::While { test, body }.into(), pos))
+    Ok((IterationStmt::While { test, body }, pos))
 }
 
 fn parse_iteration_do_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("do")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -291,13 +319,13 @@ fn parse_iteration_do_while_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos + 1).into());
     };
 
-    Ok((IterationStmt::DoWhile { test, body }.into(), pos + 2))
+    Ok((IterationStmt::DoWhile { test, body }, pos + 2))
 }
 
 fn parse_iteration_for_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("for")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -351,8 +379,7 @@ fn parse_iteration_for_stmt<'text>(
             test,
             update,
             body,
-        }
-        .into(),
+        },
         pos,
     ))
 }
@@ -368,7 +395,7 @@ pub enum JumpStmt<'text> {
 fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -381,13 +408,13 @@ fn parse_jump_goto_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos + 2).into());
     };
 
-    Ok((JumpStmt::Goto(ident).into(), pos + 3))
+    Ok((JumpStmt::Goto(ident), pos + 3))
 }
 
 fn parse_jump_continue_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -396,13 +423,13 @@ fn parse_jump_continue_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos + 1).into());
     };
 
-    Ok((JumpStmt::Continue.into(), pos + 2))
+    Ok((JumpStmt::Continue, pos + 2))
 }
 
 fn parse_jump_break_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -411,13 +438,13 @@ fn parse_jump_break_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos + 1).into());
     };
 
-    Ok((JumpStmt::Break.into(), pos + 2))
+    Ok((JumpStmt::Break, pos + 2))
 }
 
 fn parse_jump_return_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::Keyword("return")) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -434,9 +461,10 @@ fn parse_jump_return_stmt<'text>(
         return Err(ParseError::ExpectedSemicolon(pos).into());
     };
 
-    return Ok((JumpStmt::Return(expr).into(), pos + 1));
+    return Ok((JumpStmt::Return(expr), pos + 1));
 }
 
+#[derive(Debug)]
 enum ParserCombinatorError {
     ParseError(ParseError),
     IncorrectParser,
