@@ -400,14 +400,29 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
-    // auto        double      int         struct
-    // break       else        long        switch
-    // case        enum        register    typedef
-    // char        extern      return      union
-    // const       float       short       unsigned
-    // continue    for         signed      void
-    // default     goto        sizeof      volatile
-    // do          if          static      while
+    // auto
+    // case
+    // char
+    // const
+    // default
+    // double
+    // enum
+    // extern
+    // float
+    // int
+    // long
+    // register
+    // short
+    // signed
+    // sizeof
+    // static
+    // struct
+    // switch
+    // typedef
+    // union
+    // unsigned
+    // void
+    // volatile
 
     #[test]
     fn test_all() {
