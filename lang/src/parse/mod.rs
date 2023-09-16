@@ -1,23 +1,29 @@
+mod enums;
 mod expr;
 mod stmt;
+mod structs;
+mod types;
+mod decl;
 
+pub use enums::*;
 pub use expr::*;
 pub use stmt::*;
+pub use structs::*;
+pub use types::*;
+pub use decl::*;
 
-use crate::Token;
-
-pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<Stmt<'text>, ParseError> {
-    match tokens.is_empty() {
-        true => Ok(Stmt::EmptyStmt),
-        false => {
-            let (stmt, pos) = parse_stmt(tokens, 0)?;
-            match pos == tokens.len() {
-                true => Ok(stmt),
-                false => Err(ParseError::SyntaxError(pos)),
-            }
-        }
-    }
-}
+// pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<Stmt<'text>, ParseError> {
+//     match tokens.is_empty() {
+//         true => Ok(Stmt::EmptyStmt),
+//         false => {
+//             let (stmt, pos) = parse_stmt(tokens, 0)?;
+//             match pos == tokens.len() {
+//                 true => Ok(stmt),
+//                 false => Err(ParseError::SyntaxError(pos)),
+//             }
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub enum ParseError {
