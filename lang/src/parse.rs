@@ -81,55 +81,24 @@ fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
-    let parsers: &[Box<dyn StmtParser<'text>>] = &[
-        Box::new(parse_labeled_ident_stmt),
-        Box::new(parse_empty_stmt),
-        Box::new(parse_expr_stmt),
-        Box::new(parse_compound_stmt),
-        Box::new(parse_selection_stmt),
-        Box::new(parse_iteration_while_stmt),
-        Box::new(parse_iteration_do_while_stmt),
-        Box::new(parse_iteration_for_stmt),
-        Box::new(parse_jump_goto_stmt),
-        Box::new(parse_jump_continue_stmt),
-        Box::new(parse_jump_break_stmt),
-        Box::new(parse_jump_return_stmt),
-    ];
-
-    for parser in parsers {
-        match parser.parse(tokens, pos) {
-            Err(ParserCombinatorError::IncorrectParser) => continue,
-            Err(e) => return Err(e),
-            Ok((stmt, next_pos)) => return Ok((stmt, next_pos)),
-        };
-    }
-
-    Err(ParserCombinatorError::IncorrectParser)
-}
-
-trait StmtParser<'text> {
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(Stmt<'text>, usize), ParserCombinatorError>;
-}
-
-impl<'text, T, F> StmtParser<'text> for F
-where
-    T: Into<Stmt<'text>>,
-    F: Fn(&[Token<'text>], usize) -> Result<(T, usize), ParserCombinatorError>,
-{
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
-        match self(tokens, pos) {
-            Ok((stmt, pos)) => Ok((stmt.into(), pos)),
-            Err(e) => Err(e),
-        }
-    }
+    combine_parsers(
+        tokens,
+        pos,
+        &[
+            Box::new(parse_labeled_ident_stmt),
+            Box::new(parse_empty_stmt),
+            Box::new(parse_expr_stmt),
+            Box::new(parse_compound_stmt),
+            Box::new(parse_selection_stmt),
+            Box::new(parse_iteration_while_stmt),
+            Box::new(parse_iteration_do_while_stmt),
+            Box::new(parse_iteration_for_stmt),
+            Box::new(parse_jump_goto_stmt),
+            Box::new(parse_jump_continue_stmt),
+            Box::new(parse_jump_break_stmt),
+            Box::new(parse_jump_return_stmt),
+        ],
+    )
 }
 
 #[derive(Debug)]
@@ -462,6 +431,47 @@ fn parse_jump_return_stmt<'text>(
     };
 
     return Ok((JumpStmt::Return(expr), pos + 1));
+}
+
+trait Parser<'text, Ast> {
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(Ast, usize), ParserCombinatorError>;
+}
+
+fn combine_parsers<'text, Ast>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    parsers: &[Box<dyn Parser<'text, Ast>>],
+) -> Result<(Ast, usize), ParserCombinatorError> {
+    for parser in parsers {
+        match parser.parse(tokens, pos) {
+            Err(ParserCombinatorError::IncorrectParser) => continue,
+            Err(e) => return Err(e),
+            Ok((ast, pos)) => return Ok((ast, pos)),
+        };
+    }
+
+    Err(ParserCombinatorError::IncorrectParser)
+}
+
+impl<'text, T, F, Ast> Parser<'text, Ast> for F
+where
+    T: Into<Ast>,
+    F: Fn(&[Token<'text>], usize) -> Result<(T, usize), ParserCombinatorError>,
+{
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(Ast, usize), ParserCombinatorError> {
+        match self(tokens, pos) {
+            Ok((t, pos)) => Ok((t.into(), pos)),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 #[derive(Debug)]
