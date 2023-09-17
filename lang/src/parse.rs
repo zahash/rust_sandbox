@@ -11,35 +11,6 @@ pub enum StructOrUnion {
 
 pub enum StructDeclaration {}
 
-pub enum DeclarationSpecifier<'text> {
-    StorageClassSpecifier(StorageClassSpecifier),
-    TypeSpecifier(TypeSpecifier<'text>),
-    TypeQualifier(TypeQualifier),
-}
-
-#[derive(Debug)]
-pub enum StorageClassSpecifier {
-    Auto,
-    Register,
-    Static,
-    Extern,
-    TypeDef,
-}
-
-fn parse_storage_class_specifier<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-) -> Result<(StorageClassSpecifier, usize), ParserCombinatorError> {
-    match tokens.get(pos) {
-        Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
-        Some(Token::Keyword("register")) => Ok((StorageClassSpecifier::Register, pos + 1)),
-        Some(Token::Keyword("static")) => Ok((StorageClassSpecifier::Static, pos + 1)),
-        Some(Token::Keyword("extern")) => Ok((StorageClassSpecifier::Extern, pos + 1)),
-        Some(Token::Keyword("typedef")) => Ok((StorageClassSpecifier::TypeDef, pos + 1)),
-        _ => Err(ParserCombinatorError::IncorrectParser),
-    }
-}
-
 #[derive(Debug)]
 pub enum EnumSpecifier<'text> {
     NamedEnum(&'text str, EnumeratorList<'text>),
@@ -128,6 +99,50 @@ fn parse_enumerator<'text>(
     let (expr, pos) = parse_constant_expr(tokens, pos + 2)?;
 
     Ok((Enumerator::Explicit(ident, expr), pos))
+}
+
+pub enum DeclarationSpecifier<'text> {
+    StorageClassSpecifier(StorageClassSpecifier),
+    TypeSpecifier(TypeSpecifier<'text>),
+    TypeQualifier(TypeQualifier),
+}
+
+fn parse_declaration_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(DeclarationSpecifier<'text>, usize), ParserCombinatorError> {
+    combine_parsers(
+        tokens,
+        pos,
+        &[
+            Box::new(parse_storage_class_specifier),
+            Box::new(parse_type_specifier),
+            Box::new(parse_type_qualifier),
+        ],
+    )
+}
+
+#[derive(Debug)]
+pub enum StorageClassSpecifier {
+    Auto,
+    Register,
+    Static,
+    Extern,
+    TypeDef,
+}
+
+fn parse_storage_class_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StorageClassSpecifier, usize), ParserCombinatorError> {
+    match tokens.get(pos) {
+        Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
+        Some(Token::Keyword("register")) => Ok((StorageClassSpecifier::Register, pos + 1)),
+        Some(Token::Keyword("static")) => Ok((StorageClassSpecifier::Static, pos + 1)),
+        Some(Token::Keyword("extern")) => Ok((StorageClassSpecifier::Extern, pos + 1)),
+        Some(Token::Keyword("typedef")) => Ok((StorageClassSpecifier::TypeDef, pos + 1)),
+        _ => Err(ParserCombinatorError::IncorrectParser),
+    }
 }
 
 pub enum SpecifierQualifier<'text> {
@@ -659,7 +674,7 @@ fn combine_parsers<'text, Ast>(
 
 impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
-    Ast: From<ParsedValue>,
+    ParsedValue: Into<Ast>,
     F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParserCombinatorError>,
 {
     fn parse(
@@ -1557,6 +1572,30 @@ impl<'text> Display for Primary<'text> {
     }
 }
 
+impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
+    fn from(value: EnumSpecifier<'text>) -> Self {
+        TypeSpecifier::EnumSpecifier(value)
+    }
+}
+
+impl<'text> From<StorageClassSpecifier> for DeclarationSpecifier<'text> {
+    fn from(value: StorageClassSpecifier) -> Self {
+        DeclarationSpecifier::StorageClassSpecifier(value)
+    }
+}
+
+impl<'text> From<TypeSpecifier<'text>> for DeclarationSpecifier<'text> {
+    fn from(value: TypeSpecifier<'text>) -> Self {
+        DeclarationSpecifier::TypeSpecifier(value)
+    }
+}
+
+impl<'text> From<TypeQualifier> for DeclarationSpecifier<'text> {
+    fn from(value: TypeQualifier) -> Self {
+        DeclarationSpecifier::TypeQualifier(value)
+    }
+}
+
 impl<'text> From<TypeSpecifier<'text>> for SpecifierQualifier<'text> {
     fn from(value: TypeSpecifier<'text>) -> Self {
         SpecifierQualifier::TypeSpecifier(value)
@@ -1566,12 +1605,6 @@ impl<'text> From<TypeSpecifier<'text>> for SpecifierQualifier<'text> {
 impl<'text> From<TypeQualifier> for SpecifierQualifier<'text> {
     fn from(value: TypeQualifier) -> Self {
         SpecifierQualifier::TypeQualifier(value)
-    }
-}
-
-impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
-    fn from(value: EnumSpecifier<'text>) -> Self {
-        TypeSpecifier::EnumSpecifier(value)
     }
 }
 
