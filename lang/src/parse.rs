@@ -3,9 +3,7 @@ use std::fmt::{self, Display, Formatter};
 use crate::Token;
 
 #[derive(Debug)]
-pub struct TranslationUnit<'text> {
-    pub declarations: Vec<ExternalDeclaration<'text>>,
-}
+pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 
 #[derive(Debug)]
 pub enum ExternalDeclaration<'text> {
@@ -49,8 +47,8 @@ pub enum StructDeclarator<'text> {
 
 #[derive(Debug)]
 pub struct Declarator<'text> {
-    pointer: Option<Pointer>,
-    direct_declarator: DirectDeclarator<'text>,
+    pub pointer: Option<Pointer>,
+    pub direct_declarator: DirectDeclarator<'text>,
 }
 
 #[derive(Debug)]
