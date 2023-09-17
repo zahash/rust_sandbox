@@ -36,7 +36,38 @@ fn parse_enum_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(EnumSpecifier<'text>, usize), ParserCombinatorError> {
-    todo!()
+    let Some(Token::Keyword("enum")) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    fn parse_enum_body<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(EnumeratorList<'text>, usize), ParseError> {
+        let Some(Token::LCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedLCurly(pos));
+        };
+
+        let (list, pos) = parse_enumerator_list(tokens, pos + 1)?;
+
+        let Some(Token::RCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRCurly(pos).into());
+        };
+
+        return Ok((list, pos + 1));
+    }
+
+    if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
+        if let Some(Token::LCurly) = tokens.get(pos + 2) {
+            let (list, pos) = parse_enum_body(tokens, pos + 2)?;
+            return Ok((EnumSpecifier::NamedEnum(ident, list), pos));
+        }
+
+        return Ok((EnumSpecifier::EnumDeclarator(ident), pos + 2));
+    }
+
+    let (list, pos) = parse_enum_body(tokens, pos + 1)?;
+    Ok((EnumSpecifier::AnonymousEnum(list), pos))
 }
 
 #[derive(Debug)]
@@ -45,7 +76,7 @@ pub struct EnumeratorList<'text>(Vec<Enumerator<'text>>);
 fn parse_enumerator_list<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(EnumeratorList<'text>, usize), ParserCombinatorError> {
+) -> Result<(EnumeratorList<'text>, usize), ParseError> {
     let (enumerator, mut pos) = parse_enumerator(tokens, pos)?;
     let mut list = vec![enumerator];
 
@@ -70,9 +101,9 @@ pub enum Enumerator<'text> {
 fn parse_enumerator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Enumerator<'text>, usize), ParserCombinatorError> {
+) -> Result<(Enumerator<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedIdentifier(pos));
     };
 
     let Some(Token::Equals) = tokens.get(pos + 1) else {
@@ -1594,6 +1625,7 @@ pub enum ParseError {
     ExpectedSemicolon(usize),
     ExpectedLParen(usize),
     ExpectedRParen(usize),
+    ExpectedLCurly(usize),
     ExpectedRCurly(usize),
     ExpectedKeyword(&'static str, usize),
     ExpectedIdentifier(usize),
@@ -1601,21 +1633,23 @@ pub enum ParseError {
 
 #[cfg(test)]
 mod stmt_tests {
-    use super::{parse_enum_specifier, parse_enumerator, parse_enumerator_list, parse_stmt};
+    use super::*;
     use crate::lex;
 
     #[test]
     fn test() {
         let tokens = lex(r#"
-
+        
+        enum Colors {
             RED,
             BLUE = "0000ff",
             GREEN
+        }
         
         "#)
         .expect("** LEX ERROR");
 
-        match parse_enumerator_list(&tokens, 0) {
+        match parse_enum_specifier(&tokens, 0) {
             Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
             Err(e) => assert!(false, "{:?}", e),
         }
