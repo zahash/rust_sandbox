@@ -17,12 +17,27 @@ pub enum DeclarationSpecifier<'text> {
     TypeQualifier(TypeQualifier),
 }
 
+#[derive(Debug)]
 pub enum StorageClassSpecifier {
     Auto,
     Register,
     Static,
     Extern,
     TypeDef,
+}
+
+fn parse_storage_class_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StorageClassSpecifier, usize), ParserCombinatorError> {
+    match tokens.get(pos) {
+        Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
+        Some(Token::Keyword("register")) => Ok((StorageClassSpecifier::Register, pos + 1)),
+        Some(Token::Keyword("static")) => Ok((StorageClassSpecifier::Static, pos + 1)),
+        Some(Token::Keyword("extern")) => Ok((StorageClassSpecifier::Extern, pos + 1)),
+        Some(Token::Keyword("typedef")) => Ok((StorageClassSpecifier::TypeDef, pos + 1)),
+        _ => Err(ParserCombinatorError::IncorrectParser),
+    }
 }
 
 #[derive(Debug)]
@@ -77,19 +92,19 @@ fn parse_enumerator_list<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(EnumeratorList<'text>, usize), ParseError> {
-    let (enumerator, mut pos) = parse_enumerator(tokens, pos)?;
-    let mut list = vec![enumerator];
+    let (invariant, mut pos) = parse_enumerator(tokens, pos)?;
+    let mut invariants = vec![invariant];
 
     while let Some(Token::Comma) = tokens.get(pos) {
         pos += 1;
 
-        let (enumerator, next_pos) = parse_enumerator(tokens, pos)?;
+        let (invariant, next_pos) = parse_enumerator(tokens, pos)?;
         pos = next_pos;
 
-        list.push(enumerator);
+        invariants.push(invariant);
     }
 
-    Ok((EnumeratorList(list), pos))
+    Ok((EnumeratorList(invariants), pos))
 }
 
 #[derive(Debug)]
@@ -207,6 +222,48 @@ fn parse_type_qualifier<'text>(
         Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
         _ => Err(ParserCombinatorError::IncorrectParser),
     }
+}
+
+#[derive(Debug)]
+pub enum Initializer<'text> {
+    Assignment(AssignmentExpr<'text>),
+    InitializerList(Vec<AssignmentExpr<'text>>),
+}
+
+fn parse_initializer<'text>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+) -> Result<(Initializer<'text>, usize), ParseError> {
+    if let Some(Token::LCurly) = tokens.get(pos) {
+        let mut initializers = Vec::new();
+        pos += 1;
+
+        while let Some(token) = tokens.get(pos) {
+            if token == &Token::RCurly {
+                pos += 1;
+                break;
+            }
+
+            let (initializer, next_pos) = parse_assignment_expr(tokens, pos)?;
+            pos = next_pos;
+
+            initializers.push(initializer);
+
+            match tokens.get(pos) {
+                Some(Token::Comma) => pos += 1,
+                Some(Token::RCurly) => {
+                    pos += 1;
+                    break;
+                }
+                _ => return Err(ParseError::ExpectedRCurly(pos)),
+            }
+        }
+
+        return Ok((Initializer::InitializerList(initializers), pos));
+    }
+
+    let (expr, pos) = parse_assignment_expr(tokens, pos)?;
+    Ok((Initializer::Assignment(expr), pos))
 }
 
 #[derive(Debug)]
@@ -1235,6 +1292,21 @@ impl Display for TypeQualifier {
     }
 }
 
+impl<'text> Display for Initializer<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Initializer::Assignment(expr) => write!(f, "{}", expr),
+            Initializer::InitializerList(list) => {
+                write!(f, "{{ ")?;
+                for expr in list {
+                    write!(f, "{}, ", expr)?;
+                }
+                write!(f, "}}")
+            }
+        }
+    }
+}
+
 impl<'text> Display for Stmt<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -1503,6 +1575,12 @@ impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
     }
 }
 
+impl<'text> From<AssignmentExpr<'text>> for Initializer<'text> {
+    fn from(value: AssignmentExpr<'text>) -> Self {
+        Initializer::Assignment(value)
+    }
+}
+
 impl<'text> From<LabeledStmt<'text>> for Stmt<'text> {
     fn from(value: LabeledStmt<'text>) -> Self {
         Stmt::Labeled(value)
@@ -1640,16 +1718,14 @@ mod stmt_tests {
     fn test() {
         let tokens = lex(r#"
         
-        enum Colors {
-            RED,
-            BLUE = "0000ff",
-            GREEN
-        }
+         { RED = 1, BLUE = 2 }
         
         "#)
         .expect("** LEX ERROR");
 
-        match parse_enum_specifier(&tokens, 0) {
+        println!("{:?}", tokens);
+
+        match parse_initializer(&tokens, 0) {
             Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
             Err(e) => assert!(false, "{:?}", e),
         }
