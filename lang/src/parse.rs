@@ -31,6 +31,13 @@ pub enum EnumSpecifier<'text> {
     EnumDeclarator(&'text str),
 }
 
+fn parse_enum_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(EnumSpecifier<'text>, usize), ParserCombinatorError> {
+    todo!()
+}
+
 pub enum EnumeratorList<'text> {
     Single(Enumerator<'text>),
     Multiple(Box<EnumeratorList<'text>>, Enumerator<'text>),
@@ -60,10 +67,64 @@ pub enum TypeSpecifier<'text> {
     TypeDefName(&'text str),
 }
 
+fn parse_type_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+    fn parse_basic_type_specifier<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+        match tokens.get(pos) {
+            Some(Token::Keyword("void")) => Ok((TypeSpecifier::Void, pos + 1)),
+            Some(Token::Keyword("char")) => Ok((TypeSpecifier::Char, pos + 1)),
+            Some(Token::Keyword("short")) => Ok((TypeSpecifier::Short, pos + 1)),
+            Some(Token::Keyword("int")) => Ok((TypeSpecifier::Int, pos + 1)),
+            Some(Token::Keyword("long")) => Ok((TypeSpecifier::Long, pos + 1)),
+            Some(Token::Keyword("float")) => Ok((TypeSpecifier::Float, pos + 1)),
+            Some(Token::Keyword("double")) => Ok((TypeSpecifier::Double, pos + 1)),
+            Some(Token::Keyword("signed")) => Ok((TypeSpecifier::Signed, pos + 1)),
+            Some(Token::Keyword("unsigned")) => Ok((TypeSpecifier::UnSigned, pos + 1)),
+            _ => Err(ParserCombinatorError::IncorrectParser),
+        }
+    }
+
+    fn parse_typedef_name<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+        match tokens.get(pos) {
+            Some(Token::Ident(ident)) => Ok((TypeSpecifier::TypeDefName(ident), pos + 1)),
+            _ => Err(ParserCombinatorError::IncorrectParser),
+        }
+    }
+
+    combine_parsers(
+        tokens,
+        pos,
+        &[
+            Box::new(parse_basic_type_specifier),
+            Box::new(parse_enum_specifier),
+            Box::new(parse_typedef_name),
+        ],
+    )
+}
+
 #[derive(Debug)]
 pub enum TypeQualifier {
     Const,
     Volatile,
+}
+
+fn parse_type_qualifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(TypeQualifier, usize), ParserCombinatorError> {
+    match tokens.get(pos) {
+        Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
+        Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
+        _ => Err(ParserCombinatorError::IncorrectParser),
+    }
 }
 
 #[derive(Debug)]
@@ -457,10 +518,10 @@ fn combine_parsers<'text, Ast>(
     Err(ParserCombinatorError::IncorrectParser)
 }
 
-impl<'text, T, F, Ast> Parser<'text, Ast> for F
+impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
-    T: Into<Ast>,
-    F: Fn(&[Token<'text>], usize) -> Result<(T, usize), ParserCombinatorError>,
+    ParsedValue: Into<Ast>,
+    F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParserCombinatorError>,
 {
     fn parse(
         &self,
@@ -468,7 +529,7 @@ where
         pos: usize,
     ) -> Result<(Ast, usize), ParserCombinatorError> {
         match self(tokens, pos) {
-            Ok((t, pos)) => Ok((t.into(), pos)),
+            Ok((val, pos)) => Ok((val.into(), pos)),
             Err(e) => Err(e),
         }
     }
@@ -1265,6 +1326,12 @@ impl<'text> Display for Primary<'text> {
             Primary::String(s) => write!(f, "\"{}\"", s),
             Primary::Parens(expr) => write!(f, "({})", expr),
         }
+    }
+}
+
+impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
+    fn from(value: EnumSpecifier<'text>) -> Self {
+        TypeSpecifier::EnumSpecifier(value)
     }
 }
 
