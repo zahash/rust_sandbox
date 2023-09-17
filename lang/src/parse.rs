@@ -2,15 +2,6 @@ use std::fmt::{self, Display, Formatter};
 
 use crate::Token;
 
-pub enum StructOrUnionSpecifier {}
-
-pub enum StructOrUnion {
-    Struct,
-    Union,
-}
-
-pub enum StructDeclaration {}
-
 #[derive(Debug)]
 pub enum EnumSpecifier<'text> {
     NamedEnum(&'text str, EnumeratorList<'text>),
@@ -57,7 +48,7 @@ fn parse_enum_specifier<'text>(
 }
 
 #[derive(Debug)]
-pub struct EnumeratorList<'text>(Vec<Enumerator<'text>>);
+pub struct EnumeratorList<'text>(pub Vec<Enumerator<'text>>);
 
 fn parse_enumerator_list<'text>(
     tokens: &[Token<'text>],
@@ -224,8 +215,8 @@ fn parse_type_specifier<'text>(
 
 #[derive(Debug)]
 pub struct Pointer {
-    qualifiers: Vec<TypeQualifier>,
-    next: Option<Box<Pointer>>,
+    pub qualifiers: Vec<TypeQualifier>,
+    pub next: Option<Box<Pointer>>,
 }
 
 fn parse_pointer<'text>(
@@ -328,7 +319,7 @@ pub enum Stmt<'text> {
     Labeled(LabeledStmt<'text>),
     EmptyStmt,
     Expr(Expr<'text>),
-    Compound(Vec<Stmt<'text>>),
+    Compound(CompoundStmt<'text>),
     Selection(SelectionStmt<'text>),
     Iteration(IterationStmt<'text>),
     Jump(JumpStmt<'text>),
@@ -402,10 +393,13 @@ fn parse_expr_stmt<'text>(
     Ok((Stmt::Expr(expr), pos + 1))
 }
 
+#[derive(Debug)]
+pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
+
 fn parse_compound_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(CompoundStmt<'text>, usize), ParserCombinatorError> {
     let Some(Token::LCurly) = tokens.get(pos) else {
         return Err(ParserCombinatorError::IncorrectParser);
     };
@@ -415,7 +409,7 @@ fn parse_compound_stmt<'text>(
 
     while let Some(token) = tokens.get(pos) {
         if token == &Token::RCurly {
-            return Ok((Stmt::Compound(stmts), pos + 1));
+            return Ok((CompoundStmt(stmts), pos + 1));
         }
 
         match parse_stmt(tokens, pos) {
@@ -1397,13 +1391,7 @@ impl<'text> Display for Stmt<'text> {
             Stmt::EmptyStmt => write!(f, ";"),
             Stmt::Expr(stmt) => write!(f, "{};", stmt),
             Stmt::Labeled(stmt) => write!(f, "{}", stmt),
-            Stmt::Compound(stmts) => {
-                write!(f, "{{ ")?;
-                for stmt in stmts {
-                    write!(f, "{} ", stmt)?;
-                }
-                write!(f, "}}")
-            }
+            Stmt::Compound(stmt) => write!(f, "{}", stmt),
             Stmt::Selection(stmt) => write!(f, "{}", stmt),
             Stmt::Iteration(stmt) => write!(f, "{}", stmt),
             Stmt::Jump(stmt) => write!(f, "{}", stmt),
@@ -1416,6 +1404,16 @@ impl<'text> Display for LabeledStmt<'text> {
         match self {
             LabeledStmt::Ident(ident, stmt) => write!(f, "{} : {}", ident, stmt),
         }
+    }
+}
+
+impl<'text> Display for CompoundStmt<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{{ ")?;
+        for stmt in &self.0 {
+            write!(f, "{} ", stmt)?;
+        }
+        write!(f, "}}")
     }
 }
 
@@ -1686,6 +1684,12 @@ impl<'text> From<AssignmentExpr<'text>> for Initializer<'text> {
 impl<'text> From<LabeledStmt<'text>> for Stmt<'text> {
     fn from(value: LabeledStmt<'text>) -> Self {
         Stmt::Labeled(value)
+    }
+}
+
+impl<'text> From<CompoundStmt<'text>> for Stmt<'text> {
+    fn from(value: CompoundStmt<'text>) -> Self {
+        Stmt::Compound(value)
     }
 }
 
