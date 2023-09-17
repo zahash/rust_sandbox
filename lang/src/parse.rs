@@ -3,10 +3,115 @@ use std::fmt::{self, Display, Formatter};
 use crate::Token;
 
 #[derive(Debug)]
+pub struct TranslationUnit<'text> {
+    pub declarations: Vec<ExternalDeclaration<'text>>,
+}
+
+#[derive(Debug)]
+pub enum ExternalDeclaration<'text> {
+    FunctionDefinition(FunctionDefinition<'text>),
+    Declaration(Declaration<'text>),
+}
+
+#[derive(Debug)]
+pub struct FunctionDefinition<'text> {
+    pub return_type: Vec<DeclarationSpecifier<'text>>,
+    pub declarator: Declarator<'text>,
+    pub declarations: Vec<Declaration<'text>>,
+    pub body: CompoundStmt<'text>,
+}
+
+#[derive(Debug)]
+pub enum StructOrUnionSpecifier<'text> {
+    Named(StructOrUnion, &'text str, Vec<StructDeclaration<'text>>),
+    Anonymous(Vec<StructDeclaration<'text>>),
+    ForwardDeclaration(&'text str),
+}
+
+#[derive(Debug)]
+pub enum StructOrUnion {
+    Struct,
+    Union,
+}
+
+#[derive(Debug)]
+pub struct StructDeclaration<'text> {
+    pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
+    pub declarator_list: Vec<StructDeclarator<'text>>,
+}
+
+#[derive(Debug)]
+pub enum StructDeclarator<'text> {
+    Declarator(Declarator<'text>),
+    DeclaratorWithBitField(Declarator<'text>, ConstantExpr<'text>),
+    BitField(ConstantExpr<'text>),
+}
+
+#[derive(Debug)]
+pub struct Declarator<'text> {
+    pointer: Option<Pointer>,
+    direct_declarator: DirectDeclarator<'text>,
+}
+
+#[derive(Debug)]
+pub enum DirectDeclarator<'text> {
+    Identifier(&'text str),
+    Parens(Box<Declarator<'text>>),
+    Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
+    Function(
+        Box<DirectDeclarator<'text>>,
+        Option<ParameterTypeList<'text>>,
+    ),
+    Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
+}
+
+#[derive(Debug)]
+pub struct TypeName<'text> {
+    pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
+    pub abstract_declarator: Option<AbstractDeclarator<'text>>,
+}
+
+#[derive(Debug)]
+pub enum ParameterTypeList<'text> {
+    ParameterList(Vec<ParameterDeclaration<'text>>),
+    VariadicParameterList(Vec<ParameterDeclaration<'text>>),
+}
+
+#[derive(Debug)]
+pub enum ParameterDeclaration<'text> {
+    WithDeclarator(Vec<DeclarationSpecifier<'text>>, Declarator<'text>),
+    WithAbstractDeclarator(Vec<DeclarationSpecifier<'text>>, AbstractDeclarator<'text>),
+    OnlySpecifiers(Vec<DeclarationSpecifier<'text>>),
+}
+
+#[derive(Debug)]
+pub enum AbstractDeclarator<'text> {
+    Pointer(Pointer),
+    PointerWithDirect(
+        Box<AbstractDeclarator<'text>>,
+        DirectAbstractDeclarator<'text>,
+    ),
+    Direct(DirectAbstractDeclarator<'text>),
+}
+
+#[derive(Debug)]
+pub enum DirectAbstractDeclarator<'text> {
+    Parens(Box<AbstractDeclarator<'text>>),
+    Array(
+        Option<Box<DirectAbstractDeclarator<'text>>>,
+        Option<ConstantExpr<'text>>,
+    ),
+    Function(
+        Option<Box<DirectAbstractDeclarator<'text>>>,
+        Option<ParameterTypeList<'text>>,
+    ),
+}
+
+#[derive(Debug)]
 pub enum EnumSpecifier<'text> {
-    NamedEnum(&'text str, EnumeratorList<'text>),
-    AnonymousEnum(EnumeratorList<'text>),
-    EnumDeclarator(&'text str),
+    Named(&'text str, EnumeratorList<'text>),
+    Anonymous(EnumeratorList<'text>),
+    ForwardDeclaration(&'text str),
 }
 
 fn parse_enum_specifier<'text>(
@@ -37,14 +142,14 @@ fn parse_enum_specifier<'text>(
     if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
         if let Some(Token::LCurly) = tokens.get(pos + 2) {
             let (list, pos) = parse_enum_body(tokens, pos + 2)?;
-            return Ok((EnumSpecifier::NamedEnum(ident, list), pos));
+            return Ok((EnumSpecifier::Named(ident, list), pos));
         }
 
-        return Ok((EnumSpecifier::EnumDeclarator(ident), pos + 2));
+        return Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2));
     }
 
     let (list, pos) = parse_enum_body(tokens, pos + 1)?;
-    Ok((EnumSpecifier::AnonymousEnum(list), pos))
+    Ok((EnumSpecifier::Anonymous(list), pos))
 }
 
 #[derive(Debug)]
@@ -92,6 +197,61 @@ fn parse_enumerator<'text>(
     Ok((Enumerator::Explicit(ident, expr), pos))
 }
 
+#[derive(Debug)]
+pub struct Declaration<'text> {
+    pub declaration_specifiers: Vec<DeclarationSpecifier<'text>>,
+    pub init_declarators: Vec<InitDeclarator<'text>>,
+}
+
+#[derive(Debug)]
+pub enum InitDeclarator<'text> {
+    Declared(Declarator<'text>),
+    Initialized(Declarator<'text>, Initializer<'text>),
+}
+
+#[derive(Debug)]
+pub enum Initializer<'text> {
+    Assignment(AssignmentExpr<'text>),
+    InitializerList(Vec<AssignmentExpr<'text>>),
+}
+
+fn parse_initializer<'text>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+) -> Result<(Initializer<'text>, usize), ParseError> {
+    if let Some(Token::LCurly) = tokens.get(pos) {
+        let mut initializers = Vec::new();
+        pos += 1;
+
+        while let Some(token) = tokens.get(pos) {
+            if token == &Token::RCurly {
+                pos += 1;
+                break;
+            }
+
+            let (initializer, next_pos) = parse_assignment_expr(tokens, pos)?;
+            pos = next_pos;
+
+            initializers.push(initializer);
+
+            match tokens.get(pos) {
+                Some(Token::Comma) => pos += 1,
+                Some(Token::RCurly) => {
+                    pos += 1;
+                    break;
+                }
+                _ => return Err(ParseError::ExpectedRCurly(pos)),
+            }
+        }
+
+        return Ok((Initializer::InitializerList(initializers), pos));
+    }
+
+    let (expr, pos) = parse_assignment_expr(tokens, pos)?;
+    Ok((Initializer::Assignment(expr), pos))
+}
+
+#[derive(Debug)]
 pub enum DeclarationSpecifier<'text> {
     StorageClassSpecifier(StorageClassSpecifier),
     TypeSpecifier(TypeSpecifier<'text>),
@@ -136,6 +296,7 @@ fn parse_storage_class_specifier<'text>(
     }
 }
 
+#[derive(Debug)]
 pub enum SpecifierQualifier<'text> {
     TypeSpecifier(TypeSpecifier<'text>),
     TypeQualifier(TypeQualifier),
@@ -270,48 +431,6 @@ fn parse_type_qualifier<'text>(
         Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
         _ => Err(ParserCombinatorError::IncorrectParser),
     }
-}
-
-#[derive(Debug)]
-pub enum Initializer<'text> {
-    Assignment(AssignmentExpr<'text>),
-    InitializerList(Vec<AssignmentExpr<'text>>),
-}
-
-fn parse_initializer<'text>(
-    tokens: &[Token<'text>],
-    mut pos: usize,
-) -> Result<(Initializer<'text>, usize), ParseError> {
-    if let Some(Token::LCurly) = tokens.get(pos) {
-        let mut initializers = Vec::new();
-        pos += 1;
-
-        while let Some(token) = tokens.get(pos) {
-            if token == &Token::RCurly {
-                pos += 1;
-                break;
-            }
-
-            let (initializer, next_pos) = parse_assignment_expr(tokens, pos)?;
-            pos = next_pos;
-
-            initializers.push(initializer);
-
-            match tokens.get(pos) {
-                Some(Token::Comma) => pos += 1,
-                Some(Token::RCurly) => {
-                    pos += 1;
-                    break;
-                }
-                _ => return Err(ParseError::ExpectedRCurly(pos)),
-            }
-        }
-
-        return Ok((Initializer::InitializerList(initializers), pos));
-    }
-
-    let (expr, pos) = parse_assignment_expr(tokens, pos)?;
-    Ok((Initializer::Assignment(expr), pos))
 }
 
 #[derive(Debug)]
@@ -1279,9 +1398,9 @@ fn parse_primary_expr<'text>(
 impl<'text> Display for EnumSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            EnumSpecifier::NamedEnum(ident, list) => write!(f, "enum {} {{ {} }}", ident, list),
-            EnumSpecifier::AnonymousEnum(list) => write!(f, "enum {{ {} }}", list),
-            EnumSpecifier::EnumDeclarator(ident) => write!(f, "enum {}", ident),
+            EnumSpecifier::Named(ident, list) => write!(f, "enum {} {{ {} }}", ident, list),
+            EnumSpecifier::Anonymous(list) => write!(f, "enum {{ {} }}", list),
+            EnumSpecifier::ForwardDeclaration(ident) => write!(f, "enum {}", ident),
         }
     }
 }
