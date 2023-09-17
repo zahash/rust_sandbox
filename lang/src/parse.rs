@@ -223,6 +223,48 @@ fn parse_type_specifier<'text>(
 }
 
 #[derive(Debug)]
+pub struct Pointer {
+    qualifiers: Vec<TypeQualifier>,
+    next: Option<Box<Pointer>>,
+}
+
+fn parse_pointer<'text>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+) -> Result<(Pointer, usize), ParserCombinatorError> {
+    let Some(Token::Asterisk) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+    pos += 1;
+
+    let mut pointer = Pointer {
+        qualifiers: vec![],
+        next: None,
+    };
+
+    loop {
+        match parse_type_qualifier(tokens, pos) {
+            Err(ParserCombinatorError::IncorrectParser) => break,
+            Err(e) => return Err(e),
+            Ok((qualifier, next_pos)) => {
+                pointer.qualifiers.push(qualifier);
+                pos = next_pos;
+            }
+        }
+    }
+
+    match parse_pointer(tokens, pos) {
+        Err(ParserCombinatorError::IncorrectParser) => Ok((pointer, pos)),
+        Err(e) => Err(e),
+        Ok((next_pointer, next_pos)) => {
+            pos = next_pos;
+            pointer.next = Some(Box::new(next_pointer));
+            Ok((pointer, pos))
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum TypeQualifier {
     Const,
     Volatile,
@@ -1271,6 +1313,18 @@ impl<'text> Display for Enumerator<'text> {
     }
 }
 
+impl Display for StorageClassSpecifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            StorageClassSpecifier::Auto => write!(f, "auto"),
+            StorageClassSpecifier::Register => write!(f, "register"),
+            StorageClassSpecifier::Static => write!(f, "static"),
+            StorageClassSpecifier::Extern => write!(f, "extern"),
+            StorageClassSpecifier::TypeDef => write!(f, "typedef"),
+        }
+    }
+}
+
 impl<'text> Display for SpecifierQualifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -1295,6 +1349,21 @@ impl<'text> Display for TypeSpecifier<'text> {
             TypeSpecifier::EnumSpecifier(specifier) => write!(f, "{}", specifier),
             TypeSpecifier::TypeDefName(ident) => write!(f, "{}", ident),
         }
+    }
+}
+
+impl Display for Pointer {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "*")?;
+        for qualifier in &self.qualifiers {
+            write!(f, "{} ", qualifier)?;
+        }
+
+        if let Some(next_pointer) = &self.next {
+            write!(f, "{}", next_pointer)?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1751,14 +1820,14 @@ mod stmt_tests {
     fn test() {
         let tokens = lex(r#"
         
-         { RED = 1, BLUE = 2 }
+        * const * const volatile const * volatile * * * a
         
         "#)
         .expect("** LEX ERROR");
 
         println!("{:?}", tokens);
 
-        match parse_initializer(&tokens, 0) {
+        match parse_pointer(&tokens, 0) {
             Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
             Err(e) => assert!(false, "{:?}", e),
         }
