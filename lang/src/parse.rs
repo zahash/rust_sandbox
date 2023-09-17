@@ -40,9 +40,25 @@ fn parse_enum_specifier<'text>(
 }
 
 #[derive(Debug)]
-pub enum EnumeratorList<'text> {
-    Single(Enumerator<'text>),
-    Multiple(Box<EnumeratorList<'text>>, Enumerator<'text>),
+pub struct EnumeratorList<'text>(Vec<Enumerator<'text>>);
+
+fn parse_enumerator_list<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(EnumeratorList<'text>, usize), ParserCombinatorError> {
+    let (enumerator, mut pos) = parse_enumerator(tokens, pos)?;
+    let mut list = vec![enumerator];
+
+    while let Some(Token::Comma) = tokens.get(pos) {
+        pos += 1;
+
+        let (enumerator, next_pos) = parse_enumerator(tokens, pos)?;
+        pos = next_pos;
+
+        list.push(enumerator);
+    }
+
+    Ok((EnumeratorList(list), pos))
 }
 
 #[derive(Debug)]
@@ -63,7 +79,7 @@ fn parse_enumerator<'text>(
         return Ok((Enumerator::Implicit(ident), pos + 1));
     };
 
-    let (expr, pos) = parse_constant_expr(tokens, pos)?;
+    let (expr, pos) = parse_constant_expr(tokens, pos + 2)?;
 
     Ok((Enumerator::Explicit(ident, expr), pos))
 }
@@ -1121,6 +1137,73 @@ fn parse_primary_expr<'text>(
     }
 }
 
+impl<'text> Display for EnumSpecifier<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            EnumSpecifier::NamedEnum(ident, list) => write!(f, "enum {} {{ {} }}", ident, list),
+            EnumSpecifier::AnonymousEnum(list) => write!(f, "enum {{ {} }}", list),
+            EnumSpecifier::EnumDeclarator(ident) => write!(f, "enum {}", ident),
+        }
+    }
+}
+
+impl<'text> Display for EnumeratorList<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        for (i, e) in self.0.iter().enumerate() {
+            match i == self.0.len() - 1 {
+                true => write!(f, "{}", e)?,
+                false => write!(f, "{}, ", e)?,
+            }
+        }
+        Ok(())
+    }
+}
+
+impl<'text> Display for Enumerator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Enumerator::Implicit(ident) => write!(f, "{}", ident),
+            Enumerator::Explicit(ident, value) => write!(f, "{} = {}", ident, value),
+        }
+    }
+}
+
+impl<'text> Display for SpecifierQualifier<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            SpecifierQualifier::TypeSpecifier(specifier) => write!(f, "{}", specifier),
+            SpecifierQualifier::TypeQualifier(qualifier) => write!(f, "{}", qualifier),
+        }
+    }
+}
+
+impl<'text> Display for TypeSpecifier<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TypeSpecifier::Void => write!(f, "void"),
+            TypeSpecifier::Char => write!(f, "char"),
+            TypeSpecifier::Short => write!(f, "short"),
+            TypeSpecifier::Int => write!(f, "int"),
+            TypeSpecifier::Long => write!(f, "long"),
+            TypeSpecifier::Float => write!(f, "float"),
+            TypeSpecifier::Double => write!(f, "double"),
+            TypeSpecifier::Signed => write!(f, "signed"),
+            TypeSpecifier::UnSigned => write!(f, "unsigned"),
+            TypeSpecifier::EnumSpecifier(specifier) => write!(f, "{}", specifier),
+            TypeSpecifier::TypeDefName(ident) => write!(f, "{}", ident),
+        }
+    }
+}
+
+impl Display for TypeQualifier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            TypeQualifier::Const => write!(f, "const"),
+            TypeQualifier::Volatile => write!(f, "volatile"),
+        }
+    }
+}
+
 impl<'text> Display for Stmt<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -1518,8 +1601,25 @@ pub enum ParseError {
 
 #[cfg(test)]
 mod stmt_tests {
-    use super::parse_stmt;
+    use super::{parse_enum_specifier, parse_enumerator, parse_enumerator_list, parse_stmt};
     use crate::lex;
+
+    #[test]
+    fn test() {
+        let tokens = lex(r#"
+
+            RED,
+            BLUE = "0000ff",
+            GREEN
+        
+        "#)
+        .expect("** LEX ERROR");
+
+        match parse_enumerator_list(&tokens, 0) {
+            Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
+            Err(e) => assert!(false, "{:?}", e),
+        }
+    }
 
     #[test]
     fn test_all() {
