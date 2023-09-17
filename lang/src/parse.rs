@@ -25,6 +25,7 @@ pub enum StorageClassSpecifier {
     TypeDef,
 }
 
+#[derive(Debug)]
 pub enum EnumSpecifier<'text> {
     NamedEnum(&'text str, EnumeratorList<'text>),
     AnonymousEnum(EnumeratorList<'text>),
@@ -38,14 +39,33 @@ fn parse_enum_specifier<'text>(
     todo!()
 }
 
+#[derive(Debug)]
 pub enum EnumeratorList<'text> {
     Single(Enumerator<'text>),
     Multiple(Box<EnumeratorList<'text>>, Enumerator<'text>),
 }
 
+#[derive(Debug)]
 pub enum Enumerator<'text> {
     Implicit(&'text str),
     Explicit(&'text str, ConstantExpr<'text>),
+}
+
+fn parse_enumerator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Enumerator<'text>, usize), ParserCombinatorError> {
+    let Some(Token::Ident(ident)) = tokens.get(pos) else {
+        return Err(ParserCombinatorError::IncorrectParser);
+    };
+
+    let Some(Token::Equals) = tokens.get(pos + 1) else {
+        return Ok((Enumerator::Implicit(ident), pos + 1));
+    };
+
+    let (expr, pos) = parse_constant_expr(tokens, pos)?;
+
+    Ok((Enumerator::Explicit(ident, expr), pos))
 }
 
 pub enum SpecifierQualifier<'text> {
@@ -53,6 +73,21 @@ pub enum SpecifierQualifier<'text> {
     TypeQualifier(TypeQualifier),
 }
 
+fn parse_specifier_qualifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(SpecifierQualifier<'text>, usize), ParserCombinatorError> {
+    combine_parsers(
+        tokens,
+        pos,
+        &[
+            Box::new(parse_type_specifier),
+            Box::new(parse_type_qualifier),
+        ],
+    )
+}
+
+#[derive(Debug)]
 pub enum TypeSpecifier<'text> {
     Void,
     Char,
@@ -520,7 +555,7 @@ fn combine_parsers<'text, Ast>(
 
 impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
-    ParsedValue: Into<Ast>,
+    Ast: From<ParsedValue>,
     F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParserCombinatorError>,
 {
     fn parse(
@@ -634,6 +669,13 @@ fn parse_assignment_expr<'text>(
 }
 
 pub type ConstantExpr<'text> = ConditionalExpr<'text>;
+
+fn parse_constant_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ConstantExpr<'text>, usize), ParseError> {
+    parse_conditional_expr(tokens, pos)
+}
 
 #[derive(Debug, PartialEq)]
 pub enum ConditionalExpr<'text> {
@@ -1326,6 +1368,18 @@ impl<'text> Display for Primary<'text> {
             Primary::String(s) => write!(f, "\"{}\"", s),
             Primary::Parens(expr) => write!(f, "({})", expr),
         }
+    }
+}
+
+impl<'text> From<TypeSpecifier<'text>> for SpecifierQualifier<'text> {
+    fn from(value: TypeSpecifier<'text>) -> Self {
+        SpecifierQualifier::TypeSpecifier(value)
+    }
+}
+
+impl<'text> From<TypeQualifier> for SpecifierQualifier<'text> {
+    fn from(value: TypeQualifier) -> Self {
+        SpecifierQualifier::TypeQualifier(value)
     }
 }
 
