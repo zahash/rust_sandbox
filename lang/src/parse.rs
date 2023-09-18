@@ -2030,22 +2030,31 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    // #[test]
-    // fn test() {
-    //     let tokens = lex(r#"
+    #[test]
+    fn test_pointer() {
+        check!(parse_pointer, "*");
+        check!(parse_pointer, "**");
+        check!(parse_pointer, "***");
+        check!(parse_pointer, "*const ");
+        check!(
+            parse_pointer,
+            "*const volatile const volatile volatile const "
+        );
+        check!(
+            parse_pointer,
+            "*volatile const volatile *const const volatile "
+        );
+        check!(
+            parse_pointer,
+            "**volatile *******const ***const volatile ******"
+        );
+    }
 
-    //     * const * const volatile const * volatile * * * a
-
-    //     "#)
-    //     .expect("** LEX ERROR");
-
-    //     println!("{:?}", tokens);
-
-    //     match parse_pointer(&tokens, 0) {
-    //         Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
-    //         Err(e) => assert!(false, "{:?}", e),
-    //     }
-    // }
+    #[test]
+    fn test_type_qualifier() {
+        check!(parse_type_qualifier, "const");
+        check!(parse_type_qualifier, "volatile");
+    }
 
     #[test]
     fn test_simple_stmt() {
