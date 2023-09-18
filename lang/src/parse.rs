@@ -1638,16 +1638,16 @@ impl<'text> Display for IterationStmt<'text> {
                 if let Some(expr) = init {
                     write!(f, "{}", expr)?;
                 }
-                write!(f, "; ")?;
+                write!(f, ";")?;
                 if let Some(expr) = test {
-                    write!(f, "{}", expr)?;
+                    write!(f, " {}", expr)?;
                 }
-                write!(f, "; ")?;
+                write!(f, ";")?;
                 if let Some(expr) = update {
-                    write!(f, "{}", expr)?;
+                    write!(f, " {}", expr)?;
                 }
-                write!(f, ") ")?;
-                write!(f, "{}", body)
+                write!(f, ")")?;
+                write!(f, " {}", body)
             }
         }
     }
@@ -2015,88 +2015,132 @@ mod stmt_tests {
     use super::*;
     use crate::lex;
 
+    use pretty_assertions::assert_eq;
+
+    macro_rules! check_stmt {
+        ($src:expr) => {
+            check_stmt($src, $src)
+        };
+        ($src:expr, $expected:expr) => {
+            check_stmt($src, $expected)
+        };
+    }
+
+    fn check_stmt(src: &str, expected: &str) {
+        let tokens = lex(src).expect("** LEX ERROR");
+        let (stmt, pos) = parse_stmt(&tokens, 0).expect("** Unable to parse statement");
+        assert_eq!(pos, tokens.len());
+        let stmt = format!("{}", stmt);
+        assert_eq!(expected, stmt);
+    }
+
+    // #[test]
+    // fn test() {
+    //     let tokens = lex(r#"
+
+    //     * const * const volatile const * volatile * * * a
+
+    //     "#)
+    //     .expect("** LEX ERROR");
+
+    //     println!("{:?}", tokens);
+
+    //     match parse_pointer(&tokens, 0) {
+    //         Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
+    //         Err(e) => assert!(false, "{:?}", e),
+    //     }
+    // }
+
     #[test]
-    fn test() {
-        let tokens = lex(r#"
-        
-        * const * const volatile const * volatile * * * a
-        
-        "#)
-        .expect("** LEX ERROR");
-
-        println!("{:?}", tokens);
-
-        match parse_pointer(&tokens, 0) {
-            Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
-            Err(e) => assert!(false, "{:?}", e),
-        }
+    fn test_simple() {
+        check_stmt!(";");
+        check_stmt!("{ }");
+        check_stmt!("a++;");
+        check_stmt!("{ a++; }");
     }
 
     #[test]
-    fn test_all() {
-        let tokens = lex(r#"
-            {
-                ;
-                {}
-                a++;
-                { a++; }
+    fn test_labeled() {
+        check_stmt!("a : ;");
+        check_stmt!("a : { }");
+        check_stmt!("a : b;");
+        check_stmt!("a : { b; }");
+    }
 
-                a : ;
-                a : {}
-                a : b;
-                a : { b; }
-
-                if (a) ;
-                if (a) b;
-                if (a) b; else c;
-                if (a) b; else if (c) d;
-                if (a) b; else if (c) d; else e;
-
-                if (a) {}
-                if (a) { b; }
-                if (a) { b; } else { c; }
-                if (a) { b; } else if (c) { d; }
-                if (a) { b; } else if (c) { d; } else { e; }
-
-                while (a) ;
-                while (a) {}
-                while (a > 0) { a--; }
-
-                do ; while (a);
-                do {} while (a);
-                do { a++; } while (a < 10);
-
-                for (;;) ;
-                for (;;) {}
-                for (a;;) ;
-                for (;a;) ;
-                for (;;a) ;
-                for (a;a;a) ;
-                for (a;a;a) {}
-                for (i=0; i<10; i++) { a++; }
-
-                goto a;
-                continue;
-                break;
-                return;
-                return a;
-
+    #[test]
+    fn test_if() {
+        check_stmt!("if (a) ;");
+        check_stmt!("if (a) b;");
+        check_stmt!("if (a) b; else c;");
+        check_stmt!("if (a) b; else if (c) d;");
+        check_stmt!("if (a) b; else if (c) d; else e;");
+        check_stmt!("if (a) { }");
+        check_stmt!("if (a) { b; }");
+        check_stmt!("if (a) { b; } else { c; }");
+        check_stmt!("if (a) { b; } else if (c) { d; }");
+        check_stmt!("if (a) { b; } else if (c) { d; } else { e; }");
+        check_stmt!(
+            r#"
+            if (a == 1) {
+                b++;
+            } else if (a == 2) {
+                b--;
+            } else {
+                b;
             }
-        "#)
-        .expect("** LEX ERROR");
+            "#,
+            "if ((a == 1)) { b++; } else if ((a == 2)) { b--; } else { b; }"
+        )
+    }
 
-        println!("{:?}", tokens);
+    #[test]
+    fn test_while() {
+        check_stmt!("while (a) ;");
+        check_stmt!("while (a) { }");
+        check_stmt!("while (a) { b; }");
+        check_stmt!("while (a <= 10) { a++; }", "while ((a <= 10)) { a++; }");
+    }
 
-        match parse_stmt(&tokens, 0) {
-            Ok((expr, pos)) => println!("{} {}\n{}", tokens.len(), pos, expr),
-            Err(e) => assert!(false, "{:?}", e),
-        }
+    #[test]
+    fn test_do_while() {
+        check_stmt!("do ; while (a);");
+        check_stmt!("do { } while (a);");
+        check_stmt!("do { b; } while (a);");
+        check_stmt!(
+            "do { a++; } while (a <= 10);",
+            "do { a++; } while ((a <= 10));"
+        );
+    }
+
+    #[test]
+    fn test_for() {
+        check_stmt!("for (;;) ;");
+        check_stmt!("for (;;) { }");
+        check_stmt!("for (a;;) ;");
+        check_stmt!("for (; a;) ;");
+        check_stmt!("for (;; a) ;");
+        check_stmt!("for (a; a; a) ;");
+        check_stmt!("for (a; a; a) { }");
+        check_stmt!("for (a; a; a) { b; }");
+        check_stmt!(
+            "for (i=0; i<10; i++) { a++; }",
+            "for ((i = 0); (i < 10); i++) { a++; }"
+        );
+    }
+
+    #[test]
+    fn test_jump() {
+        check_stmt!("goto a;");
+        check_stmt!("continue;");
+        check_stmt!("break;");
+        check_stmt!("return;");
+        check_stmt!("return a;");
     }
 }
 
 #[cfg(test)]
 mod expr_tests {
-    use super::parse_expr;
+    use super::*;
     use crate::lex;
 
     #[test]
