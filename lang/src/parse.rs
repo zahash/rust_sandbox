@@ -1,50 +1,53 @@
-use std::fmt::{self, Display, Formatter};
+use std::{
+    fmt::{self, Display, Formatter},
+    ops::Deref,
+};
 
 use crate::Token;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ExternalDeclaration<'text> {
     FunctionDefinition(FunctionDefinition<'text>),
     Declaration(Declaration<'text>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct FunctionDefinition<'text> {
     pub return_type: Vec<DeclarationSpecifier<'text>>,
     pub declarator: Declarator<'text>,
     pub body: CompoundStmt<'text>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StructOrUnionSpecifier<'text> {
     Named(StructOrUnion, &'text str, Vec<StructDeclaration<'text>>),
     Anonymous(Vec<StructDeclaration<'text>>),
     ForwardDeclaration(&'text str),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StructOrUnion {
     Struct,
     Union,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct StructDeclaration<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
     pub declarators: Vec<StructDeclarator<'text>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StructDeclarator<'text> {
     Declarator(Declarator<'text>),
     DeclaratorWithBitField(Declarator<'text>, ConstantExpr<'text>),
     BitField(ConstantExpr<'text>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Declarator<'text> {
     pub pointer: Option<Pointer>,
     pub declarator: DirectDeclarator<'text>,
@@ -57,7 +60,7 @@ fn parse_declarator<'text>(
     todo!()
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DirectDeclarator<'text> {
     Ident(&'text str),
     Parens(Box<Declarator<'text>>),
@@ -69,26 +72,26 @@ pub enum DirectDeclarator<'text> {
     Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypeName<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
     pub abstract_declarator: Option<AbstractDeclarator<'text>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParameterTypeList<'text> {
     ParameterList(Vec<ParameterDeclaration<'text>>),
     VariadicParameterList(Vec<ParameterDeclaration<'text>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ParameterDeclaration<'text> {
     WithDeclarator(Vec<DeclarationSpecifier<'text>>, Declarator<'text>),
     WithAbstractDeclarator(Vec<DeclarationSpecifier<'text>>, AbstractDeclarator<'text>),
     OnlySpecifiers(Vec<DeclarationSpecifier<'text>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AbstractDeclarator<'text> {
     Pointer(Pointer),
     PointerWithDirect(
@@ -98,7 +101,7 @@ pub enum AbstractDeclarator<'text> {
     Direct(DirectAbstractDeclarator<'text>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DirectAbstractDeclarator<'text> {
     Parens(Box<AbstractDeclarator<'text>>),
     Array(
@@ -111,7 +114,7 @@ pub enum DirectAbstractDeclarator<'text> {
     ),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum EnumSpecifier<'text> {
     Named(&'text str, EnumeratorList<'text>),
     Anonymous(EnumeratorList<'text>),
@@ -156,7 +159,7 @@ fn parse_enum_specifier<'text>(
     Ok((EnumSpecifier::Anonymous(list), pos))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct EnumeratorList<'text>(pub Vec<Enumerator<'text>>);
 
 fn parse_enumerator_list<'text>(
@@ -178,7 +181,7 @@ fn parse_enumerator_list<'text>(
     Ok((EnumeratorList(invariants), pos))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Enumerator<'text> {
     Implicit(&'text str),
     Explicit(&'text str, ConstantExpr<'text>),
@@ -201,7 +204,7 @@ fn parse_enumerator<'text>(
     Ok((Enumerator::Explicit(ident, expr), pos))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Declaration<'text> {
     pub declaration_specifiers: Vec<DeclarationSpecifier<'text>>,
     pub init_declarators: Vec<InitDeclarator<'text>>,
@@ -237,7 +240,7 @@ fn parse_declaration<'text>(
     ))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum InitDeclarator<'text> {
     Declared(Declarator<'text>),
     Initialized(Declarator<'text>, Initializer<'text>),
@@ -271,7 +274,7 @@ fn parse_init_declarator<'text>(
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Initializer<'text> {
     Assignment(AssignmentExpr<'text>),
     InitializerList(Vec<AssignmentExpr<'text>>),
@@ -313,7 +316,7 @@ fn parse_initializer<'text>(
     Ok((Initializer::Assignment(expr), pos))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum DeclarationSpecifier<'text> {
     StorageClassSpecifier(StorageClassSpecifier),
     TypeSpecifier(TypeSpecifier<'text>),
@@ -349,7 +352,7 @@ fn parse_declaration_specifier<'text>(
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StorageClassSpecifier {
     Auto,
     Register,
@@ -372,7 +375,7 @@ fn parse_storage_class_specifier<'text>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SpecifierQualifier<'text> {
     TypeSpecifier(TypeSpecifier<'text>),
     TypeQualifier(TypeQualifier),
@@ -392,7 +395,7 @@ fn parse_specifier_qualifier<'text>(
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeSpecifier<'text> {
     Void,
     Char,
@@ -450,10 +453,39 @@ fn parse_type_specifier<'text>(
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Pointer {
     pub qualifiers: Vec<TypeQualifier>,
     pub next: Option<Box<Pointer>>,
+}
+
+pub struct PointerIter<'pointer> {
+    pointer: Option<&'pointer Pointer>,
+}
+
+impl<'pointer> IntoIterator for &'pointer Pointer {
+    type Item = &'pointer [TypeQualifier];
+    type IntoIter = PointerIter<'pointer>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PointerIter {
+            pointer: Some(self),
+        }
+    }
+}
+
+impl<'pointer> Iterator for PointerIter<'pointer> {
+    type Item = &'pointer [TypeQualifier];
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(pointer) = &self.pointer {
+            let qualifiers = pointer.qualifiers.as_slice();
+            self.pointer = pointer.next.as_ref().map(|boxed| boxed.deref());
+            return Some(qualifiers);
+        }
+
+        None
+    }
 }
 
 fn parse_pointer<'text>(
@@ -492,7 +524,7 @@ fn parse_pointer<'text>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TypeQualifier {
     Const,
     Volatile,
@@ -509,7 +541,7 @@ fn parse_type_qualifier<'text>(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Stmt<'text> {
     Labeled(LabeledStmt<'text>),
     EmptyStmt,
@@ -544,7 +576,7 @@ fn parse_stmt<'text>(
     )
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LabeledStmt<'text> {
     Ident(&'text str, Box<Stmt<'text>>),
 }
@@ -588,7 +620,7 @@ fn parse_expr_stmt<'text>(
     Ok((Stmt::Expr(expr), pos + 1))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
 
 fn parse_compound_stmt<'text>(
@@ -619,7 +651,7 @@ fn parse_compound_stmt<'text>(
     Err(ParseError::ExpectedRCurly(pos).into())
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum SelectionStmt<'text> {
     If {
         test: Expr<'text>,
@@ -663,7 +695,7 @@ fn parse_selection_stmt<'text>(
     Ok((SelectionStmt::IfElse { test, pass, fail }, pos))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum IterationStmt<'text> {
     While {
         test: Expr<'text>,
@@ -799,7 +831,7 @@ fn parse_iteration_for_stmt<'text>(
     ))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum JumpStmt<'text> {
     Goto(&'text str),
     Continue,
@@ -935,7 +967,7 @@ fn parse_expr<'text>(
     parse_assignment_expr(tokens, pos)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AssignmentExpr<'text> {
     ConditionalExpr(ConditionalExpr<'text>),
     Assign(UnaryExpr<'text>, Box<AssignmentExpr<'text>>),
@@ -1027,7 +1059,7 @@ fn parse_constant_expr<'text>(
     parse_conditional_expr(tokens, pos)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ConditionalExpr<'text> {
     LogicalOrExpr(LogicalOrExpr<'text>),
     Ternary {
@@ -1065,7 +1097,7 @@ fn parse_conditional_expr<'text>(
     Ok((test.into(), pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LogicalOrExpr<'text> {
     LogicalAndExpr(LogicalAndExpr<'text>),
     LogicalOr(Box<LogicalOrExpr<'text>>, LogicalAndExpr<'text>),
@@ -1090,7 +1122,7 @@ fn parse_logicalor_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LogicalAndExpr<'text> {
     BitOrExpr(BitOrExpr<'text>),
     LogicalAnd(Box<LogicalAndExpr<'text>>, BitOrExpr<'text>),
@@ -1115,7 +1147,7 @@ fn parse_logicaland_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BitOrExpr<'text> {
     XORExpr(XORExpr<'text>),
     BitOr(Box<BitOrExpr<'text>>, XORExpr<'text>),
@@ -1140,7 +1172,7 @@ fn parse_bitor_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum XORExpr<'text> {
     BitAndExpr(BitAndExpr<'text>),
     XOR(Box<XORExpr<'text>>, BitAndExpr<'text>),
@@ -1165,7 +1197,7 @@ fn parse_xor_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum BitAndExpr<'text> {
     EqualityExpr(EqualityExpr<'text>),
     BitAnd(Box<BitAndExpr<'text>>, EqualityExpr<'text>),
@@ -1190,7 +1222,7 @@ fn parse_bitand_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum EqualityExpr<'text> {
     ComparisionExpr(ComparisionExpr<'text>),
     EQ(Box<EqualityExpr<'text>>, ComparisionExpr<'text>),
@@ -1221,7 +1253,7 @@ fn parse_equality_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ComparisionExpr<'text> {
     ShiftExpr(ShiftExpr<'text>),
     LT(Box<ComparisionExpr<'text>>, ShiftExpr<'text>),
@@ -1264,7 +1296,7 @@ fn parse_comparision_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum ShiftExpr<'text> {
     AdditiveExpr(AdditiveExpr<'text>),
     ShiftLeft(Box<ShiftExpr<'text>>, AdditiveExpr<'text>),
@@ -1295,7 +1327,7 @@ fn parse_shift_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum AdditiveExpr<'text> {
     MultiplicativeExpr(MultiplicativeExpr<'text>),
     Add(Box<AdditiveExpr<'text>>, MultiplicativeExpr<'text>),
@@ -1326,7 +1358,7 @@ fn parse_additive_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum MultiplicativeExpr<'text> {
     UnaryExpr(UnaryExpr<'text>),
     Mul(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
@@ -1363,7 +1395,7 @@ fn parse_multiplicative_expr<'text>(
     Ok((lhs, pos))
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum UnaryExpr<'text> {
     PostfixExpr(PostfixExpr<'text>),
     PreIncr(Box<UnaryExpr<'text>>),
@@ -1420,7 +1452,7 @@ fn parse_unary_expr<'text>(
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum PostfixExpr<'text> {
     Primary(Primary<'text>),
     PostIncr(Box<PostfixExpr<'text>>),
@@ -1440,7 +1472,7 @@ fn parse_postfix_expr<'text>(
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Primary<'text> {
     Ident(&'text str),
     Int(isize),
@@ -2023,6 +2055,15 @@ macro_rules! check {
     };
 }
 
+macro_rules! ast {
+    ($f:ident, $src:expr) => {{
+        let tokens = lex($src).expect("** LEX ERROR");
+        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        assert_eq!(pos, tokens.len());
+        stmt
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2047,6 +2088,20 @@ mod tests {
         check!(
             parse_pointer,
             "**volatile *******const ***const volatile ******"
+        );
+
+        let pointer = ast!(parse_pointer, "* *const volatile *volatile * *");
+        let qualifiers: Vec<Vec<TypeQualifier>> = pointer.into_iter().map(|q| q.into()).collect();
+
+        assert_eq!(
+            qualifiers,
+            vec![
+                vec![],
+                vec![TypeQualifier::Const, TypeQualifier::Volatile],
+                vec![TypeQualifier::Volatile],
+                vec![],
+                vec![],
+            ]
         );
     }
 
