@@ -50,6 +50,13 @@ pub struct Declarator<'text> {
     pub declarator: DirectDeclarator<'text>,
 }
 
+fn parse_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Declarator<'text>, usize), ParserCombinatorError> {
+    todo!()
+}
+
 #[derive(Debug)]
 pub enum DirectDeclarator<'text> {
     Ident(&'text str),
@@ -200,10 +207,68 @@ pub struct Declaration<'text> {
     pub init_declarators: Vec<InitDeclarator<'text>>,
 }
 
+fn parse_declaration<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Declaration<'text>, usize), ParserCombinatorError> {
+    let (declaration_specifiers, pos) = parse_declaration_specifiers(tokens, pos);
+    if declaration_specifiers.is_empty() {
+        return Err(ParserCombinatorError::IncorrectParser);
+    }
+
+    let mut init_declarators = vec![];
+    let mut pos = pos;
+
+    while let Ok((init_declarator, next_pos)) = parse_init_declarator(tokens, pos) {
+        init_declarators.push(init_declarator);
+        pos = next_pos;
+    }
+
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
+
+    Ok((
+        Declaration {
+            declaration_specifiers,
+            init_declarators,
+        },
+        pos + 1,
+    ))
+}
+
 #[derive(Debug)]
 pub enum InitDeclarator<'text> {
     Declared(Declarator<'text>),
     Initialized(Declarator<'text>, Initializer<'text>),
+}
+
+fn parse_init_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
+    fn parse_initialized<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
+        let (declarator, pos) = parse_declarator(tokens, pos)?;
+        let (initializer, pos) = parse_initializer(tokens, pos)?;
+        Ok((InitDeclarator::Initialized(declarator, initializer), pos))
+    }
+
+    fn parse_declared<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
+        let (declarator, pos) = parse_declarator(tokens, pos)?;
+        Ok((InitDeclarator::Declared(declarator), pos))
+    }
+
+    combine_parsers(
+        tokens,
+        pos,
+        &[Box::new(parse_initialized), Box::new(parse_declared)],
+    )
 }
 
 #[derive(Debug)]
@@ -253,6 +318,20 @@ pub enum DeclarationSpecifier<'text> {
     StorageClassSpecifier(StorageClassSpecifier),
     TypeSpecifier(TypeSpecifier<'text>),
     TypeQualifier(TypeQualifier),
+}
+
+fn parse_declaration_specifiers<'text>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+) -> (Vec<DeclarationSpecifier<'text>>, usize) {
+    let mut declaration_specifiers = vec![];
+
+    while let Ok((specifier, next_pos)) = parse_declaration_specifier(tokens, pos) {
+        declaration_specifiers.push(specifier);
+        pos = next_pos;
+    }
+
+    (declaration_specifiers, pos)
 }
 
 fn parse_declaration_specifier<'text>(
