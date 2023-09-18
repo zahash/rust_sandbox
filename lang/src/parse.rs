@@ -15,7 +15,6 @@ pub enum ExternalDeclaration<'text> {
 pub struct FunctionDefinition<'text> {
     pub return_type: Vec<DeclarationSpecifier<'text>>,
     pub declarator: Declarator<'text>,
-    pub declarations: Vec<Declaration<'text>>,
     pub body: CompoundStmt<'text>,
 }
 
@@ -35,7 +34,7 @@ pub enum StructOrUnion {
 #[derive(Debug)]
 pub struct StructDeclaration<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
-    pub declarator_list: Vec<StructDeclarator<'text>>,
+    pub declarators: Vec<StructDeclarator<'text>>,
 }
 
 #[derive(Debug)]
@@ -48,12 +47,12 @@ pub enum StructDeclarator<'text> {
 #[derive(Debug)]
 pub struct Declarator<'text> {
     pub pointer: Option<Pointer>,
-    pub direct_declarator: DirectDeclarator<'text>,
+    pub declarator: DirectDeclarator<'text>,
 }
 
 #[derive(Debug)]
 pub enum DirectDeclarator<'text> {
-    Identifier(&'text str),
+    Ident(&'text str),
     Parens(Box<Declarator<'text>>),
     Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
     Function(
