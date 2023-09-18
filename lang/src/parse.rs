@@ -2010,29 +2010,25 @@ pub enum ParseError {
     ExpectedIdentifier(usize),
 }
 
+macro_rules! check {
+    ($f:ident, $src:expr, $expected:expr) => {
+        let tokens = lex($src).expect("** LEX ERROR");
+        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        assert_eq!(pos, tokens.len());
+        let stmt = format!("{}", stmt);
+        assert_eq!($expected, stmt);
+    };
+    ($f:ident, $src:expr) => {
+        check!($f, $src, $src)
+    };
+}
+
 #[cfg(test)]
 mod stmt_tests {
     use super::*;
     use crate::lex;
 
     use pretty_assertions::assert_eq;
-
-    macro_rules! check_stmt {
-        ($src:expr) => {
-            check_stmt($src, $src)
-        };
-        ($src:expr, $expected:expr) => {
-            check_stmt($src, $expected)
-        };
-    }
-
-    fn check_stmt(src: &str, expected: &str) {
-        let tokens = lex(src).expect("** LEX ERROR");
-        let (stmt, pos) = parse_stmt(&tokens, 0).expect("** Unable to parse statement");
-        assert_eq!(pos, tokens.len());
-        let stmt = format!("{}", stmt);
-        assert_eq!(expected, stmt);
-    }
 
     // #[test]
     // fn test() {
@@ -2053,33 +2049,34 @@ mod stmt_tests {
 
     #[test]
     fn test_simple() {
-        check_stmt!(";");
-        check_stmt!("{ }");
-        check_stmt!("a++;");
-        check_stmt!("{ a++; }");
+        check!(parse_stmt, ";");
+        check!(parse_stmt, "{ }");
+        check!(parse_stmt, "a++;");
+        check!(parse_stmt, "{ a++; }");
     }
 
     #[test]
     fn test_labeled() {
-        check_stmt!("a : ;");
-        check_stmt!("a : { }");
-        check_stmt!("a : b;");
-        check_stmt!("a : { b; }");
+        check!(parse_stmt, "a : ;");
+        check!(parse_stmt, "a : { }");
+        check!(parse_stmt, "a : b;");
+        check!(parse_stmt, "a : { b; }");
     }
 
     #[test]
     fn test_if() {
-        check_stmt!("if (a) ;");
-        check_stmt!("if (a) b;");
-        check_stmt!("if (a) b; else c;");
-        check_stmt!("if (a) b; else if (c) d;");
-        check_stmt!("if (a) b; else if (c) d; else e;");
-        check_stmt!("if (a) { }");
-        check_stmt!("if (a) { b; }");
-        check_stmt!("if (a) { b; } else { c; }");
-        check_stmt!("if (a) { b; } else if (c) { d; }");
-        check_stmt!("if (a) { b; } else if (c) { d; } else { e; }");
-        check_stmt!(
+        check!(parse_stmt, "if (a) ;");
+        check!(parse_stmt, "if (a) b;");
+        check!(parse_stmt, "if (a) b; else c;");
+        check!(parse_stmt, "if (a) b; else if (c) d;");
+        check!(parse_stmt, "if (a) b; else if (c) d; else e;");
+        check!(parse_stmt, "if (a) { }");
+        check!(parse_stmt, "if (a) { b; }");
+        check!(parse_stmt, "if (a) { b; } else { c; }");
+        check!(parse_stmt, "if (a) { b; } else if (c) { d; }");
+        check!(parse_stmt, "if (a) { b; } else if (c) { d; } else { e; }");
+        check!(
+            parse_stmt,
             r#"
             if (a == 1) {
                 b++;
@@ -2090,23 +2087,28 @@ mod stmt_tests {
             }
             "#,
             "if ((a == 1)) { b++; } else if ((a == 2)) { b--; } else { b; }"
-        )
+        );
     }
 
     #[test]
     fn test_while() {
-        check_stmt!("while (a) ;");
-        check_stmt!("while (a) { }");
-        check_stmt!("while (a) { b; }");
-        check_stmt!("while (a <= 10) { a++; }", "while ((a <= 10)) { a++; }");
+        check!(parse_stmt, "while (a) ;");
+        check!(parse_stmt, "while (a) { }");
+        check!(parse_stmt, "while (a) { b; }");
+        check!(
+            parse_stmt,
+            "while (a <= 10) { a++; }",
+            "while ((a <= 10)) { a++; }"
+        );
     }
 
     #[test]
     fn test_do_while() {
-        check_stmt!("do ; while (a);");
-        check_stmt!("do { } while (a);");
-        check_stmt!("do { b; } while (a);");
-        check_stmt!(
+        check!(parse_stmt, "do ; while (a);");
+        check!(parse_stmt, "do { } while (a);");
+        check!(parse_stmt, "do { b; } while (a);");
+        check!(
+            parse_stmt,
             "do { a++; } while (a <= 10);",
             "do { a++; } while ((a <= 10));"
         );
@@ -2114,15 +2116,16 @@ mod stmt_tests {
 
     #[test]
     fn test_for() {
-        check_stmt!("for (;;) ;");
-        check_stmt!("for (;;) { }");
-        check_stmt!("for (a;;) ;");
-        check_stmt!("for (; a;) ;");
-        check_stmt!("for (;; a) ;");
-        check_stmt!("for (a; a; a) ;");
-        check_stmt!("for (a; a; a) { }");
-        check_stmt!("for (a; a; a) { b; }");
-        check_stmt!(
+        check!(parse_stmt, "for (;;) ;");
+        check!(parse_stmt, "for (;;) { }");
+        check!(parse_stmt, "for (a;;) ;");
+        check!(parse_stmt, "for (; a;) ;");
+        check!(parse_stmt, "for (;; a) ;");
+        check!(parse_stmt, "for (a; a; a) ;");
+        check!(parse_stmt, "for (a; a; a) { }");
+        check!(parse_stmt, "for (a; a; a) { b; }");
+        check!(
+            parse_stmt,
             "for (i=0; i<10; i++) { a++; }",
             "for ((i = 0); (i < 10); i++) { a++; }"
         );
@@ -2130,11 +2133,11 @@ mod stmt_tests {
 
     #[test]
     fn test_jump() {
-        check_stmt!("goto a;");
-        check_stmt!("continue;");
-        check_stmt!("break;");
-        check_stmt!("return;");
-        check_stmt!("return a;");
+        check!(parse_stmt, "goto a;");
+        check!(parse_stmt, "continue;");
+        check!(parse_stmt, "break;");
+        check!(parse_stmt, "return;");
+        check!(parse_stmt, "return a;");
     }
 }
 
