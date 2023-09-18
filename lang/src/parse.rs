@@ -1534,6 +1534,16 @@ impl<'text> Display for Enumerator<'text> {
     }
 }
 
+impl<'text> Display for DeclarationSpecifier<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DeclarationSpecifier::StorageClassSpecifier(x) => write!(f, "{}", x),
+            DeclarationSpecifier::TypeSpecifier(x) => write!(f, "{}", x),
+            DeclarationSpecifier::TypeQualifier(x) => write!(f, "{}", x),
+        }
+    }
+}
+
 impl Display for StorageClassSpecifier {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -2055,6 +2065,15 @@ macro_rules! check {
     };
 }
 
+macro_rules! check_raw {
+    ($f:ident, $src:expr, $expected:expr) => {
+        let tokens = lex($src).expect("** LEX ERROR");
+        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        assert_eq!(pos, tokens.len());
+        assert_eq!($expected, stmt);
+    };
+}
+
 macro_rules! ast {
     ($f:ident, $src:expr) => {{
         let tokens = lex($src).expect("** LEX ERROR");
@@ -2070,6 +2089,143 @@ mod tests {
     use crate::lex;
 
     use pretty_assertions::assert_eq;
+
+    const ENUM: [(&'static str, &'static str); 3] = [
+        ("enum Color", "enum Color"),
+        (
+            r#"
+            enum Color { 
+                RED, 
+                GREEN ="00FF00", 
+                BLUE = 7 
+            }
+            "#,
+            r#"enum Color { RED, GREEN = "00FF00", BLUE = 7 }"#,
+        ),
+        (
+            r#"
+            enum { 
+                RED, 
+                GREEN = "00FF00", 
+                BLUE = 7 
+            }
+            "#,
+            r#"enum { RED, GREEN = "00FF00", BLUE = 7 }"#,
+        ),
+    ];
+
+    const STORAGE_CLASS_SPECIFIER: [(&'static str, StorageClassSpecifier); 5] = [
+        ("auto", StorageClassSpecifier::Auto),
+        ("register", StorageClassSpecifier::Register),
+        ("static", StorageClassSpecifier::Static),
+        ("extern", StorageClassSpecifier::Extern),
+        ("typedef", StorageClassSpecifier::TypeDef),
+    ];
+
+    const TYPE_SPECIFIER: [(&'static str, TypeSpecifier); 10] = [
+        ("void", TypeSpecifier::Void),
+        ("char", TypeSpecifier::Char),
+        ("short", TypeSpecifier::Short),
+        ("int", TypeSpecifier::Int),
+        ("long", TypeSpecifier::Long),
+        ("float", TypeSpecifier::Float),
+        ("double", TypeSpecifier::Double),
+        ("signed", TypeSpecifier::Signed),
+        ("unsigned", TypeSpecifier::UnSigned),
+        ("a", TypeSpecifier::TypeDefName("a")),
+    ];
+
+    const TYPE_QUALIFIER: [(&'static str, TypeQualifier); 2] = [
+        ("const", TypeQualifier::Const),
+        ("volatile", TypeQualifier::Volatile),
+    ];
+
+    #[test]
+    fn test_initializer() {
+        check!(parse_initializer, "a = b", "(a = b)");
+        check!(
+            parse_initializer,
+            "{ a = b, c = d, }",
+            "{ (a = b), (c = d), }"
+        );
+        check!(
+            parse_initializer,
+            "{ {a = b}, { c = d, e = f }, g = h, }",
+            "{ {(a = b)}, { (c = d), (e = f), }, (g = h), }"
+        );
+    }
+
+    #[test]
+    fn test_declaration_specifier() {
+        for (src, expected) in STORAGE_CLASS_SPECIFIER {
+            check_raw!(
+                parse_declaration_specifier,
+                src,
+                DeclarationSpecifier::from(expected)
+            );
+        }
+
+        for (src, expected) in TYPE_SPECIFIER {
+            check_raw!(
+                parse_declaration_specifier,
+                src,
+                DeclarationSpecifier::from(expected)
+            );
+        }
+
+        for (src, expected) in ENUM {
+            check!(parse_declaration_specifier, src, expected);
+        }
+
+        for (src, expected) in TYPE_QUALIFIER {
+            check_raw!(
+                parse_declaration_specifier,
+                src,
+                DeclarationSpecifier::from(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn test_storage_class_specifier() {
+        for (src, expected) in STORAGE_CLASS_SPECIFIER {
+            check_raw!(parse_storage_class_specifier, src, expected);
+        }
+    }
+
+    #[test]
+    fn test_specifier_qualifier() {
+        for (src, expected) in TYPE_SPECIFIER {
+            check_raw!(
+                parse_specifier_qualifier,
+                src,
+                SpecifierQualifier::from(expected)
+            );
+        }
+
+        for (src, expected) in ENUM {
+            check!(parse_specifier_qualifier, src, expected);
+        }
+
+        for (src, expected) in TYPE_QUALIFIER {
+            check_raw!(
+                parse_specifier_qualifier,
+                src,
+                SpecifierQualifier::from(expected)
+            );
+        }
+    }
+
+    #[test]
+    fn test_type_specifier() {
+        for (src, expected) in TYPE_SPECIFIER {
+            check_raw!(parse_type_specifier, src, expected);
+        }
+
+        for (src, expected) in ENUM {
+            check!(parse_type_specifier, src, expected);
+        }
+    }
 
     #[test]
     fn test_pointer() {
@@ -2107,14 +2263,15 @@ mod tests {
 
     #[test]
     fn test_type_qualifier() {
-        check!(parse_type_qualifier, "const");
-        check!(parse_type_qualifier, "volatile");
+        for (src, expected) in TYPE_QUALIFIER {
+            check_raw!(parse_type_qualifier, src, expected);
+        }
     }
 
     #[test]
     fn test_simple_stmt() {
-        check!(parse_stmt, ";");
-        check!(parse_stmt, "{ }");
+        check_raw!(parse_stmt, ";", Stmt::EmptyStmt);
+        check_raw!(parse_stmt, "{ }", Stmt::Compound(CompoundStmt(vec![])));
         check!(parse_stmt, "a++;");
         check!(parse_stmt, "{ a++; }");
     }
