@@ -2024,7 +2024,7 @@ macro_rules! check {
 }
 
 #[cfg(test)]
-mod stmt_tests {
+mod tests {
     use super::*;
     use crate::lex;
 
@@ -2048,7 +2048,7 @@ mod stmt_tests {
     // }
 
     #[test]
-    fn test_simple() {
+    fn test_simple_stmt() {
         check!(parse_stmt, ";");
         check!(parse_stmt, "{ }");
         check!(parse_stmt, "a++;");
@@ -2056,7 +2056,7 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_labeled() {
+    fn test_labeled_stmt() {
         check!(parse_stmt, "a : ;");
         check!(parse_stmt, "a : { }");
         check!(parse_stmt, "a : b;");
@@ -2064,7 +2064,7 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_if() {
+    fn test_if_stmt() {
         check!(parse_stmt, "if (a) ;");
         check!(parse_stmt, "if (a) b;");
         check!(parse_stmt, "if (a) b; else c;");
@@ -2091,7 +2091,7 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_while() {
+    fn test_while_stmt() {
         check!(parse_stmt, "while (a) ;");
         check!(parse_stmt, "while (a) { }");
         check!(parse_stmt, "while (a) { b; }");
@@ -2103,7 +2103,7 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_do_while() {
+    fn test_do_while_stmt() {
         check!(parse_stmt, "do ; while (a);");
         check!(parse_stmt, "do { } while (a);");
         check!(parse_stmt, "do { b; } while (a);");
@@ -2115,7 +2115,7 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_for() {
+    fn test_for_stmt() {
         check!(parse_stmt, "for (;;) ;");
         check!(parse_stmt, "for (;;) { }");
         check!(parse_stmt, "for (a;;) ;");
@@ -2132,32 +2132,133 @@ mod stmt_tests {
     }
 
     #[test]
-    fn test_jump() {
+    fn test_jump_stmt() {
         check!(parse_stmt, "goto a;");
         check!(parse_stmt, "continue;");
         check!(parse_stmt, "break;");
         check!(parse_stmt, "return;");
         check!(parse_stmt, "return a;");
     }
-}
-
-#[cfg(test)]
-mod expr_tests {
-    use super::*;
-    use crate::lex;
 
     #[test]
-    fn test_all() {
-        let tokens = lex(r#"
-            a = b == c ? d : e
-        "#)
-        .expect("** LEX ERROR");
+    fn test_primary() {
+        check!(parse_expr, "ident");
+        check!(parse_expr, "123");
+        check!(parse_expr, "'c'");
+        check!(parse_expr, "123.123");
+        check!(parse_expr, r#""string""#);
+        check!(parse_expr, r#"(a)"#);
+    }
 
-        println!("{:?}", tokens);
+    #[test]
+    fn test_postfix_expr() {
+        check!(parse_expr, "a++");
+        check!(parse_expr, "a--");
+    }
 
-        match parse_expr(&tokens, 0) {
-            Ok((expr, pos)) => println!("{} {} {}", tokens.len(), pos, expr),
-            Err(e) => assert!(false, "{:?}", e),
-        }
+    #[test]
+    fn test_unary_expr() {
+        check!(parse_expr, "++a");
+        check!(parse_expr, "--a");
+        check!(parse_expr, "&a");
+        check!(parse_expr, "*a");
+        check!(parse_expr, "+a", "a");
+        check!(parse_expr, "-a");
+        check!(parse_expr, "~a");
+    }
+
+    #[test]
+    fn test_multiplicative_expr() {
+        check!(parse_expr, "a * b", "(a * b)");
+        check!(parse_expr, "a / b", "(a / b)");
+        check!(parse_expr, "a % b", "(a % b)");
+        check!(parse_expr, "a * b / c % d", "(((a * b) / c) % d)");
+    }
+
+    #[test]
+    fn test_additive_expr() {
+        check!(parse_expr, "a + b", "(a + b)");
+        check!(parse_expr, "a - b", "(a - b)");
+        check!(parse_expr, "a + b - c", "((a + b) - c)");
+    }
+
+    #[test]
+    fn test_shift_expr() {
+        check!(parse_expr, "a << b", "(a << b)");
+        check!(parse_expr, "a >> b", "(a >> b)");
+        check!(parse_expr, "a << b >> c", "((a << b) >> c)");
+    }
+
+    #[test]
+    fn test_comparision_expr() {
+        check!(parse_expr, "a < b", "(a < b)");
+        check!(parse_expr, "a > b", "(a > b)");
+        check!(parse_expr, "a <= b", "(a <= b)");
+        check!(parse_expr, "a >= b", "(a >= b)");
+        check!(
+            parse_expr,
+            "a < b > c <= d >= e",
+            "((((a < b) > c) <= d) >= e)"
+        );
+    }
+
+    #[test]
+    fn test_equality_expr() {
+        check!(parse_expr, "a == b", "(a == b)");
+        check!(parse_expr, "a != b", "(a != b)");
+        check!(parse_expr, "a == b != c", "((a == b) != c)");
+    }
+
+    #[test]
+    fn test_bit_and_expr() {
+        check!(parse_expr, "a & b", "(a & b)");
+        check!(parse_expr, "a & b & c", "((a & b) & c)");
+    }
+
+    #[test]
+    fn test_xor_expr() {
+        check!(parse_expr, "a ^ b", "(a ^ b)");
+        check!(parse_expr, "a ^ b ^ c", "((a ^ b) ^ c)");
+    }
+
+    #[test]
+    fn test_bit_or_expr() {
+        check!(parse_expr, "a | b", "(a | b)");
+        check!(parse_expr, "a | b | c", "((a | b) | c)");
+    }
+
+    #[test]
+    fn test_logical_and_expr() {
+        check!(parse_expr, "a && b", "(a && b)");
+        check!(parse_expr, "a && b && c", "((a && b) && c)");
+    }
+
+    #[test]
+    fn test_logical_or_expr() {
+        check!(parse_expr, "a || b", "(a || b)");
+        check!(parse_expr, "a || b || c", "((a || b) || c)");
+    }
+
+    #[test]
+    fn test_conditional_expr() {
+        check!(parse_expr, "a ? b : c", "(a ? b : c)");
+        check!(parse_expr, "a ? b ? c : d : e", "(a ? (b ? c : d) : e)");
+    }
+
+    #[test]
+    fn test_assignment_expr() {
+        check!(parse_expr, "a = b", "(a = b)");
+        check!(parse_expr, "a *= b", "(a *= b)");
+        check!(parse_expr, "a /= b", "(a /= b)");
+        check!(parse_expr, "a %= b", "(a %= b)");
+        check!(parse_expr, "a += b", "(a += b)");
+        check!(parse_expr, "a -= b", "(a -= b)");
+        check!(parse_expr, "a <<= b", "(a <<= b)");
+        check!(parse_expr, "a >>= b", "(a >>= b)");
+        check!(parse_expr, "a &= b", "(a &= b)");
+        check!(parse_expr, "a ^= b", "(a ^= b)");
+        check!(parse_expr, "a |= b", "(a |= b)");
+
+        check!(parse_expr, "a -= b &= c", "(a -= (b &= c))");
     }
 }
