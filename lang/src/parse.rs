@@ -1607,6 +1607,121 @@ impl Display for TypeQualifier {
     }
 }
 
+impl<'text> Display for Declarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if let Some(pointer) = &self.pointer {
+            write!(f, "{}", pointer)?;
+        }
+        write!(f, "{}", self.declarator)
+    }
+}
+
+impl<'text> Display for DirectDeclarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DirectDeclarator::Ident(ident) => write!(f, "{}", ident),
+            DirectDeclarator::Parens(d) => write!(f, "({})", d),
+            DirectDeclarator::Array(d, e) => {
+                write!(f, "{}", d)?;
+                match e {
+                    Some(e) => write!(f, "[{}]", e),
+                    None => write!(f, "[]"),
+                }
+            }
+            DirectDeclarator::Function(d, p) => {
+                write!(f, "{}", d)?;
+                match p {
+                    Some(p) => write!(f, "({})", p),
+                    None => write!(f, "()"),
+                }
+            }
+            DirectDeclarator::Parameters(d, p) => {
+                write!(f, "{}", d)?;
+                write!(f, "(")?;
+                display_arr(f, p, " ")?;
+                write!(f, ")")
+            }
+        }
+    }
+}
+
+impl<'text> Display for ParameterTypeList<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ParameterTypeList::ParameterList(l) => display_arr(f, l, ", "),
+            ParameterTypeList::VariadicParameterList(l) => {
+                display_arr(f, l, ", ")?;
+                write!(f, ", ...")
+            }
+        }
+    }
+}
+
+impl<'text> Display for ParameterDeclaration<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ParameterDeclaration::WithDeclarator(dss, d) => {
+                display_arr(f, &dss, " ")?;
+                write!(f, " {}", d)
+            }
+            ParameterDeclaration::WithAbstractDeclarator(dss, ad) => {
+                display_arr(f, &dss, " ")?;
+                write!(f, " {}", ad)
+            }
+            ParameterDeclaration::OnlySpecifiers(dss) => display_arr(f, &dss, " "),
+        }
+    }
+}
+
+impl<'text> Display for AbstractDeclarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            AbstractDeclarator::Pointer(p) => write!(f, "{}", p),
+            AbstractDeclarator::PointerWithDirect(ad, dad) => write!(f, "{} {}", ad, dad),
+            AbstractDeclarator::Direct(dad) => write!(f, "{}", dad),
+        }
+    }
+}
+
+impl<'text> Display for DirectAbstractDeclarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DirectAbstractDeclarator::Parens(ad) => write!(f, "({})", ad),
+            DirectAbstractDeclarator::Array(dad, e) => {
+                if let Some(dad) = dad {
+                    write!(f, "{} ", dad)?;
+                }
+
+                write!(f, "[")?;
+                if let Some(e) = e {
+                    write!(f, "{}", e)?;
+                }
+                write!(f, "]")
+            }
+            DirectAbstractDeclarator::Function(dad, p) => {
+                if let Some(dad) = dad {
+                    write!(f, "{} ", dad)?;
+                }
+
+                write!(f, "(")?;
+                if let Some(p) = p {
+                    write!(f, "{}", p)?;
+                }
+                write!(f, ")")
+            }
+        }
+    }
+}
+
+impl<'text> Display for InitDeclarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            InitDeclarator::Declared(d) => write!(f, "{}", d),
+            InitDeclarator::Initialized(d, val) => write!(f, "{} = {}", d, val),
+        }
+    }
+}
+
 impl<'text> Display for Initializer<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -1876,6 +1991,20 @@ impl<'text> Display for Primary<'text> {
     }
 }
 
+fn display_arr<T>(f: &mut Formatter<'_>, arr: &[T], sep: &str) -> fmt::Result
+where
+    T: Display,
+{
+    if let Some(item) = arr.get(0) {
+        write!(f, "{}", item)?;
+        for item in &arr[1..] {
+            write!(f, "{}{}", sep, item)?;
+        }
+    }
+
+    Ok(())
+}
+
 impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
     fn from(value: EnumSpecifier<'text>) -> Self {
         TypeSpecifier::EnumSpecifier(value)
@@ -2139,6 +2268,11 @@ mod tests {
         ("const", TypeQualifier::Const),
         ("volatile", TypeQualifier::Volatile),
     ];
+
+    #[test]
+    fn test_init_declarator() {
+        check!(parse_init_declarator, "");
+    }
 
     #[test]
     fn test_initializer() {
