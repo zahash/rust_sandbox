@@ -55,9 +55,26 @@ pub struct Declarator<'text> {
 
 fn parse_declarator<'text>(
     tokens: &[Token<'text>],
-    pos: usize,
+    mut pos: usize,
 ) -> Result<(Declarator<'text>, usize), ParserCombinatorError> {
-    todo!()
+    let mut pointer = None;
+    match parse_pointer(tokens, pos) {
+        Ok((p, next_pos)) => {
+            pointer = Some(p);
+            pos = next_pos;
+        }
+        Err(ParserCombinatorError::IncorrectParser) => {}
+        Err(e) => return Err(e),
+    };
+
+    let (direct_declarator, pos) = parse_direct_declarator(tokens, pos)?;
+    Ok((
+        Declarator {
+            pointer,
+            declarator: direct_declarator,
+        },
+        pos,
+    ))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -65,11 +82,77 @@ pub enum DirectDeclarator<'text> {
     Ident(&'text str),
     Parens(Box<Declarator<'text>>),
     Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
-    Function(
-        Box<DirectDeclarator<'text>>,
-        Option<ParameterTypeList<'text>>,
-    ),
+    Function(Box<DirectDeclarator<'text>>, ParameterTypeList<'text>),
     Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
+}
+
+fn parse_direct_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(DirectDeclarator<'text>, usize), ParserCombinatorError> {
+    if let Some(Token::Ident(ident)) = tokens.get(pos) {
+        return Ok((DirectDeclarator::Ident(ident), pos + 1));
+    }
+
+    if let Some(Token::LParen) = tokens.get(pos) {
+        let (declarator, pos) = parse_declarator(tokens, pos)?;
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+
+        return Ok((DirectDeclarator::Parens(Box::new(declarator)), pos + 1));
+    }
+
+    let (direct_declarator, pos) = parse_direct_declarator(tokens, pos)?;
+    let direct_declarator = Box::new(direct_declarator);
+
+    if let Some(Token::LSquare) = tokens.get(pos) {
+        if let Some(Token::RSquare) = tokens.get(pos + 1) {
+            return Ok((DirectDeclarator::Array(direct_declarator, None), pos + 2));
+        };
+
+        let (expr, pos) = parse_constant_expr(tokens, pos + 1)?;
+        let Some(Token::RSquare) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+        return Ok((
+            DirectDeclarator::Array(direct_declarator, Some(expr)),
+            pos + 1,
+        ));
+    }
+
+    if let Some(Token::LParen) = tokens.get(pos) {
+        match parse_parameter_type_list(tokens, pos) {
+            Ok((parameter_type_list, pos)) => {
+                let Some(Token::RParen) = tokens.get(pos) else {
+                    return Err(ParserCombinatorError::IncorrectParser);
+                };
+                return Ok((
+                    DirectDeclarator::Function(direct_declarator, parameter_type_list),
+                    pos + 1,
+                ));
+            }
+            Err(ParserCombinatorError::IncorrectParser) => {}
+            Err(e) => return Err(e),
+        };
+
+        let mut idents = vec![];
+        let mut pos = pos;
+
+        while let Some(Token::Ident(ident)) = tokens.get(pos) {
+            pos += 1;
+            idents.push(*ident);
+        }
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+
+        return Ok((DirectDeclarator::Parameters(direct_declarator, idents), pos));
+    }
+
+    Err(ParserCombinatorError::IncorrectParser)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -82,6 +165,13 @@ pub struct TypeName<'text> {
 pub enum ParameterTypeList<'text> {
     ParameterList(Vec<ParameterDeclaration<'text>>),
     VariadicParameterList(Vec<ParameterDeclaration<'text>>),
+}
+
+fn parse_parameter_type_list<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ParameterTypeList<'text>, usize), ParserCombinatorError> {
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -101,15 +191,22 @@ pub enum AbstractDeclarator<'text> {
     Direct(DirectAbstractDeclarator<'text>),
 }
 
+fn parse_abstract_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(AbstractDeclarator<'text>, usize), ParserCombinatorError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectAbstractDeclarator<'text> {
     Parens(Box<AbstractDeclarator<'text>>),
     Array(
-        Option<Box<DirectAbstractDeclarator<'text>>>,
+        Box<Option<DirectAbstractDeclarator<'text>>>,
         Option<ConstantExpr<'text>>,
     ),
     Function(
-        Option<Box<DirectAbstractDeclarator<'text>>>,
+        Box<Option<DirectAbstractDeclarator<'text>>>,
         Option<ParameterTypeList<'text>>,
     ),
 }
@@ -118,7 +215,74 @@ fn parse_direct_abstract_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParserCombinatorError> {
-    todo!()
+    if let Some(Token::LParen) = tokens.get(pos) {
+        let (declarator, pos) = parse_abstract_declarator(tokens, pos)?;
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+
+        return Ok((
+            DirectAbstractDeclarator::Parens(Box::new(declarator)),
+            pos + 1,
+        ));
+    }
+
+    let mut direct_abstract_declarator = None;
+    let mut pos = pos;
+
+    match parse_direct_abstract_declarator(tokens, pos) {
+        Ok((d, next_pos)) => {
+            direct_abstract_declarator = Some(d);
+            pos = next_pos;
+        }
+        Err(ParserCombinatorError::IncorrectParser) => {}
+        Err(e) => return Err(e),
+    }
+
+    let direct_abstract_declarator = Box::new(direct_abstract_declarator);
+
+    if let Some(Token::LSquare) = tokens.get(pos) {
+        if let Some(Token::RSquare) = tokens.get(pos + 1) {
+            return Ok((
+                DirectAbstractDeclarator::Array(direct_abstract_declarator, None),
+                pos + 2,
+            ));
+        };
+
+        let (expr, pos) = parse_constant_expr(tokens, pos + 1)?;
+        let Some(Token::RSquare) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+        return Ok((
+            DirectAbstractDeclarator::Array(direct_abstract_declarator, Some(expr)),
+            pos + 1,
+        ));
+    }
+
+    if let Some(Token::LParen) = tokens.get(pos) {
+        if let Some(Token::RParen) = tokens.get(pos + 1) {
+            return Ok((
+                DirectAbstractDeclarator::Function(direct_abstract_declarator, None),
+                pos + 2,
+            ));
+        }
+
+        let (parameter_type_list, pos) = parse_parameter_type_list(tokens, pos)?;
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParserCombinatorError::IncorrectParser);
+        };
+
+        return Ok((
+            DirectAbstractDeclarator::Function(
+                direct_abstract_declarator,
+                Some(parameter_type_list),
+            ),
+            pos + 1,
+        ));
+    }
+
+    Err(ParserCombinatorError::IncorrectParser)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1621,13 +1785,7 @@ impl<'text> Display for DirectDeclarator<'text> {
                     None => write!(f, "[]"),
                 }
             }
-            DirectDeclarator::Function(d, p) => {
-                write!(f, "{}", d)?;
-                match p {
-                    Some(p) => write!(f, "({})", p),
-                    None => write!(f, "()"),
-                }
-            }
+            DirectDeclarator::Function(d, p) => write!(f, "{}({})", d, p),
             DirectDeclarator::Parameters(d, p) => {
                 write!(f, "{}", d)?;
                 write!(f, "(")?;
@@ -1681,7 +1839,7 @@ impl<'text> Display for DirectAbstractDeclarator<'text> {
         match self {
             DirectAbstractDeclarator::Parens(ad) => write!(f, "({})", ad),
             DirectAbstractDeclarator::Array(dad, e) => {
-                if let Some(dad) = dad {
+                if let Some(dad) = dad.deref() {
                     write!(f, "{} ", dad)?;
                 }
 
@@ -1692,7 +1850,7 @@ impl<'text> Display for DirectAbstractDeclarator<'text> {
                 write!(f, "]")
             }
             DirectAbstractDeclarator::Function(dad, p) => {
-                if let Some(dad) = dad {
+                if let Some(dad) = dad.deref() {
                     write!(f, "{} ", dad)?;
                 }
 
