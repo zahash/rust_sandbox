@@ -181,21 +181,50 @@ pub enum ParameterDeclaration<'text> {
     OnlySpecifiers(Vec<DeclarationSpecifier<'text>>),
 }
 
+fn parse_parameter_declaration<'text>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+) -> Result<(ParameterDeclaration<'text>, usize), ParserCombinatorError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum AbstractDeclarator<'text> {
     Pointer(Pointer),
-    PointerWithDirect(
-        Box<AbstractDeclarator<'text>>,
-        DirectAbstractDeclarator<'text>,
-    ),
+    PointerWithDirect(Pointer, DirectAbstractDeclarator<'text>),
     Direct(DirectAbstractDeclarator<'text>),
 }
 
 fn parse_abstract_declarator<'text>(
     tokens: &[Token<'text>],
-    pos: usize,
+    mut pos: usize,
 ) -> Result<(AbstractDeclarator<'text>, usize), ParserCombinatorError> {
-    todo!()
+    let mut pointer = None;
+    match parse_pointer(tokens, pos) {
+        Ok((p, next_pos)) => {
+            pointer = Some(p);
+            pos = next_pos;
+        }
+        Err(ParserCombinatorError::IncorrectParser) => {}
+        Err(e) => return Err(e),
+    };
+
+    let mut direct_abstract_declarator = None;
+    match parse_direct_abstract_declarator(tokens, pos) {
+        Ok((d, next_pos)) => {
+            direct_abstract_declarator = Some(d);
+            pos = next_pos;
+        }
+        Err(ParserCombinatorError::IncorrectParser) => {}
+        Err(e) => return Err(e),
+    }
+
+    match (pointer, direct_abstract_declarator) {
+        (None, None) => Err(ParserCombinatorError::IncorrectParser),
+        (None, Some(d)) => Ok((AbstractDeclarator::Direct(d), pos)),
+        (Some(p), None) => Ok((AbstractDeclarator::Pointer(p), pos)),
+        (Some(p), Some(d)) => Ok((AbstractDeclarator::PointerWithDirect(p, d), pos)),
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1828,7 +1857,7 @@ impl<'text> Display for AbstractDeclarator<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             AbstractDeclarator::Pointer(p) => write!(f, "{}", p),
-            AbstractDeclarator::PointerWithDirect(ad, dad) => write!(f, "{} {}", ad, dad),
+            AbstractDeclarator::PointerWithDirect(p, dad) => write!(f, "{}{}", p, dad),
             AbstractDeclarator::Direct(dad) => write!(f, "{}", dad),
         }
     }
