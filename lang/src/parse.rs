@@ -277,7 +277,7 @@ fn parse_init_declarator<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub enum Initializer<'text> {
     Assignment(AssignmentExpr<'text>),
-    InitializerList(Vec<AssignmentExpr<'text>>),
+    InitializerList(Vec<Initializer<'text>>),
 }
 
 fn parse_initializer<'text>(
@@ -294,7 +294,7 @@ fn parse_initializer<'text>(
                 break;
             }
 
-            let (initializer, next_pos) = parse_assignment_expr(tokens, pos)?;
+            let (initializer, next_pos) = parse_initializer(tokens, pos)?;
             pos = next_pos;
 
             initializers.push(initializer);
@@ -2151,7 +2151,7 @@ mod tests {
         check!(
             parse_initializer,
             "{ {a = b}, { c = d, e = f }, g = h, }",
-            "{ {(a = b)}, { (c = d), (e = f), }, (g = h), }"
+            "{ { (a = b), }, { (c = d), (e = f), }, (g = h), }"
         );
     }
 
