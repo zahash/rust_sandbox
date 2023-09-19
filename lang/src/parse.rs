@@ -114,6 +114,13 @@ pub enum DirectAbstractDeclarator<'text> {
     ),
 }
 
+fn parse_direct_abstract_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(DirectAbstractDeclarator<'text>, usize), ParserCombinatorError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum EnumSpecifier<'text> {
     Named(&'text str, EnumeratorList<'text>),
@@ -250,28 +257,14 @@ fn parse_init_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
-    fn parse_initialized<'text>(
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
-        let (declarator, pos) = parse_declarator(tokens, pos)?;
-        let (initializer, pos) = parse_initializer(tokens, pos)?;
-        Ok((InitDeclarator::Initialized(declarator, initializer), pos))
-    }
+    let (declarator, pos) = parse_declarator(tokens, pos)?;
 
-    fn parse_declared<'text>(
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
-        let (declarator, pos) = parse_declarator(tokens, pos)?;
-        Ok((InitDeclarator::Declared(declarator), pos))
-    }
+    let Some(Token::Equals) = tokens.get(pos) else {
+        return Ok((InitDeclarator::Declared(declarator), pos));
+    };
 
-    combine_parsers(
-        tokens,
-        pos,
-        &[Box::new(parse_initialized), Box::new(parse_declared)],
-    )
+    let (initializer, pos) = parse_initializer(tokens, pos + 1)?;
+    Ok((InitDeclarator::Initialized(declarator, initializer), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
