@@ -8,10 +8,24 @@ use crate::Token;
 #[derive(Debug, PartialEq, Clone)]
 pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 
+fn parse_translation_unit<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(TranslationUnit<'text>, usize), ParseError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ExternalDeclaration<'text> {
     FunctionDefinition(FunctionDefinition<'text>),
     Declaration(Declaration<'text>),
+}
+
+fn parse_external_declaration<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(ExternalDeclaration<'text>, usize), ParseError> {
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -21,11 +35,25 @@ pub struct FunctionDefinition<'text> {
     pub body: CompoundStmt<'text>,
 }
 
+fn parse_function_definition<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructOrUnionSpecifier<'text> {
     Named(StructOrUnion, &'text str, Vec<StructDeclaration<'text>>),
     Anonymous(Vec<StructDeclaration<'text>>),
     ForwardDeclaration(&'text str),
+}
+
+fn parse_struct_or_union_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StructOrUnionSpecifier<'text>, usize), ParseError> {
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -34,10 +62,24 @@ pub enum StructOrUnion {
     Union,
 }
 
+fn parse_struct_or_union<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StructOrUnion, usize), ParseError> {
+    todo!()
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct StructDeclaration<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
     pub declarators: Vec<StructDeclarator<'text>>,
+}
+
+fn parse_struct_declaration<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StructDeclaration<'text>, usize), ParseError> {
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -45,6 +87,13 @@ pub enum StructDeclarator<'text> {
     Declarator(Declarator<'text>),
     DeclaratorWithBitField(Declarator<'text>, ConstantExpr<'text>),
     BitField(ConstantExpr<'text>),
+}
+
+fn parse_struct_declarator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(StructDeclarator<'text>, usize), ParseError> {
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -55,7 +104,7 @@ pub struct Declarator<'text> {
 
 fn parse_declarator<'text>(
     tokens: &[Token<'text>],
-    mut pos: usize,
+    pos: usize,
 ) -> Result<(Declarator<'text>, usize), ParseError> {
     let (pointer, pos) = maybe(tokens, pos, parse_pointer);
     let (dd, pos) = parse_direct_declarator(tokens, pos)?;
