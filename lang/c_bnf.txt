@@ -144,11 +144,28 @@ The syntax of C in Backus-Naur Form
 
 <declarator> ::= {<pointer>}? <direct-declarator>
 
+========================================================================================
 <direct-declarator> ::= <identifier>
                       | ( <declarator> )
                       | <direct-declarator> [ {<constant-expression>}? ]
                       | <direct-declarator> ( <parameter-type-list> )
                       | <direct-declarator> ( {<identifier>}* )
+========================================================================================
+<direct-declarator> ::= <identifier> <direct-declarator-tail>
+<direct-declarator> ::= ( <direct-declarator> ) <direct-declarator-tail>
+<direct-declarator-tail> ::= [ {<constant-expression>}? ] <direct-declarator-tail>
+<direct-declarator-tail> ::= ( <parameter-type-list> ) <direct-declarator-tail>
+<direct-declarator-tail> ::= ( {<identifier>}* ) <direct-declarator-tail>
+<direct-declarator-tail> ::= ε
+========================================================================================
+<direct-declarator> ::= <identifier> {<direct-declarator-tail>}?
+                      | ( <direct-declarator> ) {<direct-declarator-tail>}?
+
+<direct-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-declarator-tail>}?
+                           | ( <parameter-type-list> ) {<direct-declarator-tail>}?
+                           | ( {<identifier>}* ) {<direct-declarator-tail>}?
+========================================================================================
+
 
 <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}* ;
 

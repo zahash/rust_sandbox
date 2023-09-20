@@ -2461,7 +2461,7 @@ macro_rules! check {
     ($f:ident, $src:expr, $expected:expr) => {
         let tokens = lex($src).expect("** LEX ERROR");
         let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
-        assert_eq!(pos, tokens.len());
+        assert_eq!(pos, tokens.len(), "** Unable to parse all Tokens\n{}", stmt);
         let stmt = format!("{}", stmt);
         assert_eq!($expected, stmt);
     };
@@ -2547,7 +2547,14 @@ mod tests {
 
     #[test]
     fn test_init_declarator() {
-        // check!(parse_init_declarator, "");s
+        check!(parse_init_declarator, "a");
+        check!(parse_init_declarator, "(a)");
+        check!(parse_init_declarator, "*a");
+        check!(parse_init_declarator, "*(*a)");
+        check!(parse_init_declarator, "a[]");
+        check!(parse_init_declarator, "a[b]");
+        check!(parse_init_declarator, "a()");
+        check!(parse_init_declarator, "a(b)");
     }
 
     #[test]
