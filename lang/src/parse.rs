@@ -316,28 +316,28 @@ fn parse_direct_abstract_declarator<'text>(
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum EnumSpecifier<'text> {
-    Named(&'text str, EnumeratorList<'text>),
-    Anonymous(EnumeratorList<'text>),
+    Named(&'text str, Vec<Enumerator<'text>>),
+    Anonymous(Vec<Enumerator<'text>>),
     ForwardDeclaration(&'text str),
 }
 
 fn parse_enum_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(EnumSpecifier<'text>, usize), ParserCombinatorError> {
+) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
     let Some(Token::Keyword("enum")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("enum", pos));
     };
 
     fn parse_enum_body<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(EnumeratorList<'text>, usize), ParseError> {
+    ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLCurly(pos));
         };
 
-        let (list, pos) = parse_enumerator_list(tokens, pos + 1)?;
+        let (list, pos) = many(tokens, pos + 1, parse_enumerator, Some(Token::Comma));
 
         let Some(Token::RCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRCurly(pos).into());
@@ -347,38 +347,14 @@ fn parse_enum_specifier<'text>(
     }
 
     if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
-        if let Some(Token::LCurly) = tokens.get(pos + 2) {
-            let (list, pos) = parse_enum_body(tokens, pos + 2)?;
-            return Ok((EnumSpecifier::Named(ident, list), pos));
-        }
-
-        return Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2));
+        return match parse_enum_body(tokens, pos + 2) {
+            Ok((enumerators, pos)) => Ok((EnumSpecifier::Named(ident, enumerators), pos)),
+            Err(_) => Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2)),
+        };
     }
 
     let (list, pos) = parse_enum_body(tokens, pos + 1)?;
     Ok((EnumSpecifier::Anonymous(list), pos))
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub struct EnumeratorList<'text>(pub Vec<Enumerator<'text>>);
-
-fn parse_enumerator_list<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-) -> Result<(EnumeratorList<'text>, usize), ParseError> {
-    let (invariant, mut pos) = parse_enumerator(tokens, pos)?;
-    let mut invariants = vec![invariant];
-
-    while let Some(Token::Comma) = tokens.get(pos) {
-        pos += 1;
-
-        let (invariant, next_pos) = parse_enumerator(tokens, pos)?;
-        pos = next_pos;
-
-        invariants.push(invariant);
-    }
-
-    Ok((EnumeratorList(invariants), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -413,19 +389,16 @@ pub struct Declaration<'text> {
 fn parse_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Declaration<'text>, usize), ParserCombinatorError> {
-    let (declaration_specifiers, pos) = parse_declaration_specifiers(tokens, pos);
+) -> Result<(Declaration<'text>, usize), ParseError> {
+    let (declaration_specifiers, pos) = many(tokens, pos, parse_declaration_specifier, None);
     if declaration_specifiers.is_empty() {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::SyntaxError(
+            pos,
+            "parse_declaration: expected atleast one declaration specifier",
+        ));
     }
 
-    let mut init_declarators = vec![];
-    let mut pos = pos;
-
-    while let Ok((init_declarator, next_pos)) = parse_init_declarator(tokens, pos) {
-        init_declarators.push(init_declarator);
-        pos = next_pos;
-    }
+    let (init_declarators, pos) = many(tokens, pos, parse_init_declarator, Some(Token::Comma));
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos).into());
@@ -449,7 +422,7 @@ pub enum InitDeclarator<'text> {
 fn parse_init_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(InitDeclarator<'text>, usize), ParserCombinatorError> {
+) -> Result<(InitDeclarator<'text>, usize), ParseError> {
     let (declarator, pos) = parse_declarator(tokens, pos)?;
 
     let Some(Token::Equals) = tokens.get(pos) else {
@@ -509,24 +482,10 @@ pub enum DeclarationSpecifier<'text> {
     TypeQualifier(TypeQualifier),
 }
 
-fn parse_declaration_specifiers<'text>(
-    tokens: &[Token<'text>],
-    mut pos: usize,
-) -> (Vec<DeclarationSpecifier<'text>>, usize) {
-    let mut declaration_specifiers = vec![];
-
-    while let Ok((specifier, next_pos)) = parse_declaration_specifier(tokens, pos) {
-        declaration_specifiers.push(specifier);
-        pos = next_pos;
-    }
-
-    (declaration_specifiers, pos)
-}
-
 fn parse_declaration_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(DeclarationSpecifier<'text>, usize), ParserCombinatorError> {
+) -> Result<(DeclarationSpecifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
@@ -535,6 +494,7 @@ fn parse_declaration_specifier<'text>(
             Box::new(parse_type_specifier),
             Box::new(parse_type_qualifier),
         ],
+        "cannot parse declaration specifier",
     )
 }
 
@@ -550,14 +510,17 @@ pub enum StorageClassSpecifier {
 fn parse_storage_class_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(StorageClassSpecifier, usize), ParserCombinatorError> {
+) -> Result<(StorageClassSpecifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
         Some(Token::Keyword("register")) => Ok((StorageClassSpecifier::Register, pos + 1)),
         Some(Token::Keyword("static")) => Ok((StorageClassSpecifier::Static, pos + 1)),
         Some(Token::Keyword("extern")) => Ok((StorageClassSpecifier::Extern, pos + 1)),
         Some(Token::Keyword("typedef")) => Ok((StorageClassSpecifier::TypeDef, pos + 1)),
-        _ => Err(ParserCombinatorError::IncorrectParser),
+        _ => Err(ParseError::ExpectedKeyword(
+            "expected `auto` or `register` or `static` or `extern` or `typedef`",
+            pos,
+        )),
     }
 }
 
@@ -570,7 +533,7 @@ pub enum SpecifierQualifier<'text> {
 fn parse_specifier_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(SpecifierQualifier<'text>, usize), ParserCombinatorError> {
+) -> Result<(SpecifierQualifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
@@ -578,6 +541,7 @@ fn parse_specifier_qualifier<'text>(
             Box::new(parse_type_specifier),
             Box::new(parse_type_qualifier),
         ],
+        "cannot parse specifier qualifier",
     )
 }
 
@@ -599,11 +563,11 @@ pub enum TypeSpecifier<'text> {
 fn parse_type_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
     fn parse_basic_type_specifier<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+    ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Keyword("void")) => Ok((TypeSpecifier::Void, pos + 1)),
             Some(Token::Keyword("char")) => Ok((TypeSpecifier::Char, pos + 1)),
@@ -614,17 +578,20 @@ fn parse_type_specifier<'text>(
             Some(Token::Keyword("double")) => Ok((TypeSpecifier::Double, pos + 1)),
             Some(Token::Keyword("signed")) => Ok((TypeSpecifier::Signed, pos + 1)),
             Some(Token::Keyword("unsigned")) => Ok((TypeSpecifier::UnSigned, pos + 1)),
-            _ => Err(ParserCombinatorError::IncorrectParser),
+            _ => Err(ParseError::ExpectedKeyword(
+                "expected `void` or `char` or `short` or `int` or `long` or `float` or `double` or `signed` or `unsigned`",
+                pos,
+            )),
         }
     }
 
     fn parse_typedef_name<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(TypeSpecifier<'text>, usize), ParserCombinatorError> {
+    ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Ident(ident)) => Ok((TypeSpecifier::TypeDefName(ident), pos + 1)),
-            _ => Err(ParserCombinatorError::IncorrectParser),
+            _ => Err(ParseError::ExpectedIdentifier(pos)),
         }
     }
 
@@ -636,6 +603,7 @@ fn parse_type_specifier<'text>(
             Box::new(parse_enum_specifier),
             Box::new(parse_typedef_name),
         ],
+        "cannot parse type specifier",
     )
 }
 
@@ -677,9 +645,9 @@ impl<'pointer> Iterator for PointerIter<'pointer> {
 fn parse_pointer<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
-) -> Result<(Pointer, usize), ParserCombinatorError> {
+) -> Result<(Pointer, usize), ParseError> {
     let Some(Token::Asterisk) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::SyntaxError(pos, "parse_pointer: expected `*`"));
     };
     pos += 1;
 
@@ -690,8 +658,7 @@ fn parse_pointer<'text>(
 
     loop {
         match parse_type_qualifier(tokens, pos) {
-            Err(ParserCombinatorError::IncorrectParser) => break,
-            Err(e) => return Err(e),
+            Err(_) => break,
             Ok((qualifier, next_pos)) => {
                 pointer.qualifiers.push(qualifier);
                 pos = next_pos;
@@ -700,13 +667,12 @@ fn parse_pointer<'text>(
     }
 
     match parse_pointer(tokens, pos) {
-        Err(ParserCombinatorError::IncorrectParser) => Ok((pointer, pos)),
-        Err(e) => Err(e),
         Ok((next_pointer, next_pos)) => {
             pos = next_pos;
             pointer.next = Some(Box::new(next_pointer));
             Ok((pointer, pos))
         }
+        Err(_) => Ok((pointer, pos)),
     }
 }
 
@@ -719,11 +685,11 @@ pub enum TypeQualifier {
 fn parse_type_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(TypeQualifier, usize), ParserCombinatorError> {
+) -> Result<(TypeQualifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
         Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
-        _ => Err(ParserCombinatorError::IncorrectParser),
+        _ => Err(ParseError::ExpectedKeyword("`const` or `volatile`", pos)),
     }
 }
 
@@ -741,7 +707,7 @@ pub enum Stmt<'text> {
 fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(Stmt<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
@@ -759,6 +725,7 @@ fn parse_stmt<'text>(
             Box::new(parse_jump_break_stmt),
             Box::new(parse_jump_return_stmt),
         ],
+        "cannot parse statement",
     )
 }
 
@@ -770,22 +737,25 @@ pub enum LabeledStmt<'text> {
 fn parse_labeled_ident_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(LabeledStmt<'text>, usize), ParserCombinatorError> {
-    if let Some(Token::Ident(ident)) = tokens.get(pos) {
-        if let Some(Token::Colon) = tokens.get(pos + 1) {
-            let (stmt, pos) = parse_stmt(tokens, pos + 2)?;
-            return Ok((LabeledStmt::Ident(ident, Box::new(stmt)), pos));
-        }
-    }
-    Err(ParserCombinatorError::IncorrectParser)
+) -> Result<(LabeledStmt<'text>, usize), ParseError> {
+    let Some(Token::Ident(ident)) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedIdentifier(pos));
+    };
+
+    let Some(Token::Colon) = tokens.get(pos + 1) else {
+        return Err(ParseError::ExpectedColon(pos));
+    };
+
+    let (stmt, pos) = parse_stmt(tokens, pos + 2)?;
+    Ok((LabeledStmt::Ident(ident, Box::new(stmt)), pos))
 }
 
 fn parse_empty_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(Stmt<'text>, usize), ParseError> {
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedSemicolon(pos));
     };
 
     Ok((Stmt::EmptyStmt, pos + 1))
@@ -794,10 +764,8 @@ fn parse_empty_stmt<'text>(
 fn parse_expr_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(Stmt<'text>, usize), ParserCombinatorError> {
-    let Ok((expr, pos)) = parse_expr(tokens, pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
-    };
+) -> Result<(Stmt<'text>, usize), ParseError> {
+    let (expr, pos) = parse_expr(tokens, pos)?;
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos).into());
@@ -812,9 +780,9 @@ pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
 fn parse_compound_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(CompoundStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(CompoundStmt<'text>, usize), ParseError> {
     let Some(Token::LCurly) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedLCurly(pos));
     };
 
     let mut stmts = Vec::new();
@@ -853,9 +821,9 @@ pub enum SelectionStmt<'text> {
 fn parse_selection_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(SelectionStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(SelectionStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("if")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("if", pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
@@ -902,9 +870,9 @@ pub enum IterationStmt<'text> {
 fn parse_iteration_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("while", pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
@@ -926,9 +894,9 @@ fn parse_iteration_while_stmt<'text>(
 fn parse_iteration_do_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("do")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("do", pos));
     };
 
     let (body, pos) = parse_stmt(tokens, pos + 1)?;
@@ -958,9 +926,9 @@ fn parse_iteration_do_while_stmt<'text>(
 fn parse_iteration_for_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(IterationStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("for")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("for", pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
@@ -1028,9 +996,9 @@ pub enum JumpStmt<'text> {
 fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("goto", pos));
     };
 
     let Some(Token::Ident(ident)) = tokens.get(pos + 1) else {
@@ -1047,9 +1015,9 @@ fn parse_jump_goto_stmt<'text>(
 fn parse_jump_continue_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("continue", pos));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 1) else {
@@ -1062,9 +1030,9 @@ fn parse_jump_continue_stmt<'text>(
 fn parse_jump_break_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("break", pos));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 1) else {
@@ -1077,9 +1045,9 @@ fn parse_jump_break_stmt<'text>(
 fn parse_jump_return_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-) -> Result<(JumpStmt<'text>, usize), ParserCombinatorError> {
+) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("return")) = tokens.get(pos) else {
-        return Err(ParserCombinatorError::IncorrectParser);
+        return Err(ParseError::ExpectedKeyword("return", pos));
     };
 
     let (expr, pos) = match tokens.get(pos + 1) {
@@ -1097,40 +1065,71 @@ fn parse_jump_return_stmt<'text>(
     return Ok((JumpStmt::Return(expr), pos + 1));
 }
 
+fn many<'text, Ast>(
+    tokens: &[Token<'text>],
+    mut pos: usize,
+    parser: impl Fn(&[Token<'text>], usize) -> Result<(Ast, usize), ParseError>,
+    delimiter: Option<Token>,
+) -> (Vec<Ast>, usize) {
+    let mut list = vec![];
+
+    while let Ok((ast, next_pos)) = parser(tokens, pos) {
+        list.push(ast);
+        pos = next_pos;
+
+        if let Some(delimiter) = delimiter {
+            match tokens.get(pos) {
+                Some(token) if token == &delimiter => {
+                    pos += 1;
+                }
+                _ => break,
+            };
+        }
+    }
+
+    (list, pos)
+}
+
+// fn parse_init_declarators<'text>(
+//     tokens: &[Token<'text>],
+//     mut pos: usize,
+// ) -> (Vec<InitDeclarator<'text>>, usize) {
+//     let mut init_declarators = vec![];
+
+//     while let Ok((init, next_pos)) = parse_init_declarator(tokens, pos) {
+//         init_declarators.push(init);
+//         pos = next_pos;
+//     }
+
+//     (init_declarators, pos)
+// }
+
 trait Parser<'text, Ast> {
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(Ast, usize), ParserCombinatorError>;
+    fn parse(&self, tokens: &[Token<'text>], pos: usize) -> Result<(Ast, usize), ParseError>;
 }
 
 fn combine_parsers<'text, Ast>(
     tokens: &[Token<'text>],
     pos: usize,
     parsers: &[Box<dyn Parser<'text, Ast>>],
-) -> Result<(Ast, usize), ParserCombinatorError> {
+    msg: &'static str,
+) -> Result<(Ast, usize), ParseError> {
     for parser in parsers {
         match parser.parse(tokens, pos) {
-            Err(ParserCombinatorError::IncorrectParser) => continue,
-            Err(e) => return Err(e),
             Ok((ast, pos)) => return Ok((ast, pos)),
+            Err(_) => continue,
         };
     }
 
-    Err(ParserCombinatorError::IncorrectParser)
+    Err(ParseError::SyntaxError(pos, msg))
 }
 
 impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
     ParsedValue: Into<Ast>,
-    F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParserCombinatorError>,
+    F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParseError>,
 {
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(Ast, usize), ParserCombinatorError> {
+    fn parse(&self, tokens: &[Token<'text>], pos: usize) -> Result<(Ast, usize), ParseError> {
         match self(tokens, pos) {
             Ok((val, pos)) => Ok((val.into(), pos)),
             Err(e) => Err(e),
@@ -1138,11 +1137,11 @@ where
     }
 }
 
-#[derive(Debug)]
-enum ParserCombinatorError {
-    ParseError(ParseError),
-    IncorrectParser,
-}
+// #[derive(Debug)]
+// enum ParserCombinatorError {
+//     ParseError(ParseError),
+//     IncorrectParser,
+// }
 
 pub type Expr<'text> = AssignmentExpr<'text>;
 
@@ -1685,31 +1684,42 @@ fn parse_primary_expr<'text>(
                 _ => Err(ParseError::MismatchedParentheses(pos)),
             }
         }
-        _ => Err(ParseError::SyntaxError(pos)),
+        _ => Err(ParseError::SyntaxError(
+            pos,
+            "parse_primary_expr: expected <identifier> or `int` or `char` or `float` or `string` or ( <expression> ) ",
+        )),
     }
 }
 
 impl<'text> Display for EnumSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            EnumSpecifier::Named(ident, list) => write!(f, "enum {} {{ {} }}", ident, list),
-            EnumSpecifier::Anonymous(list) => write!(f, "enum {{ {} }}", list),
+            EnumSpecifier::Named(ident, list) => {
+                write!(f, "enum {} {{ ", ident)?;
+                write_arr(f, list, ", ")?;
+                write!(f, "}}")
+            }
+            EnumSpecifier::Anonymous(list) => {
+                write!(f, "enum {{ ")?;
+                write_arr(f, list, ", ")?;
+                write!(f, "}}")
+            }
             EnumSpecifier::ForwardDeclaration(ident) => write!(f, "enum {}", ident),
         }
     }
 }
 
-impl<'text> Display for EnumeratorList<'text> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        for (i, e) in self.0.iter().enumerate() {
-            match i == self.0.len() - 1 {
-                true => write!(f, "{}", e)?,
-                false => write!(f, "{}, ", e)?,
-            }
-        }
-        Ok(())
-    }
-}
+// impl<'text> Display for EnumeratorList<'text> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         for (i, e) in self.0.iter().enumerate() {
+//             match i == self.0.len() - 1 {
+//                 true => write!(f, "{}", e)?,
+//                 false => write!(f, "{}, ", e)?,
+//             }
+//         }
+//         Ok(())
+//     }
+// }
 
 impl<'text> Display for Enumerator<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -1818,7 +1828,7 @@ impl<'text> Display for DirectDeclarator<'text> {
             DirectDeclarator::Parameters(d, p) => {
                 write!(f, "{}", d)?;
                 write!(f, "(")?;
-                display_arr(f, p, " ")?;
+                write_arr(f, p, " ")?;
                 write!(f, ")")
             }
         }
@@ -1828,9 +1838,9 @@ impl<'text> Display for DirectDeclarator<'text> {
 impl<'text> Display for ParameterTypeList<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            ParameterTypeList::ParameterList(l) => display_arr(f, l, ", "),
+            ParameterTypeList::ParameterList(l) => write_arr(f, l, ", "),
             ParameterTypeList::VariadicParameterList(l) => {
-                display_arr(f, l, ", ")?;
+                write_arr(f, l, ", ")?;
                 write!(f, ", ...")
             }
         }
@@ -1841,14 +1851,14 @@ impl<'text> Display for ParameterDeclaration<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ParameterDeclaration::WithDeclarator(dss, d) => {
-                display_arr(f, &dss, " ")?;
+                write_arr(f, &dss, " ")?;
                 write!(f, " {}", d)
             }
             ParameterDeclaration::WithAbstractDeclarator(dss, ad) => {
-                display_arr(f, &dss, " ")?;
+                write_arr(f, &dss, " ")?;
                 write!(f, " {}", ad)
             }
-            ParameterDeclaration::OnlySpecifiers(dss) => display_arr(f, &dss, " "),
+            ParameterDeclaration::OnlySpecifiers(dss) => write_arr(f, &dss, " "),
         }
     }
 }
@@ -2171,7 +2181,7 @@ impl<'text> Display for Primary<'text> {
     }
 }
 
-fn display_arr<T>(f: &mut Formatter<'_>, arr: &[T], sep: &str) -> fmt::Result
+fn write_arr<T>(f: &mut Formatter<'_>, arr: &[T], sep: &str) -> fmt::Result
 where
     T: Display,
 {
@@ -2254,12 +2264,6 @@ impl<'text> From<IterationStmt<'text>> for Stmt<'text> {
 impl<'text> From<JumpStmt<'text>> for Stmt<'text> {
     fn from(value: JumpStmt<'text>) -> Self {
         Stmt::Jump(value)
-    }
-}
-
-impl From<ParseError> for ParserCombinatorError {
-    fn from(value: ParseError) -> Self {
-        ParserCombinatorError::ParseError(value)
     }
 }
 
@@ -2348,11 +2352,11 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
 
 #[derive(Debug)]
 pub enum ParseError {
-    UnexpectedToken(usize),
     MismatchedParentheses(usize),
-    SyntaxError(usize),
+    SyntaxError(usize, &'static str),
     InvalidStatement(usize),
     ExpectedSemicolon(usize),
+    ExpectedColon(usize),
     ExpectedLParen(usize),
     ExpectedRParen(usize),
     ExpectedLCurly(usize),
