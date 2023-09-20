@@ -118,13 +118,39 @@ fn parse_declarator<'text>(
     ))
 }
 
+// #[derive(Debug, PartialEq, Clone)]
+// pub enum DirectDeclarator<'text> {
+//     Ident(&'text str),
+//     Parens(Box<Declarator<'text>>),
+//     Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
+//     Function(Box<DirectDeclarator<'text>>, ParameterTypeList<'text>),
+//     Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
+// }
+
+// <direct-declarator> ::= <identifier> {<direct-declarator-tail>}?
+//                       | ( <direct-declarator> ) {<direct-declarator-tail>}?
+
+// <direct-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-declarator-tail>}?
+//                            | ( <parameter-type-list> ) {<direct-declarator-tail>}?
+//                            | ( {<identifier>}* ) {<direct-declarator-tail>}?
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectDeclarator<'text> {
-    Ident(&'text str),
-    Parens(Box<Declarator<'text>>),
-    Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
-    Function(Box<DirectDeclarator<'text>>, ParameterTypeList<'text>),
-    Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
+    Ident(&'text str, Option<DirectDeclaratorTail<'text>>),
+    Parens(Box<Declarator<'text>>, Option<DirectDeclaratorTail<'text>>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum DirectDeclaratorTail<'text> {
+    Array(
+        Option<ConstantExpr<'text>>,
+        Box<Option<DirectDeclaratorTail<'text>>>,
+    ),
+    Function(
+        ParameterTypeList<'text>,
+        Box<Option<DirectDeclaratorTail<'text>>>,
+    ),
+    Parameters(Vec<&'text str>, Box<Option<DirectDeclaratorTail<'text>>>),
 }
 
 fn parse_direct_declarator<'text>(
@@ -135,10 +161,13 @@ fn parse_direct_declarator<'text>(
         tokens: &[Token<'text>],
         pos: usize,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
-        match tokens.get(pos) {
-            Some(Token::Ident(ident)) => Ok((DirectDeclarator::Ident(ident), pos + 1)),
-            _ => Err(ParseError::ExpectedIdentifier(pos)),
-        }
+        let Some(Token::Ident(ident)) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedIdentifier(pos));
+        };
+
+        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+
+        Ok((DirectDeclarator::Ident(&ident, dd_tail), pos))
     }
 
     fn parse_parens<'text>(
@@ -155,15 +184,27 @@ fn parse_direct_declarator<'text>(
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        Ok((DirectDeclarator::Parens(Box::new(declarator)), pos + 1))
+        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+
+        Ok((DirectDeclarator::Parens(Box::new(declarator), dd_tail), pos))
     }
 
+    combine_parsers(
+        tokens,
+        pos,
+        &[Box::new(parse_ident), Box::new(parse_parens)],
+        "cannot parse direct declarator",
+    )
+}
+
+fn parse_direct_declarator_tail<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
-        let (dd, pos) = parse_direct_declarator(tokens, pos)?;
-
+    ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
@@ -174,15 +215,15 @@ fn parse_direct_declarator<'text>(
             return Err(ParseError::ExpectedRSquare(pos));
         };
 
-        return Ok((DirectDeclarator::Array(Box::new(dd), expr), pos + 1));
+        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+
+        Ok((DirectDeclaratorTail::Array(expr, Box::new(dd_tail)), pos))
     }
 
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
-        let (dd, pos) = parse_direct_declarator(tokens, pos)?;
-
+    ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
@@ -193,15 +234,15 @@ fn parse_direct_declarator<'text>(
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        Ok((DirectDeclarator::Function(Box::new(dd), list), pos + 1))
+        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+
+        Ok((DirectDeclaratorTail::Function(list, Box::new(dd_tail)), pos))
     }
 
     fn parse_parameters<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-    ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
-        let (dd, pos) = parse_direct_declarator(tokens, pos)?;
-
+    ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
@@ -217,20 +258,23 @@ fn parse_direct_declarator<'text>(
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        Ok((DirectDeclarator::Parameters(Box::new(dd), idents), pos + 1))
+        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+
+        Ok((
+            DirectDeclaratorTail::Parameters(idents, Box::new(dd_tail)),
+            pos,
+        ))
     }
 
     combine_parsers(
         tokens,
         pos,
         &[
-            Box::new(parse_ident),
-            Box::new(parse_parens),
             Box::new(parse_array),
             Box::new(parse_function),
             Box::new(parse_parameters),
         ],
-        "cannot parse direct declarator",
+        "cannot parse direct declarator tail",
     )
 }
 
@@ -271,7 +315,7 @@ pub enum ParameterDeclaration<'text> {
 
 fn parse_parameter_declaration<'text>(
     tokens: &[Token<'text>],
-    mut pos: usize,
+    pos: usize,
 ) -> Result<(ParameterDeclaration<'text>, usize), ParseError> {
     let (dss, pos) = many(tokens, pos, parse_declaration_specifier, None);
     if dss.is_empty() {
@@ -320,16 +364,51 @@ fn parse_abstract_declarator<'text>(
     }
 }
 
+// #[derive(Debug, PartialEq, Clone)]
+// pub enum DirectAbstractDeclarator<'text> {
+//     Parens(Box<AbstractDeclarator<'text>>),
+//     Array(
+//         Box<Option<DirectAbstractDeclarator<'text>>>,
+//         Option<ConstantExpr<'text>>,
+//     ),
+//     Function(
+//         Box<Option<DirectAbstractDeclarator<'text>>>,
+//         Option<ParameterTypeList<'text>>,
+//     ),
+// }
+
+// <direct-abstract-declarator> ::=  ( <abstract-declarator> ) {<direct-abstract-declarator-tail>}?
+//                                | [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
+//                                | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
+
+// <direct-abstract-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
+//                                     | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectAbstractDeclarator<'text> {
-    Parens(Box<AbstractDeclarator<'text>>),
+    Parens(
+        Box<AbstractDeclarator<'text>>,
+        Option<DirectAbstractDeclaratorTail<'text>>,
+    ),
     Array(
-        Box<Option<DirectAbstractDeclarator<'text>>>,
         Option<ConstantExpr<'text>>,
+        Option<DirectAbstractDeclaratorTail<'text>>,
     ),
     Function(
-        Box<Option<DirectAbstractDeclarator<'text>>>,
         Option<ParameterTypeList<'text>>,
+        Option<DirectAbstractDeclaratorTail<'text>>,
+    ),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum DirectAbstractDeclaratorTail<'text> {
+    Array(
+        Option<ConstantExpr<'text>>,
+        Box<Option<DirectAbstractDeclaratorTail<'text>>>,
+    ),
+    Function(
+        Option<ParameterTypeList<'text>>,
+        Box<Option<DirectAbstractDeclaratorTail<'text>>>,
     ),
 }
 
@@ -345,15 +424,17 @@ fn parse_direct_abstract_declarator<'text>(
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (declarator, pos) = parse_abstract_declarator(tokens, pos)?;
+        let (declarator, pos) = parse_abstract_declarator(tokens, pos + 1)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
+        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+
         Ok((
-            DirectAbstractDeclarator::Parens(Box::new(declarator)),
-            pos + 1,
+            DirectAbstractDeclarator::Parens(Box::new(declarator), dad_tail),
+            pos,
         ))
     }
 
@@ -361,8 +442,6 @@ fn parse_direct_abstract_declarator<'text>(
         tokens: &[Token<'text>],
         pos: usize,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
-        let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
-
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
@@ -373,18 +452,15 @@ fn parse_direct_abstract_declarator<'text>(
             return Err(ParseError::ExpectedRSquare(pos));
         };
 
-        Ok((
-            DirectAbstractDeclarator::Array(Box::new(dad), expr),
-            pos + 1,
-        ))
+        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+
+        Ok((DirectAbstractDeclarator::Array(expr, dad_tail), pos))
     }
 
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
-        let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
-
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
@@ -395,9 +471,11 @@ fn parse_direct_abstract_declarator<'text>(
             return Err(ParseError::ExpectedRParen(pos));
         };
 
+        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+
         Ok((
-            DirectAbstractDeclarator::Function(Box::new(dad), parameter_type_list),
-            pos + 1,
+            DirectAbstractDeclarator::Function(parameter_type_list, dad_tail),
+            pos,
         ))
     }
 
@@ -411,6 +489,60 @@ fn parse_direct_abstract_declarator<'text>(
         ],
         "msg",
     )
+}
+
+fn parse_direct_abstract_declarator_tail<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
+    fn parse_array<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
+        // let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
+
+        let Some(Token::LSquare) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedLSquare(pos));
+        };
+
+        let (expr, pos) = maybe(tokens, pos + 1, parse_constant_expr);
+
+        let Some(Token::RSquare) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRSquare(pos));
+        };
+
+        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+
+        Ok((
+            DirectAbstractDeclaratorTail::Array(expr, Box::new(dad_tail)),
+            pos,
+        ))
+    }
+
+    fn parse_function<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
+        // let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
+
+        let Some(Token::LParen) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedLParen(pos));
+        };
+
+        let (parameter_type_list, pos) = maybe(tokens, pos, parse_parameter_type_list);
+
+        let Some(Token::RParen) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRParen(pos));
+        };
+
+        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+
+        Ok((
+            DirectAbstractDeclaratorTail::Function(parameter_type_list, Box::new(dad_tail)),
+            pos,
+        ))
+    }
+    todo!()
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -700,7 +832,7 @@ fn parse_type_specifier<'text>(
         &[
             Box::new(parse_basic_type_specifier),
             Box::new(parse_enum_specifier),
-            Box::new(parse_typedef_name),
+            // Box::new(parse_typedef_name),
         ],
         "cannot parse type specifier",
     )
@@ -1905,21 +2037,52 @@ impl<'text> Display for Declarator<'text> {
 impl<'text> Display for DirectDeclarator<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            DirectDeclarator::Ident(ident) => write!(f, "{}", ident),
-            DirectDeclarator::Parens(d) => write!(f, "({})", d),
-            DirectDeclarator::Array(d, e) => {
-                write!(f, "{}", d)?;
+            DirectDeclarator::Ident(ident, tail) => {
+                write!(f, "{}", ident)?;
+                if let Some(tail) = tail {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
+            }
+            DirectDeclarator::Parens(d, tail) => {
+                write!(f, "({})", d)?;
+                if let Some(tail) = tail {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl<'text> Display for DirectDeclaratorTail<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DirectDeclaratorTail::Array(e, tail) => {
                 match e {
                     Some(e) => write!(f, "[{}]", e),
                     None => write!(f, "[]"),
+                }?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
                 }
+                Ok(())
             }
-            DirectDeclarator::Function(d, p) => write!(f, "{}({})", d, p),
-            DirectDeclarator::Parameters(d, p) => {
-                write!(f, "{}", d)?;
+            DirectDeclaratorTail::Function(p, tail) => {
+                write!(f, "({})", p)?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
+            }
+            DirectDeclaratorTail::Parameters(idents, tail) => {
                 write!(f, "(")?;
-                write_arr(f, p, " ")?;
-                write!(f, ")")
+                write_arr(f, idents, " ")?;
+                write!(f, ")")?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
             }
         }
     }
@@ -1966,28 +2129,59 @@ impl<'text> Display for AbstractDeclarator<'text> {
 impl<'text> Display for DirectAbstractDeclarator<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            DirectAbstractDeclarator::Parens(ad) => write!(f, "({})", ad),
-            DirectAbstractDeclarator::Array(dad, e) => {
-                if let Some(dad) = dad.deref() {
-                    write!(f, "{} ", dad)?;
+            DirectAbstractDeclarator::Parens(ad, tail) => {
+                write!(f, "({})", ad)?;
+                if let Some(tail) = tail {
+                    write!(f, "{}", tail)?;
                 }
-
-                write!(f, "[")?;
-                if let Some(e) = e {
-                    write!(f, "{}", e)?;
-                }
-                write!(f, "]")
+                Ok(())
             }
-            DirectAbstractDeclarator::Function(dad, p) => {
-                if let Some(dad) = dad.deref() {
-                    write!(f, "{} ", dad)?;
+            DirectAbstractDeclarator::Array(e, tail) => {
+                match e {
+                    Some(e) => write!(f, "[{}]", e),
+                    None => write!(f, "[]"),
+                }?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
                 }
+                Ok(())
+            }
+            DirectAbstractDeclarator::Function(p, tail) => {
+                match p {
+                    Some(p) => write!(f, "({})", p),
+                    None => write!(f, "[]"),
+                }?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
 
-                write!(f, "(")?;
-                if let Some(p) = p {
-                    write!(f, "{}", p)?;
+impl<'text> Display for DirectAbstractDeclaratorTail<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            DirectAbstractDeclaratorTail::Array(e, tail) => {
+                match e {
+                    Some(e) => write!(f, "[{}]", e),
+                    None => write!(f, "[]"),
+                }?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
                 }
-                write!(f, ")")
+                Ok(())
+            }
+            DirectAbstractDeclaratorTail::Function(p, tail) => {
+                match p {
+                    Some(p) => write!(f, "({})", p),
+                    None => write!(f, "[]"),
+                }?;
+                if let Some(tail) = tail.deref() {
+                    write!(f, "{}", tail)?;
+                }
+                Ok(())
             }
         }
     }
@@ -2546,15 +2740,24 @@ mod tests {
     ];
 
     #[test]
-    fn test_init_declarator() {
-        check!(parse_init_declarator, "a");
-        check!(parse_init_declarator, "(a)");
-        check!(parse_init_declarator, "*a");
-        check!(parse_init_declarator, "*(*a)");
-        check!(parse_init_declarator, "a[]");
-        check!(parse_init_declarator, "a[b]");
-        check!(parse_init_declarator, "a()");
-        check!(parse_init_declarator, "a(b)");
+    fn test_declarator() {
+        check!(parse_declarator, "x");
+        check!(parse_declarator, "(y)");
+        check!(parse_declarator, "*a");
+        check!(parse_declarator, "*****a[]");
+        check!(parse_declarator, "*a()");
+        check!(parse_declarator, "*(*a)");
+        check!(parse_declarator, "arr[]");
+        check!(parse_declarator, "arr[SIZE]");
+        check!(parse_declarator, "mat[3][4]");
+        check!(parse_declarator, "f()");
+        check!(parse_declarator, "add(int a, int b)");
+        check!(parse_declarator, "(*func_ptr)()");
+        check!(parse_declarator, "(*sqrt)(double x, double y)");
+        check!(parse_declarator, "sum(int n, ...)");
+        check!(parse_declarator, "print(const char *fmt, ...)");
+        check!(parse_declarator, "log(const char *message, ...)");
+        check!(parse_declarator, "f(a b c)");
     }
 
     #[test]

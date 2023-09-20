@@ -152,14 +152,14 @@ The syntax of C in Backus-Naur Form
                       | <direct-declarator> ( {<identifier>}* )
 ========================================================================================
 <direct-declarator> ::= <identifier> <direct-declarator-tail>
-<direct-declarator> ::= ( <direct-declarator> ) <direct-declarator-tail>
+<direct-declarator> ::= ( <declarator> ) <direct-declarator-tail>
 <direct-declarator-tail> ::= [ {<constant-expression>}? ] <direct-declarator-tail>
 <direct-declarator-tail> ::= ( <parameter-type-list> ) <direct-declarator-tail>
 <direct-declarator-tail> ::= ( {<identifier>}* ) <direct-declarator-tail>
 <direct-declarator-tail> ::= ε
 ========================================================================================
 <direct-declarator> ::= <identifier> {<direct-declarator-tail>}?
-                      | ( <direct-declarator> ) {<direct-declarator-tail>}?
+                      | ( <declarator> ) {<direct-declarator-tail>}?
 
 <direct-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-declarator-tail>}?
                            | ( <parameter-type-list> ) {<direct-declarator-tail>}?
@@ -211,9 +211,32 @@ The syntax of C in Backus-Naur Form
                         | <pointer> <direct-abstract-declarator>
                         | <direct-abstract-declarator>
 
+===============================================================================================
 <direct-abstract-declarator> ::=  ( <abstract-declarator> )
                                | {<direct-abstract-declarator>}? [ {<constant-expression>}? ]
                                | {<direct-abstract-declarator>}? ( {<parameter-type-list>}? )
+===============================================================================================
+<direct-abstract-declarator> ::= ( <abstract-declarator> ) <direct-abstract-declarator-tail>
+<direct-abstract-declarator> ::= [ {<constant-expression>}? ] <direct-abstract-declarator-tail>
+<direct-abstract-declarator> ::= ( <parameter-type-list> ) <direct-abstract-declarator-tail>
+<direct-abstract-declarator-tail> ::= <direct-abstract-declarator> <direct-abstract-declarator-tail>
+<direct-abstract-declarator-tail> ::= ε
+===============================================================================================
+<direct-abstract-declarator> ::= ( <abstract-declarator> ) {<direct-abstract-declarator-tail>}?
+                               | [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
+                               | ( <parameter-type-list> ) {<direct-abstract-declarator-tail>}?
+
+<direct-abstract-declarator-tail> ::= <direct-abstract-declarator> {<direct-abstract-declarator-tail>}?
+===============================================================================================
+<direct-abstract-declarator> ::=  ( <abstract-declarator> ) {<direct-abstract-declarator-tail>}?
+                               | [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
+                               | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
+
+<direct-abstract-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
+                                    | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
+===============================================================================================
+
+
 
 <enum-specifier> ::= enum <identifier> { <enumerator-list> }
                    | enum { <enumerator-list> }
