@@ -17,6 +17,8 @@ pub enum Token<'text> {
     RSquare,
     LParen,
     RParen,
+    Dot,
+    DotDotDot,
     Comma,
     Colon,
     SemiColon,
@@ -112,6 +114,8 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
         .or(lex_rsquare(text, pos))
         .or(lex_lparen(text, pos))
         .or(lex_rparen(text, pos))
+        .or(lex_dot_dot_dot(text, pos))
+        .or(lex_dot(text, pos))
         .or(lex_comma(text, pos))
         .or(lex_colon(text, pos))
         .or(lex_semicolon(text, pos))
@@ -219,6 +223,14 @@ fn lex_lparen(text: &str, pos: usize) -> Option<(Token, usize)> {
 
 fn lex_rparen(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::RParen, lex_with_prefix(text, pos, ")")?))
+}
+
+fn lex_dot_dot_dot(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::DotDotDot, lex_with_prefix(text, pos, "...")?))
+}
+
+fn lex_dot(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Dot, lex_with_prefix(text, pos, ".")?))
 }
 
 fn lex_comma(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -410,7 +422,7 @@ mod tests {
         union unsigned void volatile while
 
         idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
-        ,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
+        ....,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
 
         use Token::*;
@@ -466,6 +478,8 @@ mod tests {
                     RSquare,
                     LParen,
                     RParen,
+                    DotDotDot,
+                    Dot,
                     Comma,
                     Colon,
                     SemiColon,

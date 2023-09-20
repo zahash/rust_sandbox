@@ -201,7 +201,16 @@ fn parse_parameter_type_list<'text>(
     tokens: &[Token<'text>],
     pos: usize,
 ) -> Result<(ParameterTypeList<'text>, usize), ParseError> {
-    todo!()
+    let (declarations, pos) = many(tokens, pos, parse_parameter_declaration, Some(Token::Comma));
+
+    if let Some(Token::DotDotDot) = tokens.get(pos) {
+        return Ok((
+            ParameterTypeList::VariadicParameterList(declarations),
+            pos + 1,
+        ));
+    }
+
+    Ok((ParameterTypeList::ParameterList(declarations), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -215,7 +224,26 @@ fn parse_parameter_declaration<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
 ) -> Result<(ParameterDeclaration<'text>, usize), ParseError> {
-    todo!()
+    let (dss, pos) = many(tokens, pos, parse_declaration_specifier, None);
+    if dss.is_empty() {
+        return Err(ParseError::SyntaxError(
+            pos,
+            "parse_declaration: expected atleast one declaration specifier",
+        ));
+    }
+
+    let (d, pos) = maybe(tokens, pos, parse_declarator);
+    let (ad, pos) = maybe(tokens, pos, parse_abstract_declarator);
+
+    match (d, ad) {
+        (None, None) => Ok((ParameterDeclaration::OnlySpecifiers(dss), pos)),
+        (None, Some(ad)) => Ok((ParameterDeclaration::WithAbstractDeclarator(dss, ad), pos)),
+        (Some(d), None) => Ok((ParameterDeclaration::WithDeclarator(dss, d), pos)),
+        (Some(_), Some(_)) => Err(ParseError::SyntaxError(
+            pos,
+            "cannot parse parameter declaration",
+        )),
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
