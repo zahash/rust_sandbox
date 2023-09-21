@@ -3,11 +3,21 @@ use std::{
     ops::Deref,
 };
 
-pub struct ParseContext {}
+pub struct ParseContext<'text> {
+    typedefs: Vec<&'text str>,
+}
 
-impl ParseContext {
-    pub fn is_typedef(&self, ident: &str) -> bool {
-        false
+impl<'text> ParseContext<'text> {
+    pub fn new() -> Self {
+        Self { typedefs: vec![] }
+    }
+
+    pub fn set_typedef(&mut self, name: &'text str) {
+        self.typedefs.push(name);
+    }
+
+    pub fn is_typedef(&self, name: &str) -> bool {
+        self.typedefs.contains(&name)
     }
 }
 
@@ -504,8 +514,6 @@ fn parse_direct_abstract_declarator_tail<'text>(
         pos: usize,
         ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
-        // let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
-
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
@@ -529,8 +537,6 @@ fn parse_direct_abstract_declarator_tail<'text>(
         pos: usize,
         ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
-        // let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
-
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
@@ -793,7 +799,7 @@ fn parse_type_specifier<'text>(
         &[
             Box::new(parse_basic_type_specifier),
             Box::new(parse_enum_specifier),
-            // Box::new(parse_typedef_name),
+            Box::new(parse_typedef_name),
         ],
         "cannot parse type specifier",
     )
@@ -1417,12 +1423,6 @@ where
         }
     }
 }
-
-// #[derive(Debug)]
-// enum ParserCombinatorError {
-//     ParseError(ParseError),
-//     IncorrectParser,
-// }
 
 pub type Expr<'text> = AssignmentExpr<'text>;
 
@@ -2804,7 +2804,6 @@ mod tests {
         ("double", TypeSpecifier::Double),
         ("signed", TypeSpecifier::Signed),
         ("unsigned", TypeSpecifier::UnSigned),
-        // ("a", TypeSpecifier::TypeDefName("a")),
     ];
 
     const TYPE_QUALIFIER: [(&'static str, TypeQualifier); 2] = [
@@ -2814,7 +2813,7 @@ mod tests {
 
     #[test]
     fn test_declarator() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_declarator, &mut ctx, "x");
         check!(parse_declarator, &mut ctx, "(y)");
@@ -2837,7 +2836,7 @@ mod tests {
 
     #[test]
     fn test_abstract_declarator() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_abstract_declarator, &mut ctx, "*");
         check!(parse_abstract_declarator, &mut ctx, "(*)");
@@ -2870,7 +2869,7 @@ mod tests {
 
     #[test]
     fn test_declaration() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_declaration, &mut ctx, "int x = 10;");
         check!(parse_declaration, &mut ctx, "int nums[] = { 1, 2, 3, };");
@@ -2884,16 +2883,26 @@ mod tests {
             &mut ctx,
             r#"const char *name = "zahash";"#
         );
-        // Need a proper way to recognize and parse typedefs (custom types/type names)
-        // if typedef parsing is enabled, it thinks `origin` is a type name instead of just an ident
-        // if typedef parsing is disabled, it cannot recognize Point as a type and not just an ident
-        // check!(parse_declaration, "const Point origin = { 0, 0, }");
-        // check!(parse_declaration, r#"Person p = { name = "zahash", age = 24, }"#);
+
+        ctx.set_typedef("Point");
+        check!(
+            parse_declaration,
+            &mut ctx,
+            "const Point origin = { 0, 0, };"
+        );
+
+        ctx.set_typedef("Person");
+        check!(
+            parse_declaration,
+            &mut ctx,
+            r#"Person p = { name = "zahash", age = 24, };"#,
+            r#"Person p = { (name = "zahash"), (age = 24), };"#
+        );
     }
 
     #[test]
     fn test_init_declarator() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_init_declarator, &mut ctx, "x = 10");
         check!(parse_init_declarator, &mut ctx, "nums[] = { 1, 2, 3, }");
@@ -2908,7 +2917,7 @@ mod tests {
 
     #[test]
     fn test_initializer() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_initializer, &mut ctx, "expr");
         check!(parse_initializer, &mut ctx, "{a, b, c}", "{ a, b, c, }");
@@ -2923,7 +2932,7 @@ mod tests {
 
     #[test]
     fn test_declaration_specifier() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
             check_raw!(
@@ -2959,7 +2968,7 @@ mod tests {
 
     #[test]
     fn test_storage_class_specifier() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
             check_raw!(parse_storage_class_specifier, &mut ctx, src, expected);
@@ -2968,7 +2977,7 @@ mod tests {
 
     #[test]
     fn test_specifier_qualifier() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         for (src, expected) in TYPE_SPECIFIER {
             check_raw!(
@@ -2995,7 +3004,15 @@ mod tests {
 
     #[test]
     fn test_type_specifier() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
+
+        ctx.set_typedef("A");
+        check_raw!(
+            parse_type_specifier,
+            &mut ctx,
+            "A",
+            TypeSpecifier::TypeDefName("A")
+        );
 
         for (src, expected) in TYPE_SPECIFIER {
             check_raw!(parse_type_specifier, &mut ctx, src, expected);
@@ -3008,7 +3025,7 @@ mod tests {
 
     #[test]
     fn test_pointer() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_pointer, &mut ctx, "*");
         check!(parse_pointer, &mut ctx, "**");
@@ -3047,7 +3064,7 @@ mod tests {
 
     #[test]
     fn test_type_qualifier() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         for (src, expected) in TYPE_QUALIFIER {
             check_raw!(parse_type_qualifier, &mut ctx, src, expected);
@@ -3056,7 +3073,7 @@ mod tests {
 
     #[test]
     fn test_enum() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         for (src, expected) in ENUM {
             check!(parse_enum_specifier, &mut ctx, src, expected);
@@ -3065,7 +3082,7 @@ mod tests {
 
     #[test]
     fn test_simple_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check_raw!(parse_stmt, &mut ctx, ";", Stmt::EmptyStmt);
         check_raw!(
@@ -3080,7 +3097,7 @@ mod tests {
 
     #[test]
     fn test_labeled_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "a : ;");
         check!(parse_stmt, &mut ctx, "a : { }");
@@ -3090,7 +3107,7 @@ mod tests {
 
     #[test]
     fn test_if_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "if (a) ;");
         check!(parse_stmt, &mut ctx, "if (a) b;");
@@ -3124,7 +3141,7 @@ mod tests {
 
     #[test]
     fn test_while_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "while (a) ;");
         check!(parse_stmt, &mut ctx, "while (a) { }");
@@ -3139,7 +3156,7 @@ mod tests {
 
     #[test]
     fn test_do_while_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "do ; while (a);");
         check!(parse_stmt, &mut ctx, "do { } while (a);");
@@ -3154,7 +3171,7 @@ mod tests {
 
     #[test]
     fn test_for_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "for (;;) ;");
         check!(parse_stmt, &mut ctx, "for (;;) { }");
@@ -3174,7 +3191,7 @@ mod tests {
 
     #[test]
     fn test_jump_stmt() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "goto a;");
         check!(parse_stmt, &mut ctx, "continue;");
@@ -3185,7 +3202,7 @@ mod tests {
 
     #[test]
     fn test_primary() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "ident");
         check!(parse_expr, &mut ctx, "123");
@@ -3197,7 +3214,7 @@ mod tests {
 
     #[test]
     fn test_postfix_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a++");
         check!(parse_expr, &mut ctx, "a--");
@@ -3205,7 +3222,7 @@ mod tests {
 
     #[test]
     fn test_unary_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "++a");
         check!(parse_expr, &mut ctx, "--a");
@@ -3218,7 +3235,7 @@ mod tests {
 
     #[test]
     fn test_multiplicative_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a * b", "(a * b)");
         check!(parse_expr, &mut ctx, "a / b", "(a / b)");
@@ -3228,7 +3245,7 @@ mod tests {
 
     #[test]
     fn test_additive_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a + b", "(a + b)");
         check!(parse_expr, &mut ctx, "a - b", "(a - b)");
@@ -3237,7 +3254,7 @@ mod tests {
 
     #[test]
     fn test_shift_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a << b", "(a << b)");
         check!(parse_expr, &mut ctx, "a >> b", "(a >> b)");
@@ -3246,7 +3263,7 @@ mod tests {
 
     #[test]
     fn test_comparision_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a < b", "(a < b)");
         check!(parse_expr, &mut ctx, "a > b", "(a > b)");
@@ -3262,7 +3279,7 @@ mod tests {
 
     #[test]
     fn test_equality_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a == b", "(a == b)");
         check!(parse_expr, &mut ctx, "a != b", "(a != b)");
@@ -3271,7 +3288,7 @@ mod tests {
 
     #[test]
     fn test_bit_and_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a & b", "(a & b)");
         check!(parse_expr, &mut ctx, "a & b & c", "((a & b) & c)");
@@ -3279,7 +3296,7 @@ mod tests {
 
     #[test]
     fn test_xor_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a ^ b", "(a ^ b)");
         check!(parse_expr, &mut ctx, "a ^ b ^ c", "((a ^ b) ^ c)");
@@ -3287,7 +3304,7 @@ mod tests {
 
     #[test]
     fn test_bit_or_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a | b", "(a | b)");
         check!(parse_expr, &mut ctx, "a | b | c", "((a | b) | c)");
@@ -3295,7 +3312,7 @@ mod tests {
 
     #[test]
     fn test_logical_and_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a && b", "(a && b)");
         check!(parse_expr, &mut ctx, "a && b && c", "((a && b) && c)");
@@ -3303,7 +3320,7 @@ mod tests {
 
     #[test]
     fn test_logical_or_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a || b", "(a || b)");
         check!(parse_expr, &mut ctx, "a || b || c", "((a || b) || c)");
@@ -3311,7 +3328,7 @@ mod tests {
 
     #[test]
     fn test_conditional_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a ? b : c", "(a ? b : c)");
         check!(
@@ -3324,7 +3341,7 @@ mod tests {
 
     #[test]
     fn test_assignment_expr() {
-        let mut ctx = ParseContext {};
+        let mut ctx = ParseContext::new();
 
         check!(parse_expr, &mut ctx, "a = b", "(a = b)");
         check!(parse_expr, &mut ctx, "a *= b", "(a *= b)");
