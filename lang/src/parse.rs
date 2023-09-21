@@ -465,7 +465,7 @@ fn parse_direct_abstract_declarator<'text>(
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (parameter_type_list, pos) = maybe(tokens, pos, parse_parameter_type_list);
+        let (parameter_type_list, pos) = maybe(tokens, pos + 1, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
@@ -487,7 +487,7 @@ fn parse_direct_abstract_declarator<'text>(
             Box::new(parse_array),
             Box::new(parse_function),
         ],
-        "msg",
+        "cannot parse direct abstract declarator",
     )
 }
 
@@ -529,7 +529,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (parameter_type_list, pos) = maybe(tokens, pos, parse_parameter_type_list);
+        let (parameter_type_list, pos) = maybe(tokens, pos + 1, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
@@ -542,7 +542,13 @@ fn parse_direct_abstract_declarator_tail<'text>(
             pos,
         ))
     }
-    todo!()
+
+    combine_parsers(
+        tokens,
+        pos,
+        &[Box::new(parse_array), Box::new(parse_function)],
+        "cannot parse direct abstract declarator tail",
+    )
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -2758,6 +2764,25 @@ mod tests {
         check!(parse_declarator, "print(const char *fmt, ...)");
         check!(parse_declarator, "log(const char *message, ...)");
         check!(parse_declarator, "f(a b c)");
+    }
+
+    #[test]
+    fn test_abstract_declarator() {
+        check!(parse_abstract_declarator, "*");
+        check!(parse_abstract_declarator, "(*)");
+        check!(parse_abstract_declarator, "*****[]");
+        check!(parse_abstract_declarator, "*()");
+        check!(parse_abstract_declarator, "*(*)");
+        check!(parse_abstract_declarator, "[]");
+        check!(parse_abstract_declarator, "[SIZE]");
+        check!(parse_abstract_declarator, "[3][4]");
+        check!(parse_abstract_declarator, "()");
+        check!(parse_abstract_declarator, "(int a, int b)");
+        check!(parse_abstract_declarator, "(*)()");
+        check!(parse_abstract_declarator, "(*)(double x, double y)");
+        check!(parse_abstract_declarator, "(int n, ...)");
+        check!(parse_abstract_declarator, "(const char *fmt, ...)");
+        check!(parse_abstract_declarator, "(const char *message, ...)");
     }
 
     #[test]
