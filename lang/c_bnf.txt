@@ -236,18 +236,6 @@ The syntax of C in Backus-Naur Form
                                     | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
 ===============================================================================================
 
-
-
-<enum-specifier> ::= enum <identifier> { <enumerator-list> }
-                   | enum { <enumerator-list> }
-                   | enum <identifier>
-
-<enumerator-list> ::= <enumerator>
-                    | <enumerator-list> , <enumerator>
-
-<enumerator> ::= <identifier>
-               | <identifier> = <constant-expression>
-
 <typedef-name> ::= <identifier>
 
 <init-declarator> ::= <declarator>
@@ -268,6 +256,17 @@ The syntax of C in Backus-Naur Form
 
 
 <compound-statement> ::= { {<declaration>}* {<statement>}* }
+
+<enum-specifier> ::= enum <identifier> { <enumerator-list> }
+                   | enum { <enumerator-list> }
+                   | enum <identifier>
+
+<enumerator-list> ::= <enumerator>
+                    | <enumerator-list> , <enumerator>
+
+<enumerator> ::= <identifier>
+               | <identifier> = <constant-expression>
+
 
 <statement> ::= <labeled-statement>
               | <expression-statement>

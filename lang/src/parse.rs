@@ -118,22 +118,6 @@ fn parse_declarator<'text>(
     ))
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub enum DirectDeclarator<'text> {
-//     Ident(&'text str),
-//     Parens(Box<Declarator<'text>>),
-//     Array(Box<DirectDeclarator<'text>>, Option<ConstantExpr<'text>>),
-//     Function(Box<DirectDeclarator<'text>>, ParameterTypeList<'text>),
-//     Parameters(Box<DirectDeclarator<'text>>, Vec<&'text str>),
-// }
-
-// <direct-declarator> ::= <identifier> {<direct-declarator-tail>}?
-//                       | ( <direct-declarator> ) {<direct-declarator-tail>}?
-
-// <direct-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-declarator-tail>}?
-//                            | ( <parameter-type-list> ) {<direct-declarator-tail>}?
-//                            | ( {<identifier>}* ) {<direct-declarator-tail>}?
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectDeclarator<'text> {
     Ident(&'text str, Option<DirectDeclaratorTail<'text>>),
@@ -364,26 +348,6 @@ fn parse_abstract_declarator<'text>(
     }
 }
 
-// #[derive(Debug, PartialEq, Clone)]
-// pub enum DirectAbstractDeclarator<'text> {
-//     Parens(Box<AbstractDeclarator<'text>>),
-//     Array(
-//         Box<Option<DirectAbstractDeclarator<'text>>>,
-//         Option<ConstantExpr<'text>>,
-//     ),
-//     Function(
-//         Box<Option<DirectAbstractDeclarator<'text>>>,
-//         Option<ParameterTypeList<'text>>,
-//     ),
-// }
-
-// <direct-abstract-declarator> ::=  ( <abstract-declarator> ) {<direct-abstract-declarator-tail>}?
-//                                | [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
-//                                | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
-
-// <direct-abstract-declarator-tail> ::= [ {<constant-expression>}? ] {<direct-abstract-declarator-tail>}?
-//                                     | ( {<parameter-type-list>}? ) {<direct-abstract-declarator-tail>}?
-
 #[derive(Debug, PartialEq, Clone)]
 pub enum DirectAbstractDeclarator<'text> {
     Parens(
@@ -549,72 +513,6 @@ fn parse_direct_abstract_declarator_tail<'text>(
         &[Box::new(parse_array), Box::new(parse_function)],
         "cannot parse direct abstract declarator tail",
     )
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum EnumSpecifier<'text> {
-    Named(&'text str, Vec<Enumerator<'text>>),
-    Anonymous(Vec<Enumerator<'text>>),
-    ForwardDeclaration(&'text str),
-}
-
-fn parse_enum_specifier<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
-    let Some(Token::Keyword("enum")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("enum", pos));
-    };
-
-    fn parse_enum_body<'text>(
-        tokens: &[Token<'text>],
-        pos: usize,
-    ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
-        let Some(Token::LCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLCurly(pos));
-        };
-
-        let (list, pos) = many(tokens, pos + 1, parse_enumerator, Some(Token::Comma));
-
-        let Some(Token::RCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRCurly(pos).into());
-        };
-
-        return Ok((list, pos + 1));
-    }
-
-    if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
-        return match parse_enum_body(tokens, pos + 2) {
-            Ok((enumerators, pos)) => Ok((EnumSpecifier::Named(ident, enumerators), pos)),
-            Err(_) => Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2)),
-        };
-    }
-
-    let (list, pos) = parse_enum_body(tokens, pos + 1)?;
-    Ok((EnumSpecifier::Anonymous(list), pos))
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Enumerator<'text> {
-    Implicit(&'text str),
-    Explicit(&'text str, ConstantExpr<'text>),
-}
-
-fn parse_enumerator<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-) -> Result<(Enumerator<'text>, usize), ParseError> {
-    let Some(Token::Ident(ident)) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedIdentifier(pos));
-    };
-
-    let Some(Token::Equals) = tokens.get(pos + 1) else {
-        return Ok((Enumerator::Implicit(ident), pos + 1));
-    };
-
-    let (expr, pos) = parse_constant_expr(tokens, pos + 2)?;
-
-    Ok((Enumerator::Explicit(ident, expr), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -928,6 +826,72 @@ fn parse_type_qualifier<'text>(
         Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
         _ => Err(ParseError::ExpectedKeyword("`const` or `volatile`", pos)),
     }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum EnumSpecifier<'text> {
+    Named(&'text str, Vec<Enumerator<'text>>),
+    Anonymous(Vec<Enumerator<'text>>),
+    ForwardDeclaration(&'text str),
+}
+
+fn parse_enum_specifier<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
+    let Some(Token::Keyword("enum")) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedKeyword("enum", pos));
+    };
+
+    fn parse_enum_body<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+    ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
+        let Some(Token::LCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedLCurly(pos));
+        };
+
+        let (list, pos) = many(tokens, pos + 1, parse_enumerator, Some(Token::Comma));
+
+        let Some(Token::RCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRCurly(pos).into());
+        };
+
+        return Ok((list, pos + 1));
+    }
+
+    if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
+        return match parse_enum_body(tokens, pos + 2) {
+            Ok((enumerators, pos)) => Ok((EnumSpecifier::Named(ident, enumerators), pos)),
+            Err(_) => Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2)),
+        };
+    }
+
+    let (list, pos) = parse_enum_body(tokens, pos + 1)?;
+    Ok((EnumSpecifier::Anonymous(list), pos))
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Enumerator<'text> {
+    Implicit(&'text str),
+    Explicit(&'text str, ConstantExpr<'text>),
+}
+
+fn parse_enumerator<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+) -> Result<(Enumerator<'text>, usize), ParseError> {
+    let Some(Token::Ident(ident)) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedIdentifier(pos));
+    };
+
+    let Some(Token::Equals) = tokens.get(pos + 1) else {
+        return Ok((Enumerator::Implicit(ident), pos + 1));
+    };
+
+    let (expr, pos) = parse_constant_expr(tokens, pos + 2)?;
+
+    Ok((Enumerator::Explicit(ident, expr), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1937,18 +1901,6 @@ impl<'text> Display for EnumSpecifier<'text> {
     }
 }
 
-// impl<'text> Display for EnumeratorList<'text> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         for (i, e) in self.0.iter().enumerate() {
-//             match i == self.0.len() - 1 {
-//                 true => write!(f, "{}", e)?,
-//                 false => write!(f, "{}, ", e)?,
-//             }
-//         }
-//         Ok(())
-//     }
-// }
-
 impl<'text> Display for Enumerator<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -2028,6 +1980,15 @@ impl Display for TypeQualifier {
             TypeQualifier::Const => write!(f, "const"),
             TypeQualifier::Volatile => write!(f, "volatile"),
         }
+    }
+}
+
+impl<'text> Display for Declaration<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write_arr(f, &self.declaration_specifiers, " ")?;
+        write!(f, " ")?;
+        write_arr(f, &self.init_declarators, " ")?;
+        write!(f, ";")
     }
 }
 
@@ -2727,7 +2688,7 @@ mod tests {
         ("typedef", StorageClassSpecifier::TypeDef),
     ];
 
-    const TYPE_SPECIFIER: [(&'static str, TypeSpecifier); 10] = [
+    const TYPE_SPECIFIER: [(&'static str, TypeSpecifier); 9] = [
         ("void", TypeSpecifier::Void),
         ("char", TypeSpecifier::Char),
         ("short", TypeSpecifier::Short),
@@ -2737,7 +2698,7 @@ mod tests {
         ("double", TypeSpecifier::Double),
         ("signed", TypeSpecifier::Signed),
         ("unsigned", TypeSpecifier::UnSigned),
-        ("a", TypeSpecifier::TypeDefName("a")),
+        // ("a", TypeSpecifier::TypeDefName("a")),
     ];
 
     const TYPE_QUALIFIER: [(&'static str, TypeQualifier); 2] = [
@@ -2786,17 +2747,42 @@ mod tests {
     }
 
     #[test]
-    fn test_initializer() {
-        check!(parse_initializer, "a = b", "(a = b)");
+    fn test_declaration() {
+        check!(parse_declaration, "int x = 10;");
+        check!(parse_declaration, "int nums[] = { 1, 2, 3, };");
         check!(
-            parse_initializer,
-            "{ a = b, c = d, }",
-            "{ (a = b), (c = d), }"
+            parse_declaration,
+            "float mat[2][3] = { { 3.1, 0.6, 2.7, }, { 1.4, 4.7, 0.6, }, };"
         );
+        check!(parse_declaration, r#"const char *name = "zahash";"#);
+        // Need a proper way to recognize and parse typedefs (custom types/type names)
+        // if typedef parsing is enabled, it thinks `origin` is a type name instead of just an ident
+        // if typedef parsing is disabled, it cannot recognize Point as a type and not just an ident
+        // check!(parse_declaration, "const Point origin = { 0, 0, }");
+        // check!(parse_declaration, r#"Person p = { name = "zahash", age = 24, }"#);
+    }
+
+    #[test]
+    fn test_init_declarator() {
+        check!(parse_init_declarator, "x = 10");
+        check!(parse_init_declarator, "nums[] = { 1, 2, 3, }");
+        check!(
+            parse_init_declarator,
+            "mat[2][3] = { { 1, 2, 3, }, { 4, 5, 6, }, }"
+        );
+        check!(parse_init_declarator, "obj = { a, b, c, }");
+        check!(parse_init_declarator, r#"*name = "zahash""#);
+    }
+
+    #[test]
+    fn test_initializer() {
+        check!(parse_initializer, "expr");
+        check!(parse_initializer, "{a, b, c}", "{ a, b, c, }");
+        check!(parse_initializer, "{a, b, c,}", "{ a, b, c, }");
         check!(
             parse_initializer,
-            "{ {a = b}, { c = d, e = f }, g = h, }",
-            "{ { (a = b), }, { (c = d), (e = f), }, (g = h), }"
+            "{a, {b, c,}, {d,}}",
+            "{ a, { b, c, }, { d, }, }"
         );
     }
 
@@ -2910,6 +2896,13 @@ mod tests {
     fn test_type_qualifier() {
         for (src, expected) in TYPE_QUALIFIER {
             check_raw!(parse_type_qualifier, src, expected);
+        }
+    }
+
+    #[test]
+    fn test_enum() {
+        for (src, expected) in ENUM {
+            check!(parse_enum_specifier, src, expected);
         }
     }
 
