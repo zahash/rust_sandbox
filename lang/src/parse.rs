@@ -3,9 +3,9 @@ use std::{
     ops::Deref,
 };
 
-pub struct Context {}
+pub struct ParseContext {}
 
-impl Context {
+impl ParseContext {
     pub fn is_typedef(&self, ident: &str) -> bool {
         false
     }
@@ -19,6 +19,7 @@ pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 fn parse_translation_unit<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(TranslationUnit<'text>, usize), ParseError> {
     todo!()
 }
@@ -32,6 +33,7 @@ pub enum ExternalDeclaration<'text> {
 fn parse_external_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ExternalDeclaration<'text>, usize), ParseError> {
     todo!()
 }
@@ -46,6 +48,7 @@ pub struct FunctionDefinition<'text> {
 fn parse_function_definition<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
     todo!()
 }
@@ -60,6 +63,7 @@ pub enum StructOrUnionSpecifier<'text> {
 fn parse_struct_or_union_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(StructOrUnionSpecifier<'text>, usize), ParseError> {
     todo!()
 }
@@ -73,6 +77,7 @@ pub enum StructOrUnion {
 fn parse_struct_or_union<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(StructOrUnion, usize), ParseError> {
     todo!()
 }
@@ -86,6 +91,7 @@ pub struct StructDeclaration<'text> {
 fn parse_struct_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(StructDeclaration<'text>, usize), ParseError> {
     todo!()
 }
@@ -100,6 +106,7 @@ pub enum StructDeclarator<'text> {
 fn parse_struct_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(StructDeclarator<'text>, usize), ParseError> {
     todo!()
 }
@@ -113,9 +120,10 @@ pub struct Declarator<'text> {
 fn parse_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Declarator<'text>, usize), ParseError> {
-    let (pointer, pos) = maybe(tokens, pos, parse_pointer);
-    let (dd, pos) = parse_direct_declarator(tokens, pos)?;
+    let (pointer, pos) = maybe(tokens, pos, ctx, parse_pointer);
+    let (dd, pos) = parse_direct_declarator(tokens, pos, ctx)?;
 
     Ok((
         Declarator {
@@ -148,16 +156,18 @@ pub enum DirectDeclaratorTail<'text> {
 fn parse_direct_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
     fn parse_ident<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::Ident(ident)) = tokens.get(pos) else {
             return Err(ParseError::ExpectedIdentifier(pos));
         };
 
-        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+        let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((DirectDeclarator::Ident(&ident, dd_tail), pos))
     }
@@ -165,18 +175,19 @@ fn parse_direct_declarator<'text>(
     fn parse_parens<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (declarator, pos) = parse_declarator(tokens, pos + 1)?;
+        let (declarator, pos) = parse_declarator(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+        let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((DirectDeclarator::Parens(Box::new(declarator), dd_tail), pos))
     }
@@ -184,6 +195,7 @@ fn parse_direct_declarator<'text>(
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[Box::new(parse_ident), Box::new(parse_parens)],
         "cannot parse direct declarator",
     )
@@ -192,22 +204,24 @@ fn parse_direct_declarator<'text>(
 fn parse_direct_declarator_tail<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
 
-        let (expr, pos) = maybe(tokens, pos + 1, parse_constant_expr);
+        let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRSquare(pos));
         };
 
-        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+        let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((DirectDeclaratorTail::Array(expr, Box::new(dd_tail)), pos))
     }
@@ -215,18 +229,19 @@ fn parse_direct_declarator_tail<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (list, pos) = parse_parameter_type_list(tokens, pos + 1)?;
+        let (list, pos) = parse_parameter_type_list(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+        let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((DirectDeclaratorTail::Function(list, Box::new(dd_tail)), pos))
     }
@@ -234,6 +249,7 @@ fn parse_direct_declarator_tail<'text>(
     fn parse_parameters<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -250,7 +266,7 @@ fn parse_direct_declarator_tail<'text>(
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dd_tail, pos) = maybe(tokens, pos + 1, parse_direct_declarator_tail);
+        let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((
             DirectDeclaratorTail::Parameters(idents, Box::new(dd_tail)),
@@ -261,6 +277,7 @@ fn parse_direct_declarator_tail<'text>(
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_array),
             Box::new(parse_function),
@@ -285,8 +302,15 @@ pub enum ParameterTypeList<'text> {
 fn parse_parameter_type_list<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ParameterTypeList<'text>, usize), ParseError> {
-    let (declarations, pos) = many(tokens, pos, parse_parameter_declaration, Some(Token::Comma));
+    let (declarations, pos) = many(
+        tokens,
+        pos,
+        ctx,
+        parse_parameter_declaration,
+        Some(Token::Comma),
+    );
 
     if let Some(Token::DotDotDot) = tokens.get(pos) {
         return Ok((
@@ -308,8 +332,9 @@ pub enum ParameterDeclaration<'text> {
 fn parse_parameter_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ParameterDeclaration<'text>, usize), ParseError> {
-    let (dss, pos) = many(tokens, pos, parse_declaration_specifier, None);
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
     if dss.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
@@ -317,8 +342,8 @@ fn parse_parameter_declaration<'text>(
         ));
     }
 
-    let (d, pos) = maybe(tokens, pos, parse_declarator);
-    let (ad, pos) = maybe(tokens, pos, parse_abstract_declarator);
+    let (d, pos) = maybe(tokens, pos, ctx, parse_declarator);
+    let (ad, pos) = maybe(tokens, pos, ctx, parse_abstract_declarator);
 
     match (d, ad) {
         (None, None) => Ok((ParameterDeclaration::OnlySpecifiers(dss), pos)),
@@ -341,9 +366,10 @@ pub enum AbstractDeclarator<'text> {
 fn parse_abstract_declarator<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(AbstractDeclarator<'text>, usize), ParseError> {
-    let (pointer, pos) = maybe(tokens, pos, parse_pointer);
-    let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
+    let (pointer, pos) = maybe(tokens, pos, ctx, parse_pointer);
+    let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
 
     match (pointer, dad) {
         (None, None) => Err(ParseError::SyntaxError(
@@ -387,22 +413,24 @@ pub enum DirectAbstractDeclaratorTail<'text> {
 fn parse_direct_abstract_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
     fn parse_parens<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (declarator, pos) = parse_abstract_declarator(tokens, pos + 1)?;
+        let (declarator, pos) = parse_abstract_declarator(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+        let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
             DirectAbstractDeclarator::Parens(Box::new(declarator), dad_tail),
@@ -413,18 +441,19 @@ fn parse_direct_abstract_declarator<'text>(
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
 
-        let (expr, pos) = maybe(tokens, pos + 1, parse_constant_expr);
+        let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRSquare(pos));
         };
 
-        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+        let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((DirectAbstractDeclarator::Array(expr, dad_tail), pos))
     }
@@ -432,18 +461,19 @@ fn parse_direct_abstract_declarator<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (parameter_type_list, pos) = maybe(tokens, pos + 1, parse_parameter_type_list);
+        let (parameter_type_list, pos) = maybe(tokens, pos + 1, ctx, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+        let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
             DirectAbstractDeclarator::Function(parameter_type_list, dad_tail),
@@ -454,6 +484,7 @@ fn parse_direct_abstract_declarator<'text>(
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_parens),
             Box::new(parse_array),
@@ -466,24 +497,26 @@ fn parse_direct_abstract_declarator<'text>(
 fn parse_direct_abstract_declarator_tail<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
-        // let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
+        // let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
 
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
         };
 
-        let (expr, pos) = maybe(tokens, pos + 1, parse_constant_expr);
+        let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRSquare(pos));
         };
 
-        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+        let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
             DirectAbstractDeclaratorTail::Array(expr, Box::new(dad_tail)),
@@ -494,20 +527,21 @@ fn parse_direct_abstract_declarator_tail<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
-        // let (dad, pos) = maybe(tokens, pos, parse_direct_abstract_declarator);
+        // let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
 
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let (parameter_type_list, pos) = maybe(tokens, pos + 1, parse_parameter_type_list);
+        let (parameter_type_list, pos) = maybe(tokens, pos + 1, ctx, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
         };
 
-        let (dad_tail, pos) = maybe(tokens, pos + 1, parse_direct_abstract_declarator_tail);
+        let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
             DirectAbstractDeclaratorTail::Function(parameter_type_list, Box::new(dad_tail)),
@@ -518,6 +552,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[Box::new(parse_array), Box::new(parse_function)],
         "cannot parse direct abstract declarator tail",
     )
@@ -532,8 +567,9 @@ pub struct Declaration<'text> {
 fn parse_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Declaration<'text>, usize), ParseError> {
-    let (declaration_specifiers, pos) = many(tokens, pos, parse_declaration_specifier, None);
+    let (declaration_specifiers, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
     if declaration_specifiers.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
@@ -541,7 +577,7 @@ fn parse_declaration<'text>(
         ));
     }
 
-    let (init_declarators, pos) = many(tokens, pos, parse_init_declarator, Some(Token::Comma));
+    let (init_declarators, pos) = many(tokens, pos, ctx, parse_init_declarator, Some(Token::Comma));
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos).into());
@@ -565,14 +601,15 @@ pub enum InitDeclarator<'text> {
 fn parse_init_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(InitDeclarator<'text>, usize), ParseError> {
-    let (declarator, pos) = parse_declarator(tokens, pos)?;
+    let (declarator, pos) = parse_declarator(tokens, pos, ctx)?;
 
     let Some(Token::Equals) = tokens.get(pos) else {
         return Ok((InitDeclarator::Declared(declarator), pos));
     };
 
-    let (initializer, pos) = parse_initializer(tokens, pos + 1)?;
+    let (initializer, pos) = parse_initializer(tokens, pos + 1, ctx)?;
     Ok((InitDeclarator::Initialized(declarator, initializer), pos))
 }
 
@@ -585,6 +622,7 @@ pub enum Initializer<'text> {
 fn parse_initializer<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Initializer<'text>, usize), ParseError> {
     if let Some(Token::LCurly) = tokens.get(pos) {
         let mut initializers = Vec::new();
@@ -596,7 +634,7 @@ fn parse_initializer<'text>(
                 break;
             }
 
-            let (initializer, next_pos) = parse_initializer(tokens, pos)?;
+            let (initializer, next_pos) = parse_initializer(tokens, pos, ctx)?;
             pos = next_pos;
 
             initializers.push(initializer);
@@ -614,7 +652,7 @@ fn parse_initializer<'text>(
         return Ok((Initializer::InitializerList(initializers), pos));
     }
 
-    let (expr, pos) = parse_assignment_expr(tokens, pos)?;
+    let (expr, pos) = parse_assignment_expr(tokens, pos, ctx)?;
     Ok((Initializer::Assignment(expr), pos))
 }
 
@@ -628,10 +666,12 @@ pub enum DeclarationSpecifier<'text> {
 fn parse_declaration_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(DeclarationSpecifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_storage_class_specifier),
             Box::new(parse_type_specifier),
@@ -653,6 +693,7 @@ pub enum StorageClassSpecifier {
 fn parse_storage_class_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(StorageClassSpecifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
@@ -676,10 +717,12 @@ pub enum SpecifierQualifier<'text> {
 fn parse_specifier_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(SpecifierQualifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_type_specifier),
             Box::new(parse_type_qualifier),
@@ -706,10 +749,12 @@ pub enum TypeSpecifier<'text> {
 fn parse_type_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
     fn parse_basic_type_specifier<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Keyword("void")) => Ok((TypeSpecifier::Void, pos + 1)),
@@ -731,7 +776,7 @@ fn parse_type_specifier<'text>(
     fn parse_typedef_name<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &Context,
+        ctx: &mut ParseContext,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Ident(ident)) if ctx.is_typedef(ident) => {
@@ -744,6 +789,7 @@ fn parse_type_specifier<'text>(
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_basic_type_specifier),
             Box::new(parse_enum_specifier),
@@ -791,6 +837,7 @@ impl<'pointer> Iterator for PointerIter<'pointer> {
 fn parse_pointer<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Pointer, usize), ParseError> {
     let Some(Token::Asterisk) = tokens.get(pos) else {
         return Err(ParseError::SyntaxError(pos, "parse_pointer: expected `*`"));
@@ -803,7 +850,7 @@ fn parse_pointer<'text>(
     };
 
     loop {
-        match parse_type_qualifier(tokens, pos) {
+        match parse_type_qualifier(tokens, pos, ctx) {
             Err(_) => break,
             Ok((qualifier, next_pos)) => {
                 pointer.qualifiers.push(qualifier);
@@ -812,7 +859,7 @@ fn parse_pointer<'text>(
         }
     }
 
-    match parse_pointer(tokens, pos) {
+    match parse_pointer(tokens, pos, ctx) {
         Ok((next_pointer, next_pos)) => {
             pos = next_pos;
             pointer.next = Some(Box::new(next_pointer));
@@ -831,6 +878,7 @@ pub enum TypeQualifier {
 fn parse_type_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(TypeQualifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
@@ -849,6 +897,7 @@ pub enum EnumSpecifier<'text> {
 fn parse_enum_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
     let Some(Token::Keyword("enum")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("enum", pos));
@@ -857,12 +906,13 @@ fn parse_enum_specifier<'text>(
     fn parse_enum_body<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &mut ParseContext,
     ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLCurly(pos));
         };
 
-        let (list, pos) = many(tokens, pos + 1, parse_enumerator, Some(Token::Comma));
+        let (list, pos) = many(tokens, pos + 1, ctx, parse_enumerator, Some(Token::Comma));
 
         let Some(Token::RCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRCurly(pos).into());
@@ -872,13 +922,13 @@ fn parse_enum_specifier<'text>(
     }
 
     if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
-        return match parse_enum_body(tokens, pos + 2) {
+        return match parse_enum_body(tokens, pos + 2, ctx) {
             Ok((enumerators, pos)) => Ok((EnumSpecifier::Named(ident, enumerators), pos)),
             Err(_) => Ok((EnumSpecifier::ForwardDeclaration(ident), pos + 2)),
         };
     }
 
-    let (list, pos) = parse_enum_body(tokens, pos + 1)?;
+    let (list, pos) = parse_enum_body(tokens, pos + 1, ctx)?;
     Ok((EnumSpecifier::Anonymous(list), pos))
 }
 
@@ -891,6 +941,7 @@ pub enum Enumerator<'text> {
 fn parse_enumerator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Enumerator<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
         return Err(ParseError::ExpectedIdentifier(pos));
@@ -900,7 +951,7 @@ fn parse_enumerator<'text>(
         return Ok((Enumerator::Implicit(ident), pos + 1));
     };
 
-    let (expr, pos) = parse_constant_expr(tokens, pos + 2)?;
+    let (expr, pos) = parse_constant_expr(tokens, pos + 2, ctx)?;
 
     Ok((Enumerator::Explicit(ident, expr), pos))
 }
@@ -919,10 +970,12 @@ pub enum Stmt<'text> {
 fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
         pos,
+        ctx,
         &[
             Box::new(parse_labeled_ident_stmt),
             Box::new(parse_empty_stmt),
@@ -949,6 +1002,7 @@ pub enum LabeledStmt<'text> {
 fn parse_labeled_ident_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(LabeledStmt<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
         return Err(ParseError::ExpectedIdentifier(pos));
@@ -958,13 +1012,14 @@ fn parse_labeled_ident_stmt<'text>(
         return Err(ParseError::ExpectedColon(pos));
     };
 
-    let (stmt, pos) = parse_stmt(tokens, pos + 2)?;
+    let (stmt, pos) = parse_stmt(tokens, pos + 2, ctx)?;
     Ok((LabeledStmt::Ident(ident, Box::new(stmt)), pos))
 }
 
 fn parse_empty_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos));
@@ -976,8 +1031,9 @@ fn parse_empty_stmt<'text>(
 fn parse_expr_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
-    let (expr, pos) = parse_expr(tokens, pos)?;
+    let (expr, pos) = parse_expr(tokens, pos, ctx)?;
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos).into());
@@ -992,6 +1048,7 @@ pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
 fn parse_compound_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(CompoundStmt<'text>, usize), ParseError> {
     let Some(Token::LCurly) = tokens.get(pos) else {
         return Err(ParseError::ExpectedLCurly(pos));
@@ -1005,7 +1062,7 @@ fn parse_compound_stmt<'text>(
             return Ok((CompoundStmt(stmts), pos + 1));
         }
 
-        match parse_stmt(tokens, pos) {
+        match parse_stmt(tokens, pos, ctx) {
             Ok((stmt, next_pos)) => {
                 pos = next_pos;
                 stmts.push(stmt);
@@ -1033,6 +1090,7 @@ pub enum SelectionStmt<'text> {
 fn parse_selection_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(SelectionStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("if")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("if", pos));
@@ -1042,20 +1100,20 @@ fn parse_selection_stmt<'text>(
         return Err(ParseError::ExpectedLParen(pos + 1).into());
     };
 
-    let (test, pos) = parse_expr(tokens, pos + 2)?;
+    let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
         return Err(ParseError::ExpectedRParen(pos).into());
     };
 
-    let (pass, pos) = parse_stmt(tokens, pos + 1)?;
+    let (pass, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let pass = Box::new(pass);
 
     let Some(Token::Keyword("else")) = tokens.get(pos) else {
         return Ok((SelectionStmt::If { test, pass }, pos));
     };
 
-    let (fail, pos) = parse_stmt(tokens, pos + 1)?;
+    let (fail, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let fail = Box::new(fail);
 
     Ok((SelectionStmt::IfElse { test, pass, fail }, pos))
@@ -1082,6 +1140,7 @@ pub enum IterationStmt<'text> {
 fn parse_iteration_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("while", pos));
@@ -1091,13 +1150,13 @@ fn parse_iteration_while_stmt<'text>(
         return Err(ParseError::ExpectedLParen(pos + 1).into());
     };
 
-    let (test, pos) = parse_expr(tokens, pos + 2)?;
+    let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
         return Err(ParseError::ExpectedRParen(pos).into());
     };
 
-    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let body = Box::new(body);
 
     Ok((IterationStmt::While { test, body }, pos))
@@ -1106,12 +1165,13 @@ fn parse_iteration_while_stmt<'text>(
 fn parse_iteration_do_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("do")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("do", pos));
     };
 
-    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let body = Box::new(body);
 
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
@@ -1122,7 +1182,7 @@ fn parse_iteration_do_while_stmt<'text>(
         return Err(ParseError::ExpectedLParen(pos + 1).into());
     };
 
-    let (test, pos) = parse_expr(tokens, pos + 2)?;
+    let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
         return Err(ParseError::ExpectedRParen(pos).into());
@@ -1138,6 +1198,7 @@ fn parse_iteration_do_while_stmt<'text>(
 fn parse_iteration_for_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("for")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("for", pos));
@@ -1150,7 +1211,7 @@ fn parse_iteration_for_stmt<'text>(
     let (init, pos) = match tokens.get(pos + 2) {
         Some(Token::SemiColon) => (None, pos + 2),
         _ => {
-            let (expr, pos) = parse_expr(tokens, pos + 2)?;
+            let (expr, pos) = parse_expr(tokens, pos + 2, ctx)?;
             (Some(expr), pos)
         }
     };
@@ -1162,7 +1223,7 @@ fn parse_iteration_for_stmt<'text>(
     let (test, pos) = match tokens.get(pos + 1) {
         Some(Token::SemiColon) => (None, pos + 1),
         _ => {
-            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_expr(tokens, pos + 1, ctx)?;
             (Some(expr), pos)
         }
     };
@@ -1174,7 +1235,7 @@ fn parse_iteration_for_stmt<'text>(
     let (update, pos) = match tokens.get(pos + 1) {
         Some(Token::RParen) => (None, pos + 1),
         _ => {
-            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_expr(tokens, pos + 1, ctx)?;
             (Some(expr), pos)
         }
     };
@@ -1183,7 +1244,7 @@ fn parse_iteration_for_stmt<'text>(
         return Err(ParseError::ExpectedRParen(pos).into());
     };
 
-    let (body, pos) = parse_stmt(tokens, pos + 1)?;
+    let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let body = Box::new(body);
 
     Ok((
@@ -1208,6 +1269,7 @@ pub enum JumpStmt<'text> {
 fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("goto", pos));
@@ -1227,6 +1289,7 @@ fn parse_jump_goto_stmt<'text>(
 fn parse_jump_continue_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("continue", pos));
@@ -1242,6 +1305,7 @@ fn parse_jump_continue_stmt<'text>(
 fn parse_jump_break_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("break", pos));
@@ -1257,12 +1321,13 @@ fn parse_jump_break_stmt<'text>(
 fn parse_jump_return_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("return")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("return", pos));
     };
 
-    let (expr, pos) = maybe(tokens, pos + 1, parse_expr);
+    let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_expr);
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos).into());
@@ -1274,12 +1339,13 @@ fn parse_jump_return_stmt<'text>(
 fn many<'text, Ast>(
     tokens: &[Token<'text>],
     mut pos: usize,
-    parser: impl Fn(&[Token<'text>], usize) -> Result<(Ast, usize), ParseError>,
+    ctx: &mut ParseContext,
+    parser: impl Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(Ast, usize), ParseError>,
     delimiter: Option<Token>,
 ) -> (Vec<Ast>, usize) {
     let mut list = vec![];
 
-    while let Ok((ast, next_pos)) = parser(tokens, pos) {
+    while let Ok((ast, next_pos)) = parser(tokens, pos, ctx) {
         list.push(ast);
         pos = next_pos;
 
@@ -1299,26 +1365,33 @@ fn many<'text, Ast>(
 fn maybe<'text, Ast>(
     tokens: &[Token<'text>],
     pos: usize,
-    parser: impl Fn(&[Token<'text>], usize) -> Result<(Ast, usize), ParseError>,
+    ctx: &mut ParseContext,
+    parser: impl Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(Ast, usize), ParseError>,
 ) -> (Option<Ast>, usize) {
-    match parser(tokens, pos) {
+    match parser(tokens, pos, ctx) {
         Ok((ast, pos)) => (Some(ast), pos),
         Err(_) => (None, pos),
     }
 }
 
 trait Parser<'text, Ast> {
-    fn parse(&self, tokens: &[Token<'text>], pos: usize) -> Result<(Ast, usize), ParseError>;
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+        ctx: &mut ParseContext,
+    ) -> Result<(Ast, usize), ParseError>;
 }
 
 fn combine_parsers<'text, Ast>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
     parsers: &[Box<dyn Parser<'text, Ast>>],
     msg: &'static str,
 ) -> Result<(Ast, usize), ParseError> {
     for parser in parsers {
-        match parser.parse(tokens, pos) {
+        match parser.parse(tokens, pos, ctx) {
             Ok((ast, pos)) => return Ok((ast, pos)),
             Err(_) => continue,
         };
@@ -1330,10 +1403,15 @@ fn combine_parsers<'text, Ast>(
 impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
     ParsedValue: Into<Ast>,
-    F: Fn(&[Token<'text>], usize) -> Result<(ParsedValue, usize), ParseError>,
+    F: Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(ParsedValue, usize), ParseError>,
 {
-    fn parse(&self, tokens: &[Token<'text>], pos: usize) -> Result<(Ast, usize), ParseError> {
-        match self(tokens, pos) {
+    fn parse(
+        &self,
+        tokens: &[Token<'text>],
+        pos: usize,
+        ctx: &mut ParseContext,
+    ) -> Result<(Ast, usize), ParseError> {
+        match self(tokens, pos, ctx) {
             Ok((val, pos)) => Ok((val.into(), pos)),
             Err(e) => Err(e),
         }
@@ -1351,8 +1429,9 @@ pub type Expr<'text> = AssignmentExpr<'text>;
 fn parse_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Expr<'text>, usize), ParseError> {
-    parse_assignment_expr(tokens, pos)
+    parse_assignment_expr(tokens, pos, ctx)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1374,67 +1453,68 @@ pub enum AssignmentExpr<'text> {
 fn parse_assignment_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
-    if let Ok((unary, pos)) = parse_unary_expr(tokens, pos) {
+    if let Ok((unary, pos)) = parse_unary_expr(tokens, pos, ctx) {
         if let Some(op) = tokens.get(pos) {
             if op == &Token::Equals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::Assign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::AsteriskEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::MulAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::SlashEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::DivAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PercentEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::ModAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PlusEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::AddAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::HyphenEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::SubAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::LTLTEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::ShiftLeftAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::GTGTEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::ShiftRightAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::AmpersandEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::BitAndAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::CaretEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::XORAssign(unary, Box::new(rhs)), pos));
             }
 
             if op == &Token::PipeEquals {
-                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1)?;
+                let (rhs, pos) = parse_assignment_expr(tokens, pos + 1, ctx)?;
                 return Ok((AssignmentExpr::BitOrAssign(unary, Box::new(rhs)), pos));
             }
         }
     }
 
-    let (expr, pos) = parse_conditional_expr(tokens, pos)?;
+    let (expr, pos) = parse_conditional_expr(tokens, pos, ctx)?;
     Ok((expr.into(), pos))
 }
 
@@ -1443,8 +1523,9 @@ pub type ConstantExpr<'text> = ConditionalExpr<'text>;
 fn parse_constant_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ConstantExpr<'text>, usize), ParseError> {
-    parse_conditional_expr(tokens, pos)
+    parse_conditional_expr(tokens, pos, ctx)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1460,15 +1541,16 @@ pub enum ConditionalExpr<'text> {
 fn parse_conditional_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ConditionalExpr<'text>, usize), ParseError> {
-    let (test, mut pos) = parse_logicalor_expr(tokens, pos)?;
+    let (test, mut pos) = parse_logicalor_expr(tokens, pos, ctx)?;
 
     if let Some(Token::Question) = tokens.get(pos) {
-        let (pass, next_pos) = parse_expr(tokens, pos + 1)?;
+        let (pass, next_pos) = parse_expr(tokens, pos + 1, ctx)?;
         pos = next_pos;
 
         if let Some(Token::Colon) = tokens.get(pos) {
-            let (fail, next_pos) = parse_conditional_expr(tokens, pos + 1)?;
+            let (fail, next_pos) = parse_conditional_expr(tokens, pos + 1, ctx)?;
             pos = next_pos;
 
             return Ok((
@@ -1494,13 +1576,14 @@ pub enum LogicalOrExpr<'text> {
 fn parse_logicalor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(LogicalOrExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_logicaland_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_logicaland_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::PipePipe => {
-                let (rhs, next_pos) = parse_logicaland_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_logicaland_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = LogicalOrExpr::LogicalOr(Box::new(lhs), rhs);
             }
@@ -1519,13 +1602,14 @@ pub enum LogicalAndExpr<'text> {
 fn parse_logicaland_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(LogicalAndExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_bitor_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_bitor_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::AmpersandAmpersand => {
-                let (rhs, next_pos) = parse_bitor_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_bitor_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = LogicalAndExpr::LogicalAnd(Box::new(lhs), rhs);
             }
@@ -1544,13 +1628,14 @@ pub enum BitOrExpr<'text> {
 fn parse_bitor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(BitOrExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_xor_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_xor_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Pipe => {
-                let (rhs, next_pos) = parse_xor_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_xor_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = BitOrExpr::BitOr(Box::new(lhs), rhs);
             }
@@ -1569,13 +1654,14 @@ pub enum XORExpr<'text> {
 fn parse_xor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(XORExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_bitand_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_bitand_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Caret => {
-                let (rhs, next_pos) = parse_bitand_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_bitand_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = XORExpr::XOR(Box::new(lhs), rhs);
             }
@@ -1594,13 +1680,14 @@ pub enum BitAndExpr<'text> {
 fn parse_bitand_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(BitAndExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_equality_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_equality_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Ampersand => {
-                let (rhs, next_pos) = parse_equality_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_equality_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = BitAndExpr::BitAnd(Box::new(lhs), rhs);
             }
@@ -1620,18 +1707,19 @@ pub enum EqualityExpr<'text> {
 fn parse_equality_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(EqualityExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_comparision_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_comparision_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::EQ => {
-                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = EqualityExpr::EQ(Box::new(lhs), rhs);
             }
             Token::NE => {
-                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_comparision_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = EqualityExpr::NE(Box::new(lhs), rhs);
             }
@@ -1653,28 +1741,29 @@ pub enum ComparisionExpr<'text> {
 fn parse_comparision_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ComparisionExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_shift_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_shift_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::LT => {
-                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ComparisionExpr::LT(Box::new(lhs), rhs);
             }
             Token::GT => {
-                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ComparisionExpr::GT(Box::new(lhs), rhs);
             }
             Token::LE => {
-                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ComparisionExpr::LE(Box::new(lhs), rhs);
             }
             Token::GE => {
-                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_shift_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ComparisionExpr::GE(Box::new(lhs), rhs);
             }
@@ -1694,18 +1783,19 @@ pub enum ShiftExpr<'text> {
 fn parse_shift_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(ShiftExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_additive_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_additive_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::LTLT => {
-                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ShiftExpr::ShiftLeft(Box::new(lhs), rhs);
             }
             Token::GTGT => {
-                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_additive_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = ShiftExpr::ShiftRight(Box::new(lhs), rhs);
             }
@@ -1725,18 +1815,19 @@ pub enum AdditiveExpr<'text> {
 fn parse_additive_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(AdditiveExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_multiplicative_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_multiplicative_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Plus => {
-                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = AdditiveExpr::Add(Box::new(lhs), rhs);
             }
             Token::Hyphen => {
-                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_multiplicative_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = AdditiveExpr::Sub(Box::new(lhs), rhs);
             }
@@ -1757,23 +1848,24 @@ pub enum MultiplicativeExpr<'text> {
 fn parse_multiplicative_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(MultiplicativeExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_unary_expr(tokens, pos)?;
+    let (lhs, mut pos) = parse_unary_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Asterisk => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Mul(Box::new(lhs), rhs);
             }
             Token::Slash => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Div(Box::new(lhs), rhs);
             }
             Token::Percent => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1)?;
+                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Mod(Box::new(lhs), rhs);
             }
@@ -1799,42 +1891,43 @@ pub enum UnaryExpr<'text> {
 fn parse_unary_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(UnaryExpr<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::PlusPlus) => {
-            let (expr, pos) = parse_postfix_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_postfix_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::PreIncr(Box::new(expr.into())), pos))
         }
         Some(Token::HyphenHyphen) => {
-            let (expr, pos) = parse_postfix_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_postfix_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::PreDecr(Box::new(expr.into())), pos))
         }
         Some(Token::Ampersand) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Ref(Box::new(expr)), pos))
         }
         Some(Token::Asterisk) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Deref(Box::new(expr)), pos))
         }
         Some(Token::Plus) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::UnaryAdd(Box::new(expr)), pos))
         }
         Some(Token::Hyphen) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::UnarySub(Box::new(expr)), pos))
         }
         Some(Token::Tilde) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::OnesComplement(Box::new(expr)), pos))
         }
         Some(Token::Exclamation) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Not(Box::new(expr)), pos))
         }
         _ => {
-            let (expr, pos) = parse_postfix_expr(tokens, pos)?;
+            let (expr, pos) = parse_postfix_expr(tokens, pos, ctx)?;
             Ok((expr.into(), pos))
         }
     }
@@ -1850,8 +1943,9 @@ pub enum PostfixExpr<'text> {
 fn parse_postfix_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(PostfixExpr<'text>, usize), ParseError> {
-    let (expr, pos) = parse_primary_expr(tokens, pos)?;
+    let (expr, pos) = parse_primary_expr(tokens, pos, ctx)?;
 
     match tokens.get(pos) {
         Some(Token::PlusPlus) => Ok((PostfixExpr::PostIncr(Box::new(expr.into())), pos + 1)),
@@ -1873,6 +1967,7 @@ pub enum Primary<'text> {
 fn parse_primary_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
+    ctx: &mut ParseContext,
 ) -> Result<(Primary<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
@@ -1881,7 +1976,7 @@ fn parse_primary_expr<'text>(
         Some(Token::Decimal(n)) => Ok((Primary::Float(*n), pos + 1)),
         Some(Token::String(s)) => Ok((Primary::String(s), pos + 1)),
         Some(Token::LParen) => {
-            let (expr, pos) = parse_expr(tokens, pos + 1)?;
+            let (expr, pos) = parse_expr(tokens, pos + 1, ctx)?;
             match tokens.get(pos) {
                 Some(Token::RParen) => Ok((Primary::Parens(Box::new(expr)), pos + 1)),
                 _ => Err(ParseError::MismatchedParentheses(pos)),
@@ -2630,31 +2725,31 @@ pub enum ParseError {
 }
 
 macro_rules! check {
-    ($f:ident, $src:expr, $expected:expr) => {
+    ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
         let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
         assert_eq!(pos, tokens.len(), "** Unable to parse all Tokens\n{}", stmt);
         let stmt = format!("{}", stmt);
         assert_eq!($expected, stmt);
     };
-    ($f:ident, $src:expr) => {
-        check!($f, $src, $src)
+    ($f:ident, $ctx:expr, $src:expr) => {
+        check!($f, $ctx, $src, $src)
     };
 }
 
 macro_rules! check_raw {
-    ($f:ident, $src:expr, $expected:expr) => {
+    ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
         let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
         assert_eq!(pos, tokens.len());
         assert_eq!($expected, stmt);
     };
 }
 
 macro_rules! ast {
-    ($f:ident, $src:expr) => {{
+    ($f:ident, $ctx:expr, $src:expr) => {{
         let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0).expect("** Unable to parse statement");
+        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
         assert_eq!(pos, tokens.len());
         stmt
     }};
@@ -2719,53 +2814,76 @@ mod tests {
 
     #[test]
     fn test_declarator() {
-        check!(parse_declarator, "x");
-        check!(parse_declarator, "(y)");
-        check!(parse_declarator, "*a");
-        check!(parse_declarator, "*****a[]");
-        check!(parse_declarator, "*a()");
-        check!(parse_declarator, "*(*a)");
-        check!(parse_declarator, "arr[]");
-        check!(parse_declarator, "arr[SIZE]");
-        check!(parse_declarator, "mat[3][4]");
-        check!(parse_declarator, "f()");
-        check!(parse_declarator, "add(int a, int b)");
-        check!(parse_declarator, "(*func_ptr)()");
-        check!(parse_declarator, "(*sqrt)(double x, double y)");
-        check!(parse_declarator, "sum(int n, ...)");
-        check!(parse_declarator, "print(const char *fmt, ...)");
-        check!(parse_declarator, "log(const char *message, ...)");
-        check!(parse_declarator, "f(a b c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_declarator, &mut ctx, "x");
+        check!(parse_declarator, &mut ctx, "(y)");
+        check!(parse_declarator, &mut ctx, "*a");
+        check!(parse_declarator, &mut ctx, "*****a[]");
+        check!(parse_declarator, &mut ctx, "*a()");
+        check!(parse_declarator, &mut ctx, "*(*a)");
+        check!(parse_declarator, &mut ctx, "arr[]");
+        check!(parse_declarator, &mut ctx, "arr[SIZE]");
+        check!(parse_declarator, &mut ctx, "mat[3][4]");
+        check!(parse_declarator, &mut ctx, "f()");
+        check!(parse_declarator, &mut ctx, "add(int a, int b)");
+        check!(parse_declarator, &mut ctx, "(*func_ptr)()");
+        check!(parse_declarator, &mut ctx, "(*sqrt)(double x, double y)");
+        check!(parse_declarator, &mut ctx, "sum(int n, ...)");
+        check!(parse_declarator, &mut ctx, "print(const char *fmt, ...)");
+        check!(parse_declarator, &mut ctx, "log(const char *message, ...)");
+        check!(parse_declarator, &mut ctx, "f(a b c)");
     }
 
     #[test]
     fn test_abstract_declarator() {
-        check!(parse_abstract_declarator, "*");
-        check!(parse_abstract_declarator, "(*)");
-        check!(parse_abstract_declarator, "*****[]");
-        check!(parse_abstract_declarator, "*()");
-        check!(parse_abstract_declarator, "*(*)");
-        check!(parse_abstract_declarator, "[]");
-        check!(parse_abstract_declarator, "[SIZE]");
-        check!(parse_abstract_declarator, "[3][4]");
-        check!(parse_abstract_declarator, "()");
-        check!(parse_abstract_declarator, "(int a, int b)");
-        check!(parse_abstract_declarator, "(*)()");
-        check!(parse_abstract_declarator, "(*)(double x, double y)");
-        check!(parse_abstract_declarator, "(int n, ...)");
-        check!(parse_abstract_declarator, "(const char *fmt, ...)");
-        check!(parse_abstract_declarator, "(const char *message, ...)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_abstract_declarator, &mut ctx, "*");
+        check!(parse_abstract_declarator, &mut ctx, "(*)");
+        check!(parse_abstract_declarator, &mut ctx, "*****[]");
+        check!(parse_abstract_declarator, &mut ctx, "*()");
+        check!(parse_abstract_declarator, &mut ctx, "*(*)");
+        check!(parse_abstract_declarator, &mut ctx, "[]");
+        check!(parse_abstract_declarator, &mut ctx, "[SIZE]");
+        check!(parse_abstract_declarator, &mut ctx, "[3][4]");
+        check!(parse_abstract_declarator, &mut ctx, "()");
+        check!(parse_abstract_declarator, &mut ctx, "(int a, int b)");
+        check!(parse_abstract_declarator, &mut ctx, "(*)()");
+        check!(
+            parse_abstract_declarator,
+            &mut ctx,
+            "(*)(double x, double y)"
+        );
+        check!(parse_abstract_declarator, &mut ctx, "(int n, ...)");
+        check!(
+            parse_abstract_declarator,
+            &mut ctx,
+            "(const char *fmt, ...)"
+        );
+        check!(
+            parse_abstract_declarator,
+            &mut ctx,
+            "(const char *message, ...)"
+        );
     }
 
     #[test]
     fn test_declaration() {
-        check!(parse_declaration, "int x = 10;");
-        check!(parse_declaration, "int nums[] = { 1, 2, 3, };");
+        let mut ctx = ParseContext {};
+
+        check!(parse_declaration, &mut ctx, "int x = 10;");
+        check!(parse_declaration, &mut ctx, "int nums[] = { 1, 2, 3, };");
         check!(
             parse_declaration,
+            &mut ctx,
             "float mat[2][3] = { { 3.1, 0.6, 2.7, }, { 1.4, 4.7, 0.6, }, };"
         );
-        check!(parse_declaration, r#"const char *name = "zahash";"#);
+        check!(
+            parse_declaration,
+            &mut ctx,
+            r#"const char *name = "zahash";"#
+        );
         // Need a proper way to recognize and parse typedefs (custom types/type names)
         // if typedef parsing is enabled, it thinks `origin` is a type name instead of just an ident
         // if typedef parsing is disabled, it cannot recognize Point as a type and not just an ident
@@ -2775,23 +2893,29 @@ mod tests {
 
     #[test]
     fn test_init_declarator() {
-        check!(parse_init_declarator, "x = 10");
-        check!(parse_init_declarator, "nums[] = { 1, 2, 3, }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_init_declarator, &mut ctx, "x = 10");
+        check!(parse_init_declarator, &mut ctx, "nums[] = { 1, 2, 3, }");
         check!(
             parse_init_declarator,
+            &mut ctx,
             "mat[2][3] = { { 1, 2, 3, }, { 4, 5, 6, }, }"
         );
-        check!(parse_init_declarator, "obj = { a, b, c, }");
-        check!(parse_init_declarator, r#"*name = "zahash""#);
+        check!(parse_init_declarator, &mut ctx, "obj = { a, b, c, }");
+        check!(parse_init_declarator, &mut ctx, r#"*name = "zahash""#);
     }
 
     #[test]
     fn test_initializer() {
-        check!(parse_initializer, "expr");
-        check!(parse_initializer, "{a, b, c}", "{ a, b, c, }");
-        check!(parse_initializer, "{a, b, c,}", "{ a, b, c, }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_initializer, &mut ctx, "expr");
+        check!(parse_initializer, &mut ctx, "{a, b, c}", "{ a, b, c, }");
+        check!(parse_initializer, &mut ctx, "{a, b, c,}", "{ a, b, c, }");
         check!(
             parse_initializer,
+            &mut ctx,
             "{a, {b, c,}, {d,}}",
             "{ a, { b, c, }, { d, }, }"
         );
@@ -2799,9 +2923,12 @@ mod tests {
 
     #[test]
     fn test_declaration_specifier() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
             check_raw!(
                 parse_declaration_specifier,
+                &mut ctx,
                 src,
                 DeclarationSpecifier::from(expected)
             );
@@ -2810,18 +2937,20 @@ mod tests {
         for (src, expected) in TYPE_SPECIFIER {
             check_raw!(
                 parse_declaration_specifier,
+                &mut ctx,
                 src,
                 DeclarationSpecifier::from(expected)
             );
         }
 
         for (src, expected) in ENUM {
-            check!(parse_declaration_specifier, src, expected);
+            check!(parse_declaration_specifier, &mut ctx, src, expected);
         }
 
         for (src, expected) in TYPE_QUALIFIER {
             check_raw!(
                 parse_declaration_specifier,
+                &mut ctx,
                 src,
                 DeclarationSpecifier::from(expected)
             );
@@ -2830,28 +2959,34 @@ mod tests {
 
     #[test]
     fn test_storage_class_specifier() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
-            check_raw!(parse_storage_class_specifier, src, expected);
+            check_raw!(parse_storage_class_specifier, &mut ctx, src, expected);
         }
     }
 
     #[test]
     fn test_specifier_qualifier() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in TYPE_SPECIFIER {
             check_raw!(
                 parse_specifier_qualifier,
+                &mut ctx,
                 src,
                 SpecifierQualifier::from(expected)
             );
         }
 
         for (src, expected) in ENUM {
-            check!(parse_specifier_qualifier, src, expected);
+            check!(parse_specifier_qualifier, &mut ctx, src, expected);
         }
 
         for (src, expected) in TYPE_QUALIFIER {
             check_raw!(
                 parse_specifier_qualifier,
+                &mut ctx,
                 src,
                 SpecifierQualifier::from(expected)
             );
@@ -2860,35 +2995,42 @@ mod tests {
 
     #[test]
     fn test_type_specifier() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in TYPE_SPECIFIER {
-            check_raw!(parse_type_specifier, src, expected);
+            check_raw!(parse_type_specifier, &mut ctx, src, expected);
         }
 
         for (src, expected) in ENUM {
-            check!(parse_type_specifier, src, expected);
+            check!(parse_type_specifier, &mut ctx, src, expected);
         }
     }
 
     #[test]
     fn test_pointer() {
-        check!(parse_pointer, "*");
-        check!(parse_pointer, "**");
-        check!(parse_pointer, "***");
-        check!(parse_pointer, "*const ");
+        let mut ctx = ParseContext {};
+
+        check!(parse_pointer, &mut ctx, "*");
+        check!(parse_pointer, &mut ctx, "**");
+        check!(parse_pointer, &mut ctx, "***");
+        check!(parse_pointer, &mut ctx, "*const ");
         check!(
             parse_pointer,
+            &mut ctx,
             "*const volatile const volatile volatile const "
         );
         check!(
             parse_pointer,
+            &mut ctx,
             "*volatile const volatile *const const volatile "
         );
         check!(
             parse_pointer,
+            &mut ctx,
             "**volatile *******const ***const volatile ******"
         );
 
-        let pointer = ast!(parse_pointer, "* *const volatile *volatile * *");
+        let pointer = ast!(parse_pointer, &mut ctx, "* *const volatile *volatile * *");
         let qualifiers: Vec<Vec<TypeQualifier>> = pointer.into_iter().map(|q| q.into()).collect();
 
         assert_eq!(
@@ -2905,48 +3047,68 @@ mod tests {
 
     #[test]
     fn test_type_qualifier() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in TYPE_QUALIFIER {
-            check_raw!(parse_type_qualifier, src, expected);
+            check_raw!(parse_type_qualifier, &mut ctx, src, expected);
         }
     }
 
     #[test]
     fn test_enum() {
+        let mut ctx = ParseContext {};
+
         for (src, expected) in ENUM {
-            check!(parse_enum_specifier, src, expected);
+            check!(parse_enum_specifier, &mut ctx, src, expected);
         }
     }
 
     #[test]
     fn test_simple_stmt() {
-        check_raw!(parse_stmt, ";", Stmt::EmptyStmt);
-        check_raw!(parse_stmt, "{ }", Stmt::Compound(CompoundStmt(vec![])));
-        check!(parse_stmt, "a++;");
-        check!(parse_stmt, "{ a++; }");
+        let mut ctx = ParseContext {};
+
+        check_raw!(parse_stmt, &mut ctx, ";", Stmt::EmptyStmt);
+        check_raw!(
+            parse_stmt,
+            &mut ctx,
+            "{ }",
+            Stmt::Compound(CompoundStmt(vec![]))
+        );
+        check!(parse_stmt, &mut ctx, "a++;");
+        check!(parse_stmt, &mut ctx, "{ a++; }");
     }
 
     #[test]
     fn test_labeled_stmt() {
-        check!(parse_stmt, "a : ;");
-        check!(parse_stmt, "a : { }");
-        check!(parse_stmt, "a : b;");
-        check!(parse_stmt, "a : { b; }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "a : ;");
+        check!(parse_stmt, &mut ctx, "a : { }");
+        check!(parse_stmt, &mut ctx, "a : b;");
+        check!(parse_stmt, &mut ctx, "a : { b; }");
     }
 
     #[test]
     fn test_if_stmt() {
-        check!(parse_stmt, "if (a) ;");
-        check!(parse_stmt, "if (a) b;");
-        check!(parse_stmt, "if (a) b; else c;");
-        check!(parse_stmt, "if (a) b; else if (c) d;");
-        check!(parse_stmt, "if (a) b; else if (c) d; else e;");
-        check!(parse_stmt, "if (a) { }");
-        check!(parse_stmt, "if (a) { b; }");
-        check!(parse_stmt, "if (a) { b; } else { c; }");
-        check!(parse_stmt, "if (a) { b; } else if (c) { d; }");
-        check!(parse_stmt, "if (a) { b; } else if (c) { d; } else { e; }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "if (a) ;");
+        check!(parse_stmt, &mut ctx, "if (a) b;");
+        check!(parse_stmt, &mut ctx, "if (a) b; else c;");
+        check!(parse_stmt, &mut ctx, "if (a) b; else if (c) d;");
+        check!(parse_stmt, &mut ctx, "if (a) b; else if (c) d; else e;");
+        check!(parse_stmt, &mut ctx, "if (a) { }");
+        check!(parse_stmt, &mut ctx, "if (a) { b; }");
+        check!(parse_stmt, &mut ctx, "if (a) { b; } else { c; }");
+        check!(parse_stmt, &mut ctx, "if (a) { b; } else if (c) { d; }");
         check!(
             parse_stmt,
+            &mut ctx,
+            "if (a) { b; } else if (c) { d; } else { e; }"
+        );
+        check!(
+            parse_stmt,
+            &mut ctx,
             r#"
             if (a == 1) {
                 b++;
@@ -2962,11 +3124,14 @@ mod tests {
 
     #[test]
     fn test_while_stmt() {
-        check!(parse_stmt, "while (a) ;");
-        check!(parse_stmt, "while (a) { }");
-        check!(parse_stmt, "while (a) { b; }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "while (a) ;");
+        check!(parse_stmt, &mut ctx, "while (a) { }");
+        check!(parse_stmt, &mut ctx, "while (a) { b; }");
         check!(
             parse_stmt,
+            &mut ctx,
             "while (a <= 10) { a++; }",
             "while ((a <= 10)) { a++; }"
         );
@@ -2974,11 +3139,14 @@ mod tests {
 
     #[test]
     fn test_do_while_stmt() {
-        check!(parse_stmt, "do ; while (a);");
-        check!(parse_stmt, "do { } while (a);");
-        check!(parse_stmt, "do { b; } while (a);");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "do ; while (a);");
+        check!(parse_stmt, &mut ctx, "do { } while (a);");
+        check!(parse_stmt, &mut ctx, "do { b; } while (a);");
         check!(
             parse_stmt,
+            &mut ctx,
             "do { a++; } while (a <= 10);",
             "do { a++; } while ((a <= 10));"
         );
@@ -2986,16 +3154,19 @@ mod tests {
 
     #[test]
     fn test_for_stmt() {
-        check!(parse_stmt, "for (;;) ;");
-        check!(parse_stmt, "for (;;) { }");
-        check!(parse_stmt, "for (a;;) ;");
-        check!(parse_stmt, "for (; a;) ;");
-        check!(parse_stmt, "for (;; a) ;");
-        check!(parse_stmt, "for (a; a; a) ;");
-        check!(parse_stmt, "for (a; a; a) { }");
-        check!(parse_stmt, "for (a; a; a) { b; }");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "for (;;) ;");
+        check!(parse_stmt, &mut ctx, "for (;;) { }");
+        check!(parse_stmt, &mut ctx, "for (a;;) ;");
+        check!(parse_stmt, &mut ctx, "for (; a;) ;");
+        check!(parse_stmt, &mut ctx, "for (;; a) ;");
+        check!(parse_stmt, &mut ctx, "for (a; a; a) ;");
+        check!(parse_stmt, &mut ctx, "for (a; a; a) { }");
+        check!(parse_stmt, &mut ctx, "for (a; a; a) { b; }");
         check!(
             parse_stmt,
+            &mut ctx,
             "for (i=0; i<10; i++) { a++; }",
             "for ((i = 0); (i < 10); i++) { a++; }"
         );
@@ -3003,70 +3174,87 @@ mod tests {
 
     #[test]
     fn test_jump_stmt() {
-        check!(parse_stmt, "goto a;");
-        check!(parse_stmt, "continue;");
-        check!(parse_stmt, "break;");
-        check!(parse_stmt, "return;");
-        check!(parse_stmt, "return a;");
+        let mut ctx = ParseContext {};
+
+        check!(parse_stmt, &mut ctx, "goto a;");
+        check!(parse_stmt, &mut ctx, "continue;");
+        check!(parse_stmt, &mut ctx, "break;");
+        check!(parse_stmt, &mut ctx, "return;");
+        check!(parse_stmt, &mut ctx, "return a;");
     }
 
     #[test]
     fn test_primary() {
-        check!(parse_expr, "ident");
-        check!(parse_expr, "123");
-        check!(parse_expr, "'c'");
-        check!(parse_expr, "123.123");
-        check!(parse_expr, r#""string""#);
-        check!(parse_expr, r#"(a)"#);
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "ident");
+        check!(parse_expr, &mut ctx, "123");
+        check!(parse_expr, &mut ctx, "'c'");
+        check!(parse_expr, &mut ctx, "123.123");
+        check!(parse_expr, &mut ctx, r#""string""#);
+        check!(parse_expr, &mut ctx, r#"(a)"#);
     }
 
     #[test]
     fn test_postfix_expr() {
-        check!(parse_expr, "a++");
-        check!(parse_expr, "a--");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a++");
+        check!(parse_expr, &mut ctx, "a--");
     }
 
     #[test]
     fn test_unary_expr() {
-        check!(parse_expr, "++a");
-        check!(parse_expr, "--a");
-        check!(parse_expr, "&a");
-        check!(parse_expr, "*a");
-        check!(parse_expr, "+a", "a");
-        check!(parse_expr, "-a");
-        check!(parse_expr, "~a");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "++a");
+        check!(parse_expr, &mut ctx, "--a");
+        check!(parse_expr, &mut ctx, "&a");
+        check!(parse_expr, &mut ctx, "*a");
+        check!(parse_expr, &mut ctx, "+a", "a");
+        check!(parse_expr, &mut ctx, "-a");
+        check!(parse_expr, &mut ctx, "~a");
     }
 
     #[test]
     fn test_multiplicative_expr() {
-        check!(parse_expr, "a * b", "(a * b)");
-        check!(parse_expr, "a / b", "(a / b)");
-        check!(parse_expr, "a % b", "(a % b)");
-        check!(parse_expr, "a * b / c % d", "(((a * b) / c) % d)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a * b", "(a * b)");
+        check!(parse_expr, &mut ctx, "a / b", "(a / b)");
+        check!(parse_expr, &mut ctx, "a % b", "(a % b)");
+        check!(parse_expr, &mut ctx, "a * b / c % d", "(((a * b) / c) % d)");
     }
 
     #[test]
     fn test_additive_expr() {
-        check!(parse_expr, "a + b", "(a + b)");
-        check!(parse_expr, "a - b", "(a - b)");
-        check!(parse_expr, "a + b - c", "((a + b) - c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a + b", "(a + b)");
+        check!(parse_expr, &mut ctx, "a - b", "(a - b)");
+        check!(parse_expr, &mut ctx, "a + b - c", "((a + b) - c)");
     }
 
     #[test]
     fn test_shift_expr() {
-        check!(parse_expr, "a << b", "(a << b)");
-        check!(parse_expr, "a >> b", "(a >> b)");
-        check!(parse_expr, "a << b >> c", "((a << b) >> c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a << b", "(a << b)");
+        check!(parse_expr, &mut ctx, "a >> b", "(a >> b)");
+        check!(parse_expr, &mut ctx, "a << b >> c", "((a << b) >> c)");
     }
 
     #[test]
     fn test_comparision_expr() {
-        check!(parse_expr, "a < b", "(a < b)");
-        check!(parse_expr, "a > b", "(a > b)");
-        check!(parse_expr, "a <= b", "(a <= b)");
-        check!(parse_expr, "a >= b", "(a >= b)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a < b", "(a < b)");
+        check!(parse_expr, &mut ctx, "a > b", "(a > b)");
+        check!(parse_expr, &mut ctx, "a <= b", "(a <= b)");
+        check!(parse_expr, &mut ctx, "a >= b", "(a >= b)");
         check!(
             parse_expr,
+            &mut ctx,
             "a < b > c <= d >= e",
             "((((a < b) > c) <= d) >= e)"
         );
@@ -3074,61 +3262,82 @@ mod tests {
 
     #[test]
     fn test_equality_expr() {
-        check!(parse_expr, "a == b", "(a == b)");
-        check!(parse_expr, "a != b", "(a != b)");
-        check!(parse_expr, "a == b != c", "((a == b) != c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a == b", "(a == b)");
+        check!(parse_expr, &mut ctx, "a != b", "(a != b)");
+        check!(parse_expr, &mut ctx, "a == b != c", "((a == b) != c)");
     }
 
     #[test]
     fn test_bit_and_expr() {
-        check!(parse_expr, "a & b", "(a & b)");
-        check!(parse_expr, "a & b & c", "((a & b) & c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a & b", "(a & b)");
+        check!(parse_expr, &mut ctx, "a & b & c", "((a & b) & c)");
     }
 
     #[test]
     fn test_xor_expr() {
-        check!(parse_expr, "a ^ b", "(a ^ b)");
-        check!(parse_expr, "a ^ b ^ c", "((a ^ b) ^ c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a ^ b", "(a ^ b)");
+        check!(parse_expr, &mut ctx, "a ^ b ^ c", "((a ^ b) ^ c)");
     }
 
     #[test]
     fn test_bit_or_expr() {
-        check!(parse_expr, "a | b", "(a | b)");
-        check!(parse_expr, "a | b | c", "((a | b) | c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a | b", "(a | b)");
+        check!(parse_expr, &mut ctx, "a | b | c", "((a | b) | c)");
     }
 
     #[test]
     fn test_logical_and_expr() {
-        check!(parse_expr, "a && b", "(a && b)");
-        check!(parse_expr, "a && b && c", "((a && b) && c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a && b", "(a && b)");
+        check!(parse_expr, &mut ctx, "a && b && c", "((a && b) && c)");
     }
 
     #[test]
     fn test_logical_or_expr() {
-        check!(parse_expr, "a || b", "(a || b)");
-        check!(parse_expr, "a || b || c", "((a || b) || c)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a || b", "(a || b)");
+        check!(parse_expr, &mut ctx, "a || b || c", "((a || b) || c)");
     }
 
     #[test]
     fn test_conditional_expr() {
-        check!(parse_expr, "a ? b : c", "(a ? b : c)");
-        check!(parse_expr, "a ? b ? c : d : e", "(a ? (b ? c : d) : e)");
+        let mut ctx = ParseContext {};
+
+        check!(parse_expr, &mut ctx, "a ? b : c", "(a ? b : c)");
+        check!(
+            parse_expr,
+            &mut ctx,
+            "a ? b ? c : d : e",
+            "(a ? (b ? c : d) : e)"
+        );
     }
 
     #[test]
     fn test_assignment_expr() {
-        check!(parse_expr, "a = b", "(a = b)");
-        check!(parse_expr, "a *= b", "(a *= b)");
-        check!(parse_expr, "a /= b", "(a /= b)");
-        check!(parse_expr, "a %= b", "(a %= b)");
-        check!(parse_expr, "a += b", "(a += b)");
-        check!(parse_expr, "a -= b", "(a -= b)");
-        check!(parse_expr, "a <<= b", "(a <<= b)");
-        check!(parse_expr, "a >>= b", "(a >>= b)");
-        check!(parse_expr, "a &= b", "(a &= b)");
-        check!(parse_expr, "a ^= b", "(a ^= b)");
-        check!(parse_expr, "a |= b", "(a |= b)");
+        let mut ctx = ParseContext {};
 
-        check!(parse_expr, "a -= b &= c", "(a -= (b &= c))");
+        check!(parse_expr, &mut ctx, "a = b", "(a = b)");
+        check!(parse_expr, &mut ctx, "a *= b", "(a *= b)");
+        check!(parse_expr, &mut ctx, "a /= b", "(a /= b)");
+        check!(parse_expr, &mut ctx, "a %= b", "(a %= b)");
+        check!(parse_expr, &mut ctx, "a += b", "(a += b)");
+        check!(parse_expr, &mut ctx, "a -= b", "(a -= b)");
+        check!(parse_expr, &mut ctx, "a <<= b", "(a <<= b)");
+        check!(parse_expr, &mut ctx, "a >>= b", "(a >>= b)");
+        check!(parse_expr, &mut ctx, "a &= b", "(a &= b)");
+        check!(parse_expr, &mut ctx, "a ^= b", "(a ^= b)");
+        check!(parse_expr, &mut ctx, "a |= b", "(a |= b)");
+
+        check!(parse_expr, &mut ctx, "a -= b &= c", "(a -= (b &= c))");
     }
 }
