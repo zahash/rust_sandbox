@@ -3,6 +3,14 @@ use std::{
     ops::Deref,
 };
 
+pub struct Context {}
+
+impl Context {
+    pub fn is_typedef(&self, ident: &str) -> bool {
+        false
+    }
+}
+
 use crate::Token;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -723,9 +731,12 @@ fn parse_type_specifier<'text>(
     fn parse_typedef_name<'text>(
         tokens: &[Token<'text>],
         pos: usize,
+        ctx: &Context,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
-            Some(Token::Ident(ident)) => Ok((TypeSpecifier::TypeDefName(ident), pos + 1)),
+            Some(Token::Ident(ident)) if ctx.is_typedef(ident) => {
+                Ok((TypeSpecifier::TypeDefName(ident), pos + 1))
+            }
             _ => Err(ParseError::ExpectedIdentifier(pos)),
         }
     }
