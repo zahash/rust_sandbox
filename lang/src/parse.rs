@@ -75,7 +75,38 @@ fn parse_struct_or_union_specifier<'text>(
     pos: usize,
     ctx: &mut ParseContext,
 ) -> Result<(StructOrUnionSpecifier<'text>, usize), ParseError> {
-    todo!()
+    let (sou, pos) = parse_struct_or_union(tokens, pos, ctx)?;
+
+    fn parse_struct_body<'text>(
+        tokens: &[Token<'text>],
+        pos: usize,
+        ctx: &mut ParseContext,
+    ) -> Result<(Vec<StructDeclaration<'text>>, usize), ParseError> {
+        let Some(Token::LCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedLCurly(pos));
+        };
+
+        let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_declaration, None);
+
+        let Some(Token::RCurly) = tokens.get(pos) else {
+            return Err(ParseError::ExpectedRCurly(pos).into());
+        };
+
+        return Ok((sds, pos + 1));
+    }
+
+    if let Some(Token::Ident(ident)) = tokens.get(pos) {
+        return match parse_struct_body(tokens, pos + 1, ctx) {
+            Ok((sds, pos)) => Ok((StructOrUnionSpecifier::Named(sou, ident, sds), pos)),
+            Err(_) => Ok((
+                StructOrUnionSpecifier::ForwardDeclaration(sou, ident),
+                pos + 1,
+            )),
+        };
+    }
+
+    let (sds, pos) = parse_struct_body(tokens, pos, ctx)?;
+    Ok((StructOrUnionSpecifier::Anonymous(sou, sds), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -89,7 +120,11 @@ fn parse_struct_or_union<'text>(
     pos: usize,
     ctx: &mut ParseContext,
 ) -> Result<(StructOrUnion, usize), ParseError> {
-    todo!()
+    match tokens.get(pos) {
+        Some(Token::Keyword("struct")) => Ok((StructOrUnion::Struct, pos + 1)),
+        Some(Token::Keyword("union")) => Ok((StructOrUnion::Union, pos + 1)),
+        _ => Err(ParseError::ExpectedKeyword("`struct` or `union`", pos)),
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -103,7 +138,26 @@ fn parse_struct_declaration<'text>(
     pos: usize,
     ctx: &mut ParseContext,
 ) -> Result<(StructDeclaration<'text>, usize), ParseError> {
-    todo!()
+    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier, None);
+    let (ds, pos) = many(
+        tokens,
+        pos,
+        ctx,
+        parse_struct_declarator,
+        Some(Token::Comma),
+    );
+
+    let Some(Token::SemiColon) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedSemicolon(pos).into());
+    };
+
+    Ok((
+        StructDeclaration {
+            specifier_qualifiers: sqs,
+            declarators: ds,
+        },
+        pos + 1,
+    ))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -118,7 +172,27 @@ fn parse_struct_declarator<'text>(
     pos: usize,
     ctx: &mut ParseContext,
 ) -> Result<(StructDeclarator<'text>, usize), ParseError> {
-    todo!()
+    let (declarator, pos) = maybe(tokens, pos, ctx, parse_declarator);
+
+    let (bit_field, pos) = if let Some(Token::Colon) = tokens.get(pos) {
+        let (bit_field, pos) = parse_conditional_expr(tokens, pos + 1, ctx)?;
+        (Some(bit_field), pos)
+    } else {
+        (None, pos)
+    };
+
+    match (declarator, bit_field) {
+        (None, None) => Err(ParseError::SyntaxError(
+            pos,
+            "cannot parse struct declarator. neither declarator nor bitfield found.",
+        )),
+        (None, Some(bit_field)) => Ok((StructDeclarator::BitField(bit_field), pos)),
+        (Some(declarator), None) => Ok((StructDeclarator::Declarator(declarator), pos)),
+        (Some(declarator), Some(bit_field)) => Ok((
+            StructDeclarator::DeclaratorWithBitField(declarator, bit_field),
+            pos,
+        )),
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -361,7 +435,7 @@ fn parse_parameter_declaration<'text>(
         (Some(d), None) => Ok((ParameterDeclaration::WithDeclarator(dss, d), pos)),
         (Some(_), Some(_)) => Err(ParseError::SyntaxError(
             pos,
-            "cannot parse parameter declaration",
+            "cannot parse parameter declaration. can have either declarator or abstract declarator but not both.",
         )),
     }
 }
@@ -384,7 +458,7 @@ fn parse_abstract_declarator<'text>(
     match (pointer, dad) {
         (None, None) => Err(ParseError::SyntaxError(
             pos,
-            "cannot parse abstract declarator",
+            "cannot parse abstract declarator. neither pointer nor abstract direct declarator found.",
         )),
         (None, Some(d)) => Ok((AbstractDeclarator::Direct(d), pos)),
         (Some(p), None) => Ok((AbstractDeclarator::Pointer(p), pos)),
@@ -925,6 +999,7 @@ fn parse_type_specifier<'text>(
         ctx,
         &[
             Box::new(parse_basic_type_specifier),
+            Box::new(parse_struct_or_union_specifier),
             Box::new(parse_enum_specifier),
             Box::new(parse_typedef_name),
         ],
@@ -2120,12 +2195,12 @@ impl<'text> Display for StructOrUnionSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             StructOrUnionSpecifier::Named(sou, ident, ds) => {
-                write!(f, "{} {} {{", sou, ident)?;
+                write!(f, "{} {} {{ ", sou, ident)?;
                 write_arr(f, ds, " ")?;
                 write!(f, " }}")
             }
             StructOrUnionSpecifier::Anonymous(sou, ds) => {
-                write!(f, "{} {{", sou)?;
+                write!(f, "{} {{ ", sou)?;
                 write_arr(f, ds, " ")?;
                 write!(f, " }}")
             }
@@ -2148,6 +2223,7 @@ impl Display for StructOrUnion {
 impl<'text> Display for StructDeclaration<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write_arr(f, &self.specifier_qualifiers, " ")?;
+        write!(f, " ")?;
         write_arr(f, &self.declarators, ", ")?;
         write!(f, ";")
     }
@@ -2727,6 +2803,12 @@ where
     Ok(())
 }
 
+impl<'text> From<StructOrUnionSpecifier<'text>> for TypeSpecifier<'text> {
+    fn from(value: StructOrUnionSpecifier<'text>) -> Self {
+        TypeSpecifier::StructOrUnionSpecifier(value)
+    }
+}
+
 impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
     fn from(value: EnumSpecifier<'text>) -> Self {
         TypeSpecifier::EnumSpecifier(value)
@@ -2938,28 +3020,19 @@ mod tests {
 
     use pretty_assertions::assert_eq;
 
-    const ENUM: [(&'static str, &'static str); 3] = [
-        ("enum Color", "enum Color"),
-        (
-            r#"
-            enum Color { 
-                RED, 
-                GREEN ="00FF00", 
-                BLUE = 7 
-            }
-            "#,
-            r#"enum Color { RED, GREEN = "00FF00", BLUE = 7 }"#,
-        ),
-        (
-            r#"
-            enum { 
-                RED, 
-                GREEN = "00FF00", 
-                BLUE = 7 
-            }
-            "#,
-            r#"enum { RED, GREEN = "00FF00", BLUE = 7 }"#,
-        ),
+    const STRUCT_UNION: [&'static str; 6] = [
+        "struct Point",
+        r#"struct Point { float x; float y; }"#,
+        r#"struct { float x; float y; }"#,
+        "union Data",
+        r#"union Data { int i; float f; char str[20]; }"#,
+        r#"union { int i; float f; char str[20]; }"#,
+    ];
+
+    const ENUM: [&'static str; 3] = [
+        "enum Color",
+        r#"enum Color { RED, GREEN = "00FF00", BLUE = 7 }"#,
+        r#"enum { RED, GREEN = "00FF00", BLUE = 7 }"#,
     ];
 
     const STORAGE_CLASS_SPECIFIER: [(&'static str, StorageClassSpecifier); 5] = [
@@ -2986,6 +3059,15 @@ mod tests {
         ("const", TypeQualifier::Const),
         ("volatile", TypeQualifier::Volatile),
     ];
+
+    #[test]
+    fn test_struct_or_union() {
+        let mut ctx = ParseContext::new();
+
+        for src in STRUCT_UNION {
+            check!(parse_struct_or_union_specifier, &mut ctx, src);
+        }
+    }
 
     #[test]
     fn test_declarator() {
@@ -3047,6 +3129,7 @@ mod tests {
     fn test_declaration() {
         let mut ctx = ParseContext::new();
 
+        check!(parse_declaration, &mut ctx, "int x;");
         check!(parse_declaration, &mut ctx, "int x = 10;");
         check!(parse_declaration, &mut ctx, "int nums[] = { 1, 2, 3, };");
         check!(
@@ -3143,8 +3226,8 @@ mod tests {
             );
         }
 
-        for (src, expected) in ENUM {
-            check!(parse_declaration_specifier, &mut ctx, src, expected);
+        for src in ENUM {
+            check!(parse_declaration_specifier, &mut ctx, src);
         }
 
         for (src, expected) in TYPE_QUALIFIER {
@@ -3179,8 +3262,8 @@ mod tests {
             );
         }
 
-        for (src, expected) in ENUM {
-            check!(parse_specifier_qualifier, &mut ctx, src, expected);
+        for src in ENUM {
+            check!(parse_specifier_qualifier, &mut ctx, src);
         }
 
         for (src, expected) in TYPE_QUALIFIER {
@@ -3209,8 +3292,12 @@ mod tests {
             check_raw!(parse_type_specifier, &mut ctx, src, expected);
         }
 
-        for (src, expected) in ENUM {
-            check!(parse_type_specifier, &mut ctx, src, expected);
+        for src in STRUCT_UNION {
+            check!(parse_type_specifier, &mut ctx, src);
+        }
+
+        for src in ENUM {
+            check!(parse_type_specifier, &mut ctx, src);
         }
     }
 
@@ -3266,8 +3353,8 @@ mod tests {
     fn test_enum() {
         let mut ctx = ParseContext::new();
 
-        for (src, expected) in ENUM {
-            check!(parse_enum_specifier, &mut ctx, src, expected);
+        for src in ENUM {
+            check!(parse_enum_specifier, &mut ctx, src);
         }
     }
 

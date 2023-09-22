@@ -131,7 +131,7 @@ The syntax of C in Backus-Naur Form
 <struct-or-union> ::= struct
                     | union
 
-<struct-declaration> ::= {<specifier-qualifier>}* <struct-declarator-list>
+<struct-declaration> ::= {<specifier-qualifier>}* <struct-declarator-list> ;
 
 <struct-declarator-list> ::= <struct-declarator>
                            | <struct-declarator-list> , <struct-declarator>
