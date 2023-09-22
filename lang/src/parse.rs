@@ -66,8 +66,8 @@ fn parse_function_definition<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructOrUnionSpecifier<'text> {
     Named(StructOrUnion, &'text str, Vec<StructDeclaration<'text>>),
-    Anonymous(Vec<StructDeclaration<'text>>),
-    ForwardDeclaration(&'text str),
+    Anonymous(StructOrUnion, Vec<StructDeclaration<'text>>),
+    ForwardDeclaration(StructOrUnion, &'text str),
 }
 
 fn parse_struct_or_union_specifier<'text>(
@@ -2118,21 +2118,62 @@ fn parse_primary_expr<'text>(
 
 impl<'text> Display for StructOrUnionSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        todo!()
+        match self {
+            StructOrUnionSpecifier::Named(sou, ident, ds) => {
+                write!(f, "{} {} {{", sou, ident)?;
+                write_arr(f, ds, " ")?;
+                write!(f, " }}")
+            }
+            StructOrUnionSpecifier::Anonymous(sou, ds) => {
+                write!(f, "{} {{", sou)?;
+                write_arr(f, ds, " ")?;
+                write!(f, " }}")
+            }
+            StructOrUnionSpecifier::ForwardDeclaration(sou, ident) => {
+                write!(f, "{} {}", sou, ident)
+            }
+        }
+    }
+}
+
+impl Display for StructOrUnion {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            StructOrUnion::Struct => write!(f, "struct"),
+            StructOrUnion::Union => write!(f, "union"),
+        }
+    }
+}
+
+impl<'text> Display for StructDeclaration<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write_arr(f, &self.specifier_qualifiers, " ")?;
+        write_arr(f, &self.declarators, ", ")?;
+        write!(f, ";")
+    }
+}
+
+impl<'text> Display for StructDeclarator<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            StructDeclarator::Declarator(d) => write!(f, "{}", d),
+            StructDeclarator::DeclaratorWithBitField(d, e) => write!(f, "{} : {}", d, e),
+            StructDeclarator::BitField(e) => write!(f, ": {}", e),
+        }
     }
 }
 
 impl<'text> Display for EnumSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            EnumSpecifier::Named(ident, list) => {
+            EnumSpecifier::Named(ident, members) => {
                 write!(f, "enum {} {{ ", ident)?;
-                write_arr(f, list, ", ")?;
+                write_arr(f, members, ", ")?;
                 write!(f, " }}")
             }
-            EnumSpecifier::Anonymous(list) => {
+            EnumSpecifier::Anonymous(members) => {
                 write!(f, "enum {{ ")?;
-                write_arr(f, list, ", ")?;
+                write_arr(f, members, ", ")?;
                 write!(f, " }}")
             }
             EnumSpecifier::ForwardDeclaration(ident) => write!(f, "enum {}", ident),
