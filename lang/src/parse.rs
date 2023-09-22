@@ -573,10 +573,10 @@ pub struct Declaration<'text> {
 fn parse_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Declaration<'text>, usize), ParseError> {
-    let (declaration_specifiers, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
-    if declaration_specifiers.is_empty() {
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
+    if dss.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
             "parse_declaration: expected atleast one declaration specifier",
@@ -589,9 +589,23 @@ fn parse_declaration<'text>(
         return Err(ParseError::ExpectedSemicolon(pos).into());
     };
 
+    let validated_dss: ValidatedDeclarationSpecifiers<'text> = dss
+        .try_into()
+        .map_err(|err| ParseError::InvalidDeclarationSpecifiers(pos, err))?;
+
+    if validated_dss.storage_class_specifier == Some(StorageClassSpecifier::TypeDef) {
+        if let Some(InitDeclarator::Declared(Declarator {
+            pointer: None,
+            declarator: DirectDeclarator::Ident(ident, None),
+        })) = init_declarators.get(0)
+        {
+            ctx.set_typedef(ident);
+        }
+    }
+
     Ok((
         Declaration {
-            declaration_specifiers,
+            declaration_specifiers: validated_dss.into(),
             init_declarators,
         },
         pos + 1,
@@ -670,7 +684,7 @@ pub enum DeclarationSpecifier<'text> {
 }
 
 struct ValidatedDeclarationSpecifiers<'text> {
-    storage_class_specifier: StorageClassSpecifier,
+    storage_class_specifier: Option<StorageClassSpecifier>,
     type_qualifiers: Vec<TypeQualifier>,
     type_specifiers: Vec<TypeSpecifier<'text>>,
 }
@@ -678,9 +692,10 @@ struct ValidatedDeclarationSpecifiers<'text> {
 impl<'text> From<ValidatedDeclarationSpecifiers<'text>> for Vec<DeclarationSpecifier<'text>> {
     fn from(validated_dss: ValidatedDeclarationSpecifiers<'text>) -> Self {
         let mut dss = vec![];
-        dss.push(DeclarationSpecifier::StorageClassSpecifier(
-            validated_dss.storage_class_specifier,
-        ));
+
+        if let Some(scs) = validated_dss.storage_class_specifier {
+            dss.push(DeclarationSpecifier::StorageClassSpecifier(scs));
+        }
         dss.extend(
             validated_dss
                 .type_qualifiers
@@ -724,7 +739,7 @@ impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSp
                 storage_class_specifiers
             ));
         }
-        let storage_class_specifier = storage_class_specifiers.into_iter().next().unwrap();
+        let storage_class_specifier = storage_class_specifiers.into_iter().next();
 
         let mut simple_type_specifiers = vec![];
         let mut struct_or_union_specifiers = vec![];
@@ -766,7 +781,9 @@ impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSp
         // just a sanity check
         assert_eq!(
             dss_len,
-            type_qualifiers.len() + type_specifiers.len() + 1, // +1 for storage_class_specifier
+            storage_class_specifier.is_some() as usize
+                + type_qualifiers.len()
+                + type_specifiers.len(),
             "declaration specifiers length mismatch after validation"
         );
 
@@ -2839,6 +2856,7 @@ pub enum ParseError {
     ExpectedRSquare(usize),
     ExpectedKeyword(&'static str, usize),
     ExpectedIdentifier(usize),
+    InvalidDeclarationSpecifiers(usize, String),
 }
 
 macro_rules! check {
@@ -3015,6 +3033,9 @@ mod tests {
             r#"Person p = { name = "zahash", age = 24, };"#,
             r#"Person p = { (name = "zahash"), (age = 24), };"#
         );
+
+        check!(parse_declaration, &mut ctx, "typedef long long ll;");
+        check!(parse_declaration, &mut ctx, "ll a = 10;");
     }
 
     #[test]
