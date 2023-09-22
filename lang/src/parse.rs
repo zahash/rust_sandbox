@@ -339,12 +339,18 @@ fn parse_direct_declarator_tail<'text>(
             return Err(ParseError::ExpectedLParen(pos));
         };
 
-        let mut idents = vec![];
-        let mut pos = pos + 1;
-        while let Some(Token::Ident(ident)) = tokens.get(pos) {
-            pos += 1;
-            idents.push(*ident);
+        fn parse_ident<'text>(
+            tokens: &[Token<'text>],
+            pos: usize,
+            ctx: &mut ParseContext,
+        ) -> Result<(&'text str, usize), ParseError> {
+            match tokens.get(pos) {
+                Some(Token::Ident(ident)) => Ok((ident, pos + 1)),
+                _ => Err(ParseError::ExpectedIdentifier(pos)),
+            }
         }
+
+        let (idents, pos) = many(tokens, pos + 1, ctx, parse_ident, Some(Token::Comma));
 
         let Some(Token::RParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedRParen(pos));
@@ -2401,7 +2407,7 @@ impl<'text> Display for DirectDeclaratorTail<'text> {
             }
             DirectDeclaratorTail::Parameters(idents, tail) => {
                 write!(f, "(")?;
-                write_arr(f, idents, " ")?;
+                write_arr(f, idents, ", ")?;
                 write!(f, ")")?;
                 if let Some(tail) = tail.deref() {
                     write!(f, "{}", tail)?;
@@ -3089,7 +3095,7 @@ mod tests {
         check!(parse_declarator, &mut ctx, "sum(int n, ...)");
         check!(parse_declarator, &mut ctx, "print(const char *fmt, ...)");
         check!(parse_declarator, &mut ctx, "log(const char *message, ...)");
-        check!(parse_declarator, &mut ctx, "f(a b c)");
+        check!(parse_declarator, &mut ctx, "f(a, b, c)");
     }
 
     #[test]
@@ -3146,19 +3152,22 @@ mod tests {
         check!(parse_declaration, &mut ctx, "typedef long long ll;");
         check!(parse_declaration, &mut ctx, "ll a = 10;");
 
-        // check!(
-        //     parse_declaration,
-        //     &mut ctx,
-        //     "typedef struct { float x; float y; } Point;"
-        // );
-        ctx.set_typedef("Point");
+        check!(
+            parse_declaration,
+            &mut ctx,
+            "typedef struct { float x; float y; } Point;"
+        );
         check!(
             parse_declaration,
             &mut ctx,
             "const Point origin = { 0, 0, };"
         );
 
-        ctx.set_typedef("Person");
+        check!(
+            parse_declaration,
+            &mut ctx,
+            "typedef struct { const char *name; int age; } Person;"
+        );
         check!(
             parse_declaration,
             &mut ctx,
@@ -3280,7 +3289,7 @@ mod tests {
     fn test_type_specifier() {
         let mut ctx = ParseContext::new();
 
-        ctx.set_typedef("A");
+        check!(parse_declaration, &mut ctx, "typedef int A;");
         check_raw!(
             parse_type_specifier,
             &mut ctx,
