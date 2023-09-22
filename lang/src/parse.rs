@@ -669,6 +669,115 @@ pub enum DeclarationSpecifier<'text> {
     TypeQualifier(TypeQualifier),
 }
 
+struct ValidatedDeclarationSpecifiers<'text> {
+    storage_class_specifier: StorageClassSpecifier,
+    type_qualifiers: Vec<TypeQualifier>,
+    type_specifiers: Vec<TypeSpecifier<'text>>,
+}
+
+impl<'text> From<ValidatedDeclarationSpecifiers<'text>> for Vec<DeclarationSpecifier<'text>> {
+    fn from(validated_dss: ValidatedDeclarationSpecifiers<'text>) -> Self {
+        let mut dss = vec![];
+        dss.push(DeclarationSpecifier::StorageClassSpecifier(
+            validated_dss.storage_class_specifier,
+        ));
+        dss.extend(
+            validated_dss
+                .type_qualifiers
+                .into_iter()
+                .map(|tq| DeclarationSpecifier::TypeQualifier(tq)),
+        );
+        dss.extend(
+            validated_dss
+                .type_specifiers
+                .into_iter()
+                .map(|ts| DeclarationSpecifier::TypeSpecifier(ts)),
+        );
+        dss
+    }
+}
+
+impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSpecifiers<'text> {
+    type Error = String;
+
+    fn try_from(dss: Vec<DeclarationSpecifier<'text>>) -> Result<Self, Self::Error> {
+        let dss_len = dss.len();
+
+        let mut storage_class_specifiers = vec![];
+        let mut type_specifiers = vec![];
+        let mut type_qualifiers = vec![];
+
+        for ds in dss {
+            match ds {
+                DeclarationSpecifier::StorageClassSpecifier(scs) => {
+                    storage_class_specifiers.push(scs)
+                }
+                DeclarationSpecifier::TypeSpecifier(ts) => type_specifiers.push(ts),
+                DeclarationSpecifier::TypeQualifier(tq) => type_qualifiers.push(tq),
+            }
+        }
+
+        if storage_class_specifiers.len() > 1 {
+            return Err(format!(
+                "cannot have more than 1 storage class specifier. Found {}. {:?}",
+                storage_class_specifiers.len(),
+                storage_class_specifiers
+            ));
+        }
+        let storage_class_specifier = storage_class_specifiers.into_iter().next().unwrap();
+
+        let mut simple_type_specifiers = vec![];
+        let mut struct_or_union_specifiers = vec![];
+        let mut enum_specifiers = vec![];
+        let mut typedef_names = vec![];
+        for ts in &type_specifiers {
+            match ts {
+                TypeSpecifier::StructOrUnionSpecifier(sus) => struct_or_union_specifiers.push(sus),
+                TypeSpecifier::EnumSpecifier(es) => enum_specifiers.push(es),
+                TypeSpecifier::TypeDefName(name) => typedef_names.push(name),
+                _ => simple_type_specifiers.push(ts),
+            }
+        }
+
+        let simple_type_specifiers_present = !simple_type_specifiers.is_empty();
+        let struct_or_union_specifiers_present = !struct_or_union_specifiers.is_empty();
+        let enum_specifiers_present = !enum_specifiers.is_empty();
+        let typedef_names_present = !typedef_names.is_empty();
+
+        let exactly_one_type_is_present = simple_type_specifiers_present
+            ^ struct_or_union_specifiers_present
+            ^ enum_specifiers_present
+            ^ typedef_names_present;
+
+        if !exactly_one_type_is_present {
+            return Err(format!(
+            "either enum specifier or struct specifier or typedef name or simple specifier (void, int, ...) must be present. \
+            Eg: `long long unsigned` or `enum {{ A, B }}` or `struct {{ int a; }}` or `Person` are allowed \
+            but not `long enum {{ A, B }}` because it contains both simple specifier (long) and enum specifier. \
+            Right now, this contains {}{}{}{}
+            ",
+            if simple_type_specifiers_present {"simple type specifiers, "} else {""},
+            if struct_or_union_specifiers_present {"struct or union specifiers, "} else {""},
+            if enum_specifiers_present {"enum specifiers, "} else {""},
+            if typedef_names_present {"typedef names"} else {""},
+        ));
+        }
+
+        // just a sanity check
+        assert_eq!(
+            dss_len,
+            type_qualifiers.len() + type_specifiers.len() + 1, // +1 for storage_class_specifier
+            "declaration specifiers length mismatch after validation"
+        );
+
+        Ok(ValidatedDeclarationSpecifiers {
+            storage_class_specifier,
+            type_qualifiers,
+            type_specifiers,
+        })
+    }
+}
+
 fn parse_declaration_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
@@ -748,6 +857,7 @@ pub enum TypeSpecifier<'text> {
     Double,
     Signed,
     UnSigned,
+    StructOrUnionSpecifier(StructOrUnionSpecifier<'text>),
     EnumSpecifier(EnumSpecifier<'text>),
     TypeDefName(&'text str),
 }
@@ -1989,6 +2099,12 @@ fn parse_primary_expr<'text>(
     }
 }
 
+impl<'text> Display for StructOrUnionSpecifier<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
 impl<'text> Display for EnumSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -2059,6 +2175,7 @@ impl<'text> Display for TypeSpecifier<'text> {
             TypeSpecifier::Double => write!(f, "double"),
             TypeSpecifier::Signed => write!(f, "signed"),
             TypeSpecifier::UnSigned => write!(f, "unsigned"),
+            TypeSpecifier::StructOrUnionSpecifier(specifier) => write!(f, "{}", specifier),
             TypeSpecifier::EnumSpecifier(specifier) => write!(f, "{}", specifier),
             TypeSpecifier::TypeDefName(ident) => write!(f, "{}", ident),
         }
