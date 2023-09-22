@@ -3,6 +3,8 @@ use std::{
     ops::Deref,
 };
 
+use crate::Token;
+
 pub struct ParseContext<'text> {
     typedefs: Vec<&'text str>,
 }
@@ -21,8 +23,6 @@ impl<'text> ParseContext<'text> {
     }
 }
 
-use crate::Token;
-
 #[derive(Debug, PartialEq, Clone)]
 pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 
@@ -31,7 +31,8 @@ fn parse_translation_unit<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(TranslationUnit<'text>, usize), ParseError> {
-    todo!()
+    let (eds, pos) = many(tokens, pos, ctx, parse_external_declaration, None);
+    Ok((TranslationUnit(eds), pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
