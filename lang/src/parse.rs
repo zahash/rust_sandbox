@@ -2128,12 +2128,12 @@ impl<'text> Display for EnumSpecifier<'text> {
             EnumSpecifier::Named(ident, list) => {
                 write!(f, "enum {} {{ ", ident)?;
                 write_arr(f, list, ", ")?;
-                write!(f, "}}")
+                write!(f, " }}")
             }
             EnumSpecifier::Anonymous(list) => {
                 write!(f, "enum {{ ")?;
                 write_arr(f, list, ", ")?;
-                write!(f, "}}")
+                write!(f, " }}")
             }
             EnumSpecifier::ForwardDeclaration(ident) => write!(f, "enum {}", ident),
         }
@@ -2907,7 +2907,7 @@ mod tests {
                 BLUE = 7 
             }
             "#,
-            r#"enum Color { RED, GREEN = "00FF00", BLUE = 7}"#,
+            r#"enum Color { RED, GREEN = "00FF00", BLUE = 7 }"#,
         ),
         (
             r#"
@@ -2917,7 +2917,7 @@ mod tests {
                 BLUE = 7 
             }
             "#,
-            r#"enum { RED, GREEN = "00FF00", BLUE = 7}"#,
+            r#"enum { RED, GREEN = "00FF00", BLUE = 7 }"#,
         ),
     ];
 
@@ -3019,6 +3019,14 @@ mod tests {
             r#"const char *name = "zahash";"#
         );
 
+        check!(parse_declaration, &mut ctx, "typedef long long ll;");
+        check!(parse_declaration, &mut ctx, "ll a = 10;");
+
+        // check!(
+        //     parse_declaration,
+        //     &mut ctx,
+        //     "typedef struct { float x; float y; } Point;"
+        // );
         ctx.set_typedef("Point");
         check!(
             parse_declaration,
@@ -3034,8 +3042,12 @@ mod tests {
             r#"Person p = { (name = "zahash"), (age = 24), };"#
         );
 
-        check!(parse_declaration, &mut ctx, "typedef long long ll;");
-        check!(parse_declaration, &mut ctx, "ll a = 10;");
+        check!(
+            parse_declaration,
+            &mut ctx,
+            r#"typedef enum { RED, GREEN, BLUE } Color;"#
+        );
+        check!(parse_declaration, &mut ctx, r#"Color c = RED;"#);
     }
 
     #[test]
