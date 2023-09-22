@@ -29,7 +29,7 @@ pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 fn parse_translation_unit<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(TranslationUnit<'text>, usize), ParseError> {
     todo!()
 }
@@ -43,9 +43,18 @@ pub enum ExternalDeclaration<'text> {
 fn parse_external_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ExternalDeclaration<'text>, usize), ParseError> {
-    todo!()
+    combine_parsers(
+        tokens,
+        pos,
+        ctx,
+        &[
+            Box::new(parse_function_definition),
+            Box::new(parse_declaration),
+        ],
+        "cannot parse external declaration",
+    )
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -58,7 +67,7 @@ pub struct FunctionDefinition<'text> {
 fn parse_function_definition<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
     todo!()
 }
@@ -73,14 +82,14 @@ pub enum StructOrUnionSpecifier<'text> {
 fn parse_struct_or_union_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(StructOrUnionSpecifier<'text>, usize), ParseError> {
     let (sou, pos) = parse_struct_or_union(tokens, pos, ctx)?;
 
     fn parse_struct_body<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(Vec<StructDeclaration<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLCurly(pos));
@@ -118,7 +127,7 @@ pub enum StructOrUnion {
 fn parse_struct_or_union<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(StructOrUnion, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("struct")) => Ok((StructOrUnion::Struct, pos + 1)),
@@ -136,7 +145,7 @@ pub struct StructDeclaration<'text> {
 fn parse_struct_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(StructDeclaration<'text>, usize), ParseError> {
     let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier, None);
     let (ds, pos) = many(
@@ -170,7 +179,7 @@ pub enum StructDeclarator<'text> {
 fn parse_struct_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(StructDeclarator<'text>, usize), ParseError> {
     let (declarator, pos) = maybe(tokens, pos, ctx, parse_declarator);
 
@@ -204,7 +213,7 @@ pub struct Declarator<'text> {
 fn parse_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Declarator<'text>, usize), ParseError> {
     let (pointer, pos) = maybe(tokens, pos, ctx, parse_pointer);
     let (dd, pos) = parse_direct_declarator(tokens, pos, ctx)?;
@@ -240,12 +249,12 @@ pub enum DirectDeclaratorTail<'text> {
 fn parse_direct_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
     fn parse_ident<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::Ident(ident)) = tokens.get(pos) else {
             return Err(ParseError::ExpectedIdentifier(pos));
@@ -259,7 +268,7 @@ fn parse_direct_declarator<'text>(
     fn parse_parens<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -288,12 +297,12 @@ fn parse_direct_declarator<'text>(
 fn parse_direct_declarator_tail<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
@@ -313,7 +322,7 @@ fn parse_direct_declarator_tail<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -333,7 +342,7 @@ fn parse_direct_declarator_tail<'text>(
     fn parse_parameters<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -342,7 +351,7 @@ fn parse_direct_declarator_tail<'text>(
         fn parse_ident<'text>(
             tokens: &[Token<'text>],
             pos: usize,
-            _: &mut ParseContext,
+            _: &mut ParseContext<'text>,
         ) -> Result<(&'text str, usize), ParseError> {
             match tokens.get(pos) {
                 Some(Token::Ident(ident)) => Ok((ident, pos + 1)),
@@ -392,7 +401,7 @@ pub enum ParameterTypeList<'text> {
 fn parse_parameter_type_list<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ParameterTypeList<'text>, usize), ParseError> {
     let (declarations, pos) = many(
         tokens,
@@ -422,7 +431,7 @@ pub enum ParameterDeclaration<'text> {
 fn parse_parameter_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ParameterDeclaration<'text>, usize), ParseError> {
     let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
     if dss.is_empty() {
@@ -456,7 +465,7 @@ pub enum AbstractDeclarator<'text> {
 fn parse_abstract_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(AbstractDeclarator<'text>, usize), ParseError> {
     let (pointer, pos) = maybe(tokens, pos, ctx, parse_pointer);
     let (dad, pos) = maybe(tokens, pos, ctx, parse_direct_abstract_declarator);
@@ -503,12 +512,12 @@ pub enum DirectAbstractDeclaratorTail<'text> {
 fn parse_direct_abstract_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
     fn parse_parens<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -531,7 +540,7 @@ fn parse_direct_abstract_declarator<'text>(
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
@@ -551,7 +560,7 @@ fn parse_direct_abstract_declarator<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -587,12 +596,12 @@ fn parse_direct_abstract_declarator<'text>(
 fn parse_direct_abstract_declarator_tail<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
     fn parse_array<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLSquare(pos));
@@ -615,7 +624,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
     fn parse_function<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLParen(pos));
@@ -701,7 +710,7 @@ pub enum InitDeclarator<'text> {
 fn parse_init_declarator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(InitDeclarator<'text>, usize), ParseError> {
     let (declarator, pos) = parse_declarator(tokens, pos, ctx)?;
 
@@ -722,7 +731,7 @@ pub enum Initializer<'text> {
 fn parse_initializer<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Initializer<'text>, usize), ParseError> {
     if let Some(Token::LCurly) = tokens.get(pos) {
         let mut initializers = Vec::new();
@@ -878,7 +887,7 @@ impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSp
 fn parse_declaration_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(DeclarationSpecifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
@@ -905,7 +914,7 @@ pub enum StorageClassSpecifier {
 fn parse_storage_class_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(StorageClassSpecifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
@@ -929,7 +938,7 @@ pub enum SpecifierQualifier<'text> {
 fn parse_specifier_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(SpecifierQualifier<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
@@ -962,12 +971,12 @@ pub enum TypeSpecifier<'text> {
 fn parse_type_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
     fn parse_basic_type_specifier<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        _: &mut ParseContext,
+        _: &mut ParseContext<'text>,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Keyword("void")) => Ok((TypeSpecifier::Void, pos + 1)),
@@ -989,7 +998,7 @@ fn parse_type_specifier<'text>(
     fn parse_typedef_name<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Ident(ident)) if ctx.is_typedef(ident) => {
@@ -1051,7 +1060,7 @@ impl<'pointer> Iterator for PointerIter<'pointer> {
 fn parse_pointer<'text>(
     tokens: &[Token<'text>],
     mut pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Pointer, usize), ParseError> {
     let Some(Token::Asterisk) = tokens.get(pos) else {
         return Err(ParseError::SyntaxError(pos, "parse_pointer: expected `*`"));
@@ -1092,7 +1101,7 @@ pub enum TypeQualifier {
 fn parse_type_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(TypeQualifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
@@ -1111,7 +1120,7 @@ pub enum EnumSpecifier<'text> {
 fn parse_enum_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
     let Some(Token::Keyword("enum")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("enum", pos));
@@ -1120,7 +1129,7 @@ fn parse_enum_specifier<'text>(
     fn parse_enum_body<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
             return Err(ParseError::ExpectedLCurly(pos));
@@ -1155,7 +1164,7 @@ pub enum Enumerator<'text> {
 fn parse_enumerator<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Enumerator<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
         return Err(ParseError::ExpectedIdentifier(pos));
@@ -1184,7 +1193,7 @@ pub enum Stmt<'text> {
 fn parse_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     combine_parsers(
         tokens,
@@ -1216,7 +1225,7 @@ pub enum LabeledStmt<'text> {
 fn parse_labeled_ident_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(LabeledStmt<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
         return Err(ParseError::ExpectedIdentifier(pos));
@@ -1233,7 +1242,7 @@ fn parse_labeled_ident_stmt<'text>(
 fn parse_empty_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos));
@@ -1245,7 +1254,7 @@ fn parse_empty_stmt<'text>(
 fn parse_expr_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     let (expr, pos) = parse_expr(tokens, pos, ctx)?;
 
@@ -1262,7 +1271,7 @@ pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
 fn parse_compound_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(CompoundStmt<'text>, usize), ParseError> {
     let Some(Token::LCurly) = tokens.get(pos) else {
         return Err(ParseError::ExpectedLCurly(pos));
@@ -1304,7 +1313,7 @@ pub enum SelectionStmt<'text> {
 fn parse_selection_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(SelectionStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("if")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("if", pos));
@@ -1354,7 +1363,7 @@ pub enum IterationStmt<'text> {
 fn parse_iteration_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("while", pos));
@@ -1379,7 +1388,7 @@ fn parse_iteration_while_stmt<'text>(
 fn parse_iteration_do_while_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("do")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("do", pos));
@@ -1412,7 +1421,7 @@ fn parse_iteration_do_while_stmt<'text>(
 fn parse_iteration_for_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("for")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("for", pos));
@@ -1483,7 +1492,7 @@ pub enum JumpStmt<'text> {
 fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("goto", pos));
@@ -1503,7 +1512,7 @@ fn parse_jump_goto_stmt<'text>(
 fn parse_jump_continue_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("continue", pos));
@@ -1519,7 +1528,7 @@ fn parse_jump_continue_stmt<'text>(
 fn parse_jump_break_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    _: &mut ParseContext,
+    _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("break", pos));
@@ -1535,7 +1544,7 @@ fn parse_jump_break_stmt<'text>(
 fn parse_jump_return_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("return")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("return", pos));
@@ -1553,8 +1562,12 @@ fn parse_jump_return_stmt<'text>(
 fn many<'text, Ast>(
     tokens: &[Token<'text>],
     mut pos: usize,
-    ctx: &mut ParseContext,
-    parser: impl Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(Ast, usize), ParseError>,
+    ctx: &mut ParseContext<'text>,
+    parser: impl Fn(
+        &[Token<'text>],
+        usize,
+        &mut ParseContext<'text>,
+    ) -> Result<(Ast, usize), ParseError>,
     delimiter: Option<Token>,
 ) -> (Vec<Ast>, usize) {
     let mut list = vec![];
@@ -1579,8 +1592,12 @@ fn many<'text, Ast>(
 fn maybe<'text, Ast>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
-    parser: impl Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(Ast, usize), ParseError>,
+    ctx: &mut ParseContext<'text>,
+    parser: impl Fn(
+        &[Token<'text>],
+        usize,
+        &mut ParseContext<'text>,
+    ) -> Result<(Ast, usize), ParseError>,
 ) -> (Option<Ast>, usize) {
     match parser(tokens, pos, ctx) {
         Ok((ast, pos)) => (Some(ast), pos),
@@ -1593,14 +1610,14 @@ trait Parser<'text, Ast> {
         &self,
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(Ast, usize), ParseError>;
 }
 
 fn combine_parsers<'text, Ast>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
     parsers: &[Box<dyn Parser<'text, Ast>>],
     msg: &'static str,
 ) -> Result<(Ast, usize), ParseError> {
@@ -1617,13 +1634,17 @@ fn combine_parsers<'text, Ast>(
 impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
 where
     ParsedValue: Into<Ast>,
-    F: Fn(&[Token<'text>], usize, &mut ParseContext) -> Result<(ParsedValue, usize), ParseError>,
+    F: Fn(
+        &[Token<'text>],
+        usize,
+        &mut ParseContext<'text>,
+    ) -> Result<(ParsedValue, usize), ParseError>,
 {
     fn parse(
         &self,
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        ctx: &mut ParseContext<'text>,
     ) -> Result<(Ast, usize), ParseError> {
         match self(tokens, pos, ctx) {
             Ok((val, pos)) => Ok((val.into(), pos)),
@@ -1637,7 +1658,7 @@ pub type Expr<'text> = AssignmentExpr<'text>;
 fn parse_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Expr<'text>, usize), ParseError> {
     parse_assignment_expr(tokens, pos, ctx)
 }
@@ -1661,7 +1682,7 @@ pub enum AssignmentExpr<'text> {
 fn parse_assignment_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(AssignmentExpr<'text>, usize), ParseError> {
     if let Ok((unary, pos)) = parse_unary_expr(tokens, pos, ctx) {
         if let Some(op) = tokens.get(pos) {
@@ -1731,7 +1752,7 @@ pub type ConstantExpr<'text> = ConditionalExpr<'text>;
 fn parse_constant_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ConstantExpr<'text>, usize), ParseError> {
     parse_conditional_expr(tokens, pos, ctx)
 }
@@ -1749,7 +1770,7 @@ pub enum ConditionalExpr<'text> {
 fn parse_conditional_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ConditionalExpr<'text>, usize), ParseError> {
     let (test, mut pos) = parse_logicalor_expr(tokens, pos, ctx)?;
 
@@ -1784,7 +1805,7 @@ pub enum LogicalOrExpr<'text> {
 fn parse_logicalor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(LogicalOrExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_logicaland_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1810,7 +1831,7 @@ pub enum LogicalAndExpr<'text> {
 fn parse_logicaland_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(LogicalAndExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_bitor_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1836,7 +1857,7 @@ pub enum BitOrExpr<'text> {
 fn parse_bitor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(BitOrExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_xor_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1862,7 +1883,7 @@ pub enum XORExpr<'text> {
 fn parse_xor_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(XORExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_bitand_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1888,7 +1909,7 @@ pub enum BitAndExpr<'text> {
 fn parse_bitand_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(BitAndExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_equality_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1915,7 +1936,7 @@ pub enum EqualityExpr<'text> {
 fn parse_equality_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(EqualityExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_comparision_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1949,7 +1970,7 @@ pub enum ComparisionExpr<'text> {
 fn parse_comparision_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ComparisionExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_shift_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -1991,7 +2012,7 @@ pub enum ShiftExpr<'text> {
 fn parse_shift_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(ShiftExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_additive_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -2023,7 +2044,7 @@ pub enum AdditiveExpr<'text> {
 fn parse_additive_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(AdditiveExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_multiplicative_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -2056,7 +2077,7 @@ pub enum MultiplicativeExpr<'text> {
 fn parse_multiplicative_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(MultiplicativeExpr<'text>, usize), ParseError> {
     let (lhs, mut pos) = parse_unary_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
@@ -2099,7 +2120,7 @@ pub enum UnaryExpr<'text> {
 fn parse_unary_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(UnaryExpr<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::PlusPlus) => {
@@ -2151,7 +2172,7 @@ pub enum PostfixExpr<'text> {
 fn parse_postfix_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(PostfixExpr<'text>, usize), ParseError> {
     let (expr, pos) = parse_primary_expr(tokens, pos, ctx)?;
 
@@ -2175,7 +2196,7 @@ pub enum Primary<'text> {
 fn parse_primary_expr<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    ctx: &mut ParseContext<'text>,
 ) -> Result<(Primary<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
@@ -2807,6 +2828,18 @@ where
     }
 
     Ok(())
+}
+
+impl<'text> From<FunctionDefinition<'text>> for ExternalDeclaration<'text> {
+    fn from(value: FunctionDefinition<'text>) -> Self {
+        ExternalDeclaration::FunctionDefinition(value)
+    }
+}
+
+impl<'text> From<Declaration<'text>> for ExternalDeclaration<'text> {
+    fn from(value: Declaration<'text>) -> Self {
+        ExternalDeclaration::Declaration(value)
+    }
 }
 
 impl<'text> From<StructOrUnionSpecifier<'text>> for TypeSpecifier<'text> {
