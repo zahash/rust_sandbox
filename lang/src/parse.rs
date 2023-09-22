@@ -118,7 +118,7 @@ pub enum StructOrUnion {
 fn parse_struct_or_union<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(StructOrUnion, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("struct")) => Ok((StructOrUnion::Struct, pos + 1)),
@@ -342,7 +342,7 @@ fn parse_direct_declarator_tail<'text>(
         fn parse_ident<'text>(
             tokens: &[Token<'text>],
             pos: usize,
-            ctx: &mut ParseContext,
+            _: &mut ParseContext,
         ) -> Result<(&'text str, usize), ParseError> {
             match tokens.get(pos) {
                 Some(Token::Ident(ident)) => Ok((ident, pos + 1)),
@@ -455,7 +455,7 @@ pub enum AbstractDeclarator<'text> {
 
 fn parse_abstract_declarator<'text>(
     tokens: &[Token<'text>],
-    mut pos: usize,
+    pos: usize,
     ctx: &mut ParseContext,
 ) -> Result<(AbstractDeclarator<'text>, usize), ParseError> {
     let (pointer, pos) = maybe(tokens, pos, ctx, parse_pointer);
@@ -905,7 +905,7 @@ pub enum StorageClassSpecifier {
 fn parse_storage_class_specifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(StorageClassSpecifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("auto")) => Ok((StorageClassSpecifier::Auto, pos + 1)),
@@ -967,7 +967,7 @@ fn parse_type_specifier<'text>(
     fn parse_basic_type_specifier<'text>(
         tokens: &[Token<'text>],
         pos: usize,
-        ctx: &mut ParseContext,
+        _: &mut ParseContext,
     ) -> Result<(TypeSpecifier<'text>, usize), ParseError> {
         match tokens.get(pos) {
             Some(Token::Keyword("void")) => Ok((TypeSpecifier::Void, pos + 1)),
@@ -1092,7 +1092,7 @@ pub enum TypeQualifier {
 fn parse_type_qualifier<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(TypeQualifier, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
@@ -1233,7 +1233,7 @@ fn parse_labeled_ident_stmt<'text>(
 fn parse_empty_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     let Some(Token::SemiColon) = tokens.get(pos) else {
         return Err(ParseError::ExpectedSemicolon(pos));
@@ -1483,7 +1483,7 @@ pub enum JumpStmt<'text> {
 fn parse_jump_goto_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("goto", pos));
@@ -1503,7 +1503,7 @@ fn parse_jump_goto_stmt<'text>(
 fn parse_jump_continue_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("continue", pos));
@@ -1519,7 +1519,7 @@ fn parse_jump_continue_stmt<'text>(
 fn parse_jump_break_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
-    ctx: &mut ParseContext,
+    _: &mut ParseContext,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
         return Err(ParseError::ExpectedKeyword("break", pos));
