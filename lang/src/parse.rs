@@ -427,6 +427,30 @@ pub struct TypeName<'text> {
     pub abstract_declarator: Option<AbstractDeclarator<'text>>,
 }
 
+fn parse_type_name<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(TypeName<'text>, usize), ParseError> {
+    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier, None);
+    if sqs.is_empty() {
+        return Err(ParseError::SyntaxError(
+            pos,
+            "parse_type_name: expected atleast one specifier qualifier",
+        ));
+    }
+
+    let (ad, pos) = maybe(tokens, pos, ctx, parse_abstract_declarator);
+
+    Ok((
+        TypeName {
+            specifier_qualifiers: sqs,
+            abstract_declarator: ad,
+        },
+        pos,
+    ))
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum ParameterTypeList<'text> {
     ParameterList(Vec<ParameterDeclaration<'text>>),
@@ -2704,6 +2728,16 @@ impl<'text> Display for DirectDeclaratorTail<'text> {
     }
 }
 
+impl<'text> Display for TypeName<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write_arr(f, &self.specifier_qualifiers, " ")?;
+        if let Some(ad) = &self.abstract_declarator {
+            write!(f, "{}", ad)?;
+        }
+        Ok(())
+    }
+}
+
 impl<'text> Display for ParameterTypeList<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -2725,7 +2759,7 @@ impl<'text> Display for ParameterDeclaration<'text> {
             }
             ParameterDeclaration::WithAbstractDeclarator(dss, ad) => {
                 write_arr(f, &dss, " ")?;
-                write!(f, " {}", ad)
+                write!(f, "{}", ad)
             }
             ParameterDeclaration::OnlySpecifiers(dss) => write_arr(f, &dss, " "),
         }
@@ -3399,6 +3433,24 @@ mod tests {
         for src in STRUCT_UNION {
             check!(parse_struct_or_union_specifier, &mut ctx, src);
         }
+    }
+
+    #[test]
+    fn test_type_name() {
+        let mut ctx = ParseContext::new();
+
+        check!(parse_type_name, &mut ctx, "int");
+        check!(parse_type_name, &mut ctx, "const char volatile");
+        check!(parse_type_name, &mut ctx, "int*");
+        check!(parse_type_name, &mut ctx, "double[10]");
+        check!(parse_type_name, &mut ctx, "int(*)(int, char)");
+        check!(parse_type_name, &mut ctx, "const int*(*)(int[5])");
+        check!(parse_type_name, &mut ctx, "int(*(*[10])())[5]");
+        check!(
+            parse_type_name,
+            &mut ctx,
+            "unsigned long long(*)(char*, int)"
+        );
     }
 
     #[test]
