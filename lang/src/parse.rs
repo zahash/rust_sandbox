@@ -2260,6 +2260,10 @@ fn parse_unary_expr<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub enum PostfixExpr<'text> {
     Primary(Primary<'text>),
+    ArrayAccess(Box<PostfixExpr<'text>>, Box<Expr<'text>>),
+    FunctionCall(Box<PostfixExpr<'text>>, Vec<AssignmentExpr<'text>>),
+    MemberAccess(Box<PostfixExpr<'text>>, &'text str),
+    PointerMemberAccess(Box<PostfixExpr<'text>>, &'text str),
     PostIncr(Box<PostfixExpr<'text>>),
     PostDecr(Box<PostfixExpr<'text>>),
 }
@@ -2920,6 +2924,10 @@ impl<'text> Display for PostfixExpr<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             PostfixExpr::Primary(expr) => write!(f, "{}", expr),
+            PostfixExpr::ArrayAccess(_, _) => todo!(),
+            PostfixExpr::FunctionCall(_, _) => todo!(),
+            PostfixExpr::MemberAccess(_, _) => todo!(),
+            PostfixExpr::PointerMemberAccess(_, _) => todo!(),
             PostfixExpr::PostIncr(expr) => write!(f, "{}++", expr),
             PostfixExpr::PostDecr(expr) => write!(f, "{}--", expr),
         }

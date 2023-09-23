@@ -22,6 +22,7 @@ pub enum Token<'text> {
     Comma,
     Colon,
     SemiColon,
+    Arrow,
     Plus,
     PlusPlus,
     Hyphen,
@@ -119,6 +120,7 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
         .or(lex_comma(text, pos))
         .or(lex_colon(text, pos))
         .or(lex_semicolon(text, pos))
+        .or(lex_arrow(text, pos))
         .or(lex_plus_plus(text, pos))
         .or(lex_plus_equals(text, pos))
         .or(lex_plus(text, pos))
@@ -243,6 +245,10 @@ fn lex_colon(text: &str, pos: usize) -> Option<(Token, usize)> {
 
 fn lex_semicolon(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::SemiColon, lex_with_prefix(text, pos, ";")?))
+}
+
+fn lex_arrow(text: &str, pos: usize) -> Option<(Token, usize)> {
+    Some((Token::Arrow, lex_with_prefix(text, pos, "->")?))
 }
 
 fn lex_plus(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -422,7 +428,7 @@ mod tests {
         union unsigned void volatile while
 
         idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
-        ....,:;+++---*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
+        ....,:;+++--->-*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
 
         use Token::*;
@@ -486,6 +492,7 @@ mod tests {
                     PlusPlus,
                     Plus,
                     HyphenHyphen,
+                    Arrow,
                     Hyphen,
                     Asterisk,
                     Slash,
