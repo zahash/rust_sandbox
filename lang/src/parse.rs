@@ -25,19 +25,10 @@ impl<'text> ParseContext<'text> {
 
 #[derive(Debug)]
 pub enum ParseError {
-    MismatchedParentheses(usize),
     SyntaxError(usize, &'static str),
-    InvalidStatement(usize),
-    ExpectedSemicolon(usize),
-    ExpectedColon(usize),
-    ExpectedLParen(usize),
-    ExpectedRParen(usize),
-    ExpectedLCurly(usize),
-    ExpectedRCurly(usize),
-    ExpectedLSquare(usize),
-    ExpectedRSquare(usize),
-    ExpectedKeyword(&'static str, usize),
-    ExpectedIdentifier(usize),
+    ExpectedIdent(usize),
+    Expected(Token<'static>, usize),
+    ExpectedOneOf(Vec<Token<'static>>, usize),
     InvalidDeclarationSpecifiers(usize, String),
 }
 
@@ -133,13 +124,13 @@ fn parse_struct_or_union_specifier<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(Vec<StructDeclaration<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLCurly(pos));
+            return Err(ParseError::Expected(Token::LCurly, pos));
         };
 
         let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_declaration, None);
 
         let Some(Token::RCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRCurly(pos).into());
+            return Err(ParseError::Expected(Token::RCurly, pos));
         };
 
         return Ok((sds, pos + 1));
@@ -173,7 +164,10 @@ fn parse_struct_or_union<'text>(
     match tokens.get(pos) {
         Some(Token::Keyword("struct")) => Ok((StructOrUnion::Struct, pos + 1)),
         Some(Token::Keyword("union")) => Ok((StructOrUnion::Union, pos + 1)),
-        _ => Err(ParseError::ExpectedKeyword("`struct` or `union`", pos)),
+        _ => Err(ParseError::ExpectedOneOf(
+            vec![Token::Keyword("struct"), Token::Keyword("union")],
+            pos,
+        )),
     }
 }
 
@@ -198,7 +192,7 @@ fn parse_struct_declaration<'text>(
     );
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     Ok((
@@ -298,7 +292,7 @@ fn parse_direct_declarator<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::Ident(ident)) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedIdentifier(pos));
+            return Err(ParseError::ExpectedIdent(pos));
         };
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
@@ -312,13 +306,13 @@ fn parse_direct_declarator<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         let (declarator, pos) = parse_declarator(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
@@ -346,13 +340,13 @@ fn parse_direct_declarator_tail<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLSquare(pos));
+            return Err(ParseError::Expected(Token::LSquare, pos));
         };
 
         let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRSquare(pos));
+            return Err(ParseError::Expected(Token::RSquare, pos));
         };
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
@@ -366,13 +360,13 @@ fn parse_direct_declarator_tail<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         let (list, pos) = parse_parameter_type_list(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
@@ -386,7 +380,7 @@ fn parse_direct_declarator_tail<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         fn parse_ident<'text>(
@@ -396,14 +390,14 @@ fn parse_direct_declarator_tail<'text>(
         ) -> Result<(&'text str, usize), ParseError> {
             match tokens.get(pos) {
                 Some(Token::Ident(ident)) => Ok((ident, pos + 1)),
-                _ => Err(ParseError::ExpectedIdentifier(pos)),
+                _ => Err(ParseError::ExpectedIdent(pos)),
             }
         }
 
         let (idents, pos) = many(tokens, pos + 1, ctx, parse_ident, Some(Token::Comma));
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
@@ -561,13 +555,13 @@ fn parse_direct_abstract_declarator<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         let (declarator, pos) = parse_abstract_declarator(tokens, pos + 1, ctx)?;
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
@@ -584,13 +578,13 @@ fn parse_direct_abstract_declarator<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLSquare(pos));
+            return Err(ParseError::Expected(Token::LSquare, pos));
         };
 
         let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRSquare(pos));
+            return Err(ParseError::Expected(Token::RSquare, pos));
         };
 
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
@@ -604,13 +598,13 @@ fn parse_direct_abstract_declarator<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclarator<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         let (parameter_type_list, pos) = maybe(tokens, pos + 1, ctx, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
@@ -645,13 +639,13 @@ fn parse_direct_abstract_declarator_tail<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLSquare(pos));
+            return Err(ParseError::Expected(Token::LSquare, pos));
         };
 
         let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_constant_expr);
 
         let Some(Token::RSquare) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRSquare(pos));
+            return Err(ParseError::Expected(Token::RSquare, pos));
         };
 
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
@@ -668,13 +662,13 @@ fn parse_direct_abstract_declarator_tail<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(DirectAbstractDeclaratorTail<'text>, usize), ParseError> {
         let Some(Token::LParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLParen(pos));
+            return Err(ParseError::Expected(Token::LParen, pos));
         };
 
         let (parameter_type_list, pos) = maybe(tokens, pos + 1, ctx, parse_parameter_type_list);
 
         let Some(Token::RParen) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRParen(pos));
+            return Err(ParseError::Expected(Token::RParen, pos));
         };
 
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
@@ -716,7 +710,7 @@ fn parse_declaration<'text>(
     let (init_declarators, pos) = many(tokens, pos, ctx, parse_init_declarator, Some(Token::Comma));
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     let validated_dss: ValidatedDeclarationSpecifiers<'text> = dss
@@ -795,7 +789,7 @@ fn parse_initializer<'text>(
                     pos += 1;
                     break;
                 }
-                _ => return Err(ParseError::ExpectedRCurly(pos)),
+                _ => return Err(ParseError::Expected(Token::RCurly, pos)),
             }
         }
 
@@ -963,8 +957,14 @@ fn parse_storage_class_specifier<'text>(
         Some(Token::Keyword("static")) => Ok((StorageClassSpecifier::Static, pos + 1)),
         Some(Token::Keyword("extern")) => Ok((StorageClassSpecifier::Extern, pos + 1)),
         Some(Token::Keyword("typedef")) => Ok((StorageClassSpecifier::TypeDef, pos + 1)),
-        _ => Err(ParseError::ExpectedKeyword(
-            "expected `auto` or `register` or `static` or `extern` or `typedef`",
+        _ => Err(ParseError::ExpectedOneOf(
+            vec![
+                Token::Keyword("auto"),
+                Token::Keyword("register"),
+                Token::Keyword("static"),
+                Token::Keyword("extern"),
+                Token::Keyword("typedef"),
+            ],
             pos,
         )),
     }
@@ -1029,8 +1029,18 @@ fn parse_type_specifier<'text>(
             Some(Token::Keyword("double")) => Ok((TypeSpecifier::Double, pos + 1)),
             Some(Token::Keyword("signed")) => Ok((TypeSpecifier::Signed, pos + 1)),
             Some(Token::Keyword("unsigned")) => Ok((TypeSpecifier::UnSigned, pos + 1)),
-            _ => Err(ParseError::ExpectedKeyword(
-                "expected `void` or `char` or `short` or `int` or `long` or `float` or `double` or `signed` or `unsigned`",
+            _ => Err(ParseError::ExpectedOneOf(
+                vec![
+                    Token::Keyword("void"),
+                    Token::Keyword("char"),
+                    Token::Keyword("short"),
+                    Token::Keyword("int"),
+                    Token::Keyword("long"),
+                    Token::Keyword("float"),
+                    Token::Keyword("double"),
+                    Token::Keyword("signed"),
+                    Token::Keyword("unsigned"),
+                ],
                 pos,
             )),
         }
@@ -1045,7 +1055,7 @@ fn parse_type_specifier<'text>(
             Some(Token::Ident(ident)) if ctx.is_typedef(ident) => {
                 Ok((TypeSpecifier::TypeDefName(ident), pos + 1))
             }
-            _ => Err(ParseError::ExpectedIdentifier(pos)),
+            _ => Err(ParseError::ExpectedIdent(pos)),
         }
     }
 
@@ -1147,7 +1157,10 @@ fn parse_type_qualifier<'text>(
     match tokens.get(pos) {
         Some(Token::Keyword("const")) => Ok((TypeQualifier::Const, pos + 1)),
         Some(Token::Keyword("volatile")) => Ok((TypeQualifier::Volatile, pos + 1)),
-        _ => Err(ParseError::ExpectedKeyword("`const` or `volatile`", pos)),
+        _ => Err(ParseError::ExpectedOneOf(
+            vec![Token::Keyword("const"), Token::Keyword("volatile")],
+            pos,
+        )),
     }
 }
 
@@ -1164,7 +1177,7 @@ fn parse_enum_specifier<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(EnumSpecifier<'text>, usize), ParseError> {
     let Some(Token::Keyword("enum")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("enum", pos));
+        return Err(ParseError::Expected(Token::Keyword("enum"), pos));
     };
 
     fn parse_enum_body<'text>(
@@ -1173,13 +1186,13 @@ fn parse_enum_specifier<'text>(
         ctx: &mut ParseContext<'text>,
     ) -> Result<(Vec<Enumerator<'text>>, usize), ParseError> {
         let Some(Token::LCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedLCurly(pos));
+            return Err(ParseError::Expected(Token::LCurly, pos));
         };
 
         let (list, pos) = many(tokens, pos + 1, ctx, parse_enumerator, Some(Token::Comma));
 
         let Some(Token::RCurly) = tokens.get(pos) else {
-            return Err(ParseError::ExpectedRCurly(pos).into());
+            return Err(ParseError::Expected(Token::RCurly, pos));
         };
 
         return Ok((list, pos + 1));
@@ -1208,7 +1221,7 @@ fn parse_enumerator<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(Enumerator<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedIdentifier(pos));
+        return Err(ParseError::ExpectedIdent(pos));
     };
 
     let Some(Token::Equals) = tokens.get(pos + 1) else {
@@ -1272,11 +1285,11 @@ fn parse_labeled_ident_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(LabeledStmt<'text>, usize), ParseError> {
     let Some(Token::Ident(ident)) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedIdentifier(pos));
+        return Err(ParseError::ExpectedIdent(pos));
     };
 
     let Some(Token::Colon) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedColon(pos));
+        return Err(ParseError::Expected(Token::Colon, pos));
     };
 
     let (stmt, pos) = parse_stmt(tokens, pos + 2, ctx)?;
@@ -1289,7 +1302,7 @@ fn parse_empty_stmt<'text>(
     _: &mut ParseContext<'text>,
 ) -> Result<(Stmt<'text>, usize), ParseError> {
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos));
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     Ok((Stmt::EmptyStmt, pos + 1))
@@ -1303,7 +1316,7 @@ fn parse_expr_stmt<'text>(
     let (expr, pos) = parse_expr(tokens, pos, ctx)?;
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     Ok((Stmt::Expr(expr), pos + 1))
@@ -1318,13 +1331,13 @@ fn parse_compound_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(CompoundStmt<'text>, usize), ParseError> {
     let Some(Token::LCurly) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedLCurly(pos));
+        return Err(ParseError::Expected(Token::LCurly, pos));
     };
 
     let (items, pos) = many(tokens, pos + 1, ctx, parse_block_item, None);
 
     let Some(Token::RCurly) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedRCurly(pos));
+        return Err(ParseError::Expected(Token::RCurly, pos));
     };
 
     Ok((CompoundStmt(items), pos + 1))
@@ -1374,17 +1387,17 @@ fn parse_selection_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(SelectionStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("if")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("if", pos));
+        return Err(ParseError::Expected(Token::Keyword("if"), pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedLParen(pos + 1).into());
+        return Err(ParseError::Expected(Token::LParen, pos + 1));
     };
 
     let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedRParen(pos).into());
+        return Err(ParseError::Expected(Token::RParen, pos));
     };
 
     let (pass, pos) = parse_stmt(tokens, pos + 1, ctx)?;
@@ -1442,17 +1455,17 @@ fn parse_iteration_while_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("while", pos));
+        return Err(ParseError::Expected(Token::Keyword("while"), pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedLParen(pos + 1).into());
+        return Err(ParseError::Expected(Token::LParen, pos + 1));
     };
 
     let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedRParen(pos).into());
+        return Err(ParseError::Expected(Token::RParen, pos));
     };
 
     let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
@@ -1467,28 +1480,28 @@ fn parse_iteration_do_while_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("do")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("do", pos));
+        return Err(ParseError::Expected(Token::Keyword("do"), pos));
     };
 
     let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
     let body = Box::new(body);
 
     let Some(Token::Keyword("while")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("while", pos).into());
+        return Err(ParseError::Expected(Token::Keyword("while"), pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedLParen(pos + 1).into());
+        return Err(ParseError::Expected(Token::LParen, pos + 1));
     };
 
     let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
 
     let Some(Token::RParen) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedRParen(pos).into());
+        return Err(ParseError::Expected(Token::RParen, pos));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos + 1));
     };
 
     Ok((IterationStmt::DoWhile { test, body }, pos + 2))
@@ -1500,11 +1513,11 @@ fn parse_iteration_for_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(IterationStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("for")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("for", pos));
+        return Err(ParseError::Expected(Token::Keyword("for"), pos));
     };
 
     let Some(Token::LParen) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedLParen(pos + 1).into());
+        return Err(ParseError::Expected(Token::LParen, pos + 1));
     };
 
     let (init, pos) = match tokens.get(pos + 2) {
@@ -1516,7 +1529,7 @@ fn parse_iteration_for_stmt<'text>(
     };
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     let (test, pos) = match tokens.get(pos + 1) {
@@ -1528,7 +1541,7 @@ fn parse_iteration_for_stmt<'text>(
     };
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     let (update, pos) = match tokens.get(pos + 1) {
@@ -1540,7 +1553,7 @@ fn parse_iteration_for_stmt<'text>(
     };
 
     let Some(Token::RParen) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedRParen(pos).into());
+        return Err(ParseError::Expected(Token::RParen, pos));
     };
 
     let (body, pos) = parse_stmt(tokens, pos + 1, ctx)?;
@@ -1590,15 +1603,15 @@ fn parse_jump_goto_stmt<'text>(
     _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("goto")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("goto", pos));
+        return Err(ParseError::Expected(Token::Keyword("goto"), pos));
     };
 
     let Some(Token::Ident(ident)) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedIdentifier(pos + 1).into());
+        return Err(ParseError::ExpectedIdent(pos + 1));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 2) else {
-        return Err(ParseError::ExpectedSemicolon(pos + 2).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos + 2));
     };
 
     Ok((JumpStmt::Goto(ident), pos + 3))
@@ -1610,11 +1623,11 @@ fn parse_jump_continue_stmt<'text>(
     _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("continue")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("continue", pos));
+        return Err(ParseError::Expected(Token::Keyword("continue"), pos));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos + 1));
     };
 
     Ok((JumpStmt::Continue, pos + 2))
@@ -1626,11 +1639,11 @@ fn parse_jump_break_stmt<'text>(
     _: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("break")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("break", pos));
+        return Err(ParseError::Expected(Token::Keyword("break"), pos));
     };
 
     let Some(Token::SemiColon) = tokens.get(pos + 1) else {
-        return Err(ParseError::ExpectedSemicolon(pos + 1).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos + 1));
     };
 
     Ok((JumpStmt::Break, pos + 2))
@@ -1642,13 +1655,13 @@ fn parse_jump_return_stmt<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(JumpStmt<'text>, usize), ParseError> {
     let Some(Token::Keyword("return")) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedKeyword("return", pos));
+        return Err(ParseError::Expected(Token::Keyword("return"), pos));
     };
 
     let (expr, pos) = maybe(tokens, pos + 1, ctx, parse_expr);
 
     let Some(Token::SemiColon) = tokens.get(pos) else {
-        return Err(ParseError::ExpectedSemicolon(pos).into());
+        return Err(ParseError::Expected(Token::SemiColon, pos));
     };
 
     return Ok((JumpStmt::Return(expr), pos + 1));
@@ -2307,7 +2320,7 @@ fn parse_primary_expr<'text>(
             let (expr, pos) = parse_expr(tokens, pos + 1, ctx)?;
             match tokens.get(pos) {
                 Some(Token::RParen) => Ok((Primary::Parens(Box::new(expr)), pos + 1)),
-                _ => Err(ParseError::MismatchedParentheses(pos)),
+                _ => Err(ParseError::Expected(Token::RParen, pos)),
             }
         }
         _ => Err(ParseError::SyntaxError(
