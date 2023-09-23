@@ -23,6 +23,32 @@ impl<'text> ParseContext<'text> {
     }
 }
 
+#[derive(Debug)]
+pub enum ParseError {
+    MismatchedParentheses(usize),
+    SyntaxError(usize, &'static str),
+    InvalidStatement(usize),
+    ExpectedSemicolon(usize),
+    ExpectedColon(usize),
+    ExpectedLParen(usize),
+    ExpectedRParen(usize),
+    ExpectedLCurly(usize),
+    ExpectedRCurly(usize),
+    ExpectedLSquare(usize),
+    ExpectedRSquare(usize),
+    ExpectedKeyword(&'static str, usize),
+    ExpectedIdentifier(usize),
+    InvalidDeclarationSpecifiers(usize, String),
+}
+
+pub fn parse<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(TranslationUnit<'text>, usize), ParseError> {
+    parse_translation_unit(tokens, pos, ctx)
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct TranslationUnit<'text>(pub Vec<ExternalDeclaration<'text>>);
 
@@ -3065,24 +3091,6 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
     fn from(value: Primary<'text>) -> Self {
         PostfixExpr::Primary(value)
     }
-}
-
-#[derive(Debug)]
-pub enum ParseError {
-    MismatchedParentheses(usize),
-    SyntaxError(usize, &'static str),
-    InvalidStatement(usize),
-    ExpectedSemicolon(usize),
-    ExpectedColon(usize),
-    ExpectedLParen(usize),
-    ExpectedRParen(usize),
-    ExpectedLCurly(usize),
-    ExpectedRCurly(usize),
-    ExpectedLSquare(usize),
-    ExpectedRSquare(usize),
-    ExpectedKeyword(&'static str, usize),
-    ExpectedIdentifier(usize),
-    InvalidDeclarationSpecifiers(usize, String),
 }
 
 macro_rules! check {
