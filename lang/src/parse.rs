@@ -2289,6 +2289,46 @@ fn parse_postfix_expr<'text>(
     let (expr, pos) = parse_primary_expr(tokens, pos, ctx)?;
 
     match tokens.get(pos) {
+        Some(Token::LSquare) => {
+            let (access, pos) = parse_expr(tokens, pos + 1, ctx)?;
+            match tokens.get(pos) {
+                Some(Token::RSquare) => Ok((
+                    PostfixExpr::ArrayAccess(Box::new(expr.into()), Box::new(access)),
+                    pos + 1,
+                )),
+                _ => Err(ParseError::Expected(Token::RSquare, pos)),
+            }
+        }
+        Some(Token::LParen) => {
+            let (args, pos) = many(
+                tokens,
+                pos + 1,
+                ctx,
+                parse_assignment_expr,
+                Some(Token::Comma),
+            );
+            match tokens.get(pos) {
+                Some(Token::RParen) => Ok((
+                    PostfixExpr::FunctionCall(Box::new(expr.into()), args),
+                    pos + 1,
+                )),
+                _ => Err(ParseError::Expected(Token::RParen, pos)),
+            }
+        }
+        Some(Token::Dot) => match tokens.get(pos + 1) {
+            Some(Token::Ident(ident)) => Ok((
+                PostfixExpr::MemberAccess(Box::new(expr.into()), ident),
+                pos + 2,
+            )),
+            _ => Err(ParseError::ExpectedIdent(pos + 1)),
+        },
+        Some(Token::Arrow) => match tokens.get(pos + 1) {
+            Some(Token::Ident(ident)) => Ok((
+                PostfixExpr::PointerMemberAccess(Box::new(expr.into()), ident),
+                pos + 2,
+            )),
+            _ => Err(ParseError::ExpectedIdent(pos + 1)),
+        },
         Some(Token::PlusPlus) => Ok((PostfixExpr::PostIncr(Box::new(expr.into())), pos + 1)),
         Some(Token::HyphenHyphen) => Ok((PostfixExpr::PostDecr(Box::new(expr.into())), pos + 1)),
         _ => Ok((expr.into(), pos)),
@@ -2937,10 +2977,15 @@ impl<'text> Display for PostfixExpr<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             PostfixExpr::Primary(expr) => write!(f, "{}", expr),
-            PostfixExpr::ArrayAccess(_, _) => todo!(),
-            PostfixExpr::FunctionCall(_, _) => todo!(),
-            PostfixExpr::MemberAccess(_, _) => todo!(),
-            PostfixExpr::PointerMemberAccess(_, _) => todo!(),
+            PostfixExpr::ArrayAccess(expr, access) => write!(f, "{}[{}]", expr, access),
+            PostfixExpr::FunctionCall(expr, args) => {
+                write!(f, "{}", expr)?;
+                write!(f, "(")?;
+                write_arr(f, args, ", ")?;
+                write!(f, ")")
+            }
+            PostfixExpr::MemberAccess(expr, ident) => write!(f, "{}.{}", expr, ident),
+            PostfixExpr::PointerMemberAccess(expr, ident) => write!(f, "{}->{}", expr, ident),
             PostfixExpr::PostIncr(expr) => write!(f, "{}++", expr),
             PostfixExpr::PostDecr(expr) => write!(f, "{}--", expr),
         }
@@ -3242,12 +3287,12 @@ mod tests {
             "int add(int a, int b) { return (a + b); }"
         );
 
-        // check!(
-        //     parse_function_definition,
-        //     &mut ctx,
-        //     "int euc(int x, int y) { return sqrt(x*x + y*y); }",
-        //     "int euc(int x, int y) { return sqrt(x*x + y*y); }"
-        // );
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            "int euc(int x, int y) { return sqrt(x*x + y*y); }",
+            "int euc(int x, int y) { return sqrt(((x * x) + (y * y))); }"
+        );
     }
 
     #[test]
@@ -3684,7 +3729,10 @@ mod tests {
 
         check!(parse_expr, &mut ctx, "a++");
         check!(parse_expr, &mut ctx, "a--");
-        // check!(parse_expr, &mut ctx, "add(a, b)");
+        check!(parse_expr, &mut ctx, "add(a, b)");
+        check!(parse_expr, &mut ctx, "arr[10]");
+        check!(parse_expr, &mut ctx, "person.name");
+        check!(parse_expr, &mut ctx, "person->name");
     }
 
     #[test]
