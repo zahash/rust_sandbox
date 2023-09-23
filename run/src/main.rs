@@ -1,2 +1,4 @@
-#[tokio::main]
-async fn main() {}
+// #[tokio::main]
+// async fn main() {}
+
+fn main() {}

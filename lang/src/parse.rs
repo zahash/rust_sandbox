@@ -1201,18 +1201,13 @@ fn parse_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_labeled_ident_stmt),
+            Box::new(parse_labeled_stmt),
             Box::new(parse_empty_stmt),
             Box::new(parse_expr_stmt),
             Box::new(parse_compound_stmt),
             Box::new(parse_selection_stmt),
-            Box::new(parse_iteration_while_stmt),
-            Box::new(parse_iteration_do_while_stmt),
-            Box::new(parse_iteration_for_stmt),
-            Box::new(parse_jump_goto_stmt),
-            Box::new(parse_jump_continue_stmt),
-            Box::new(parse_jump_break_stmt),
-            Box::new(parse_jump_return_stmt),
+            Box::new(parse_iteration_stmt),
+            Box::new(parse_jump_stmt),
         ],
         "cannot parse statement",
     )
@@ -1221,6 +1216,14 @@ fn parse_stmt<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub enum LabeledStmt<'text> {
     Ident(&'text str, Box<Stmt<'text>>),
+}
+
+fn parse_labeled_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(LabeledStmt<'text>, usize), ParseError> {
+    parse_labeled_ident_stmt(tokens, pos, ctx)
 }
 
 fn parse_labeled_ident_stmt<'text>(
@@ -1267,7 +1270,7 @@ fn parse_expr_stmt<'text>(
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct CompoundStmt<'text>(pub Vec<Stmt<'text>>);
+pub struct CompoundStmt<'text>(pub Vec<BlockItem<'text>>);
 
 fn parse_compound_stmt<'text>(
     tokens: &[Token<'text>],
@@ -1278,24 +1281,38 @@ fn parse_compound_stmt<'text>(
         return Err(ParseError::ExpectedLCurly(pos));
     };
 
-    let mut stmts = Vec::new();
-    let mut pos = pos + 1;
+    let (items, pos) = many(tokens, pos + 1, ctx, parse_block_item, None);
 
-    while let Some(token) = tokens.get(pos) {
-        if token == &Token::RCurly {
-            return Ok((CompoundStmt(stmts), pos + 1));
-        }
+    let Some(Token::RCurly) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedRCurly(pos));
+    };
 
-        match parse_stmt(tokens, pos, ctx) {
-            Ok((stmt, next_pos)) => {
-                pos = next_pos;
-                stmts.push(stmt);
-            }
-            Err(e) => return Err(e.into()),
-        };
+    Ok((CompoundStmt(items), pos + 1))
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum BlockItem<'text> {
+    Declaration(Declaration<'text>),
+    Statement(Stmt<'text>),
+}
+
+fn parse_block_item<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(BlockItem<'text>, usize), ParseError> {
+    if let (Some(d), pos) = maybe(tokens, pos, ctx, parse_declaration) {
+        return Ok((BlockItem::Declaration(d), pos));
     }
 
-    Err(ParseError::ExpectedRCurly(pos).into())
+    if let (Some(s), pos) = maybe(tokens, pos, ctx, parse_stmt) {
+        return Ok((BlockItem::Statement(s), pos));
+    }
+
+    Err(ParseError::SyntaxError(
+        pos,
+        "parse_block_item: expected declaration or statement",
+    ))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -1359,6 +1376,24 @@ pub enum IterationStmt<'text> {
         update: Option<Expr<'text>>,
         body: Box<Stmt<'text>>,
     },
+}
+
+fn parse_iteration_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(IterationStmt<'text>, usize), ParseError> {
+    combine_parsers(
+        tokens,
+        pos,
+        ctx,
+        &[
+            Box::new(parse_iteration_while_stmt),
+            Box::new(parse_iteration_do_while_stmt),
+            Box::new(parse_iteration_for_stmt),
+        ],
+        "cannot parse iteration statement",
+    )
 }
 
 fn parse_iteration_while_stmt<'text>(
@@ -1488,6 +1523,25 @@ pub enum JumpStmt<'text> {
     Continue,
     Break,
     Return(Option<Expr<'text>>),
+}
+
+fn parse_jump_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(JumpStmt<'text>, usize), ParseError> {
+    combine_parsers(
+        tokens,
+        pos,
+        ctx,
+        &[
+            Box::new(parse_jump_goto_stmt),
+            Box::new(parse_jump_continue_stmt),
+            Box::new(parse_jump_break_stmt),
+            Box::new(parse_jump_return_stmt),
+        ],
+        "cannot parse jump statement",
+    )
 }
 
 fn parse_jump_goto_stmt<'text>(
@@ -2588,10 +2642,19 @@ impl<'text> Display for LabeledStmt<'text> {
 impl<'text> Display for CompoundStmt<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{{ ")?;
-        for stmt in &self.0 {
-            write!(f, "{} ", stmt)?;
+        for item in &self.0 {
+            write!(f, "{} ", item)?;
         }
         write!(f, "}}")
+    }
+}
+
+impl<'text> Display for BlockItem<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            BlockItem::Declaration(d) => write!(f, "{}", d),
+            BlockItem::Statement(s) => write!(f, "{}", s),
+        }
     }
 }
 
@@ -3183,18 +3246,12 @@ mod tests {
             r#"const char *name = "zahash";"#
         );
 
-        check!(parse_declaration, &mut ctx, "typedef long long ll;");
-        check!(parse_declaration, &mut ctx, "ll a = 10;");
+        check!(parse_stmt, &mut ctx, "{ typedef long long ll; ll a = 10; }");
 
         check!(
-            parse_declaration,
+            parse_stmt,
             &mut ctx,
-            "typedef struct { float x; float y; } Point;"
-        );
-        check!(
-            parse_declaration,
-            &mut ctx,
-            "const Point origin = { 0, 0, };"
+            "{ typedef struct { float x; float y; } Point; const Point origin = { 0, 0, }; }"
         );
 
         check!(
@@ -3414,6 +3471,7 @@ mod tests {
         );
         check!(parse_stmt, &mut ctx, "a++;");
         check!(parse_stmt, &mut ctx, "{ a++; }");
+        check!(parse_stmt, &mut ctx, "{ int a = 0; a++; }");
     }
 
     #[test]

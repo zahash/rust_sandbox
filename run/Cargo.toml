@@ -7,5 +7,3 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1" }
-
-calc = { path = "../calc" }
