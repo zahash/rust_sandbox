@@ -1269,6 +1269,8 @@ fn parse_stmt<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub enum LabeledStmt<'text> {
     Ident(&'text str, Box<Stmt<'text>>),
+    Case(ConstantExpr<'text>, Box<Stmt<'text>>),
+    Default(Box<Stmt<'text>>),
 }
 
 fn parse_labeled_stmt<'text>(
@@ -1276,7 +1278,17 @@ fn parse_labeled_stmt<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(LabeledStmt<'text>, usize), ParseError> {
-    parse_labeled_ident_stmt(tokens, pos, ctx)
+    combine_parsers(
+        tokens,
+        pos,
+        ctx,
+        &[
+            Box::new(parse_labeled_ident_stmt),
+            Box::new(parse_labeled_case_stmt),
+            Box::new(parse_labeled_default_stmt),
+        ],
+        "cannot parse labeled statement",
+    )
 }
 
 fn parse_labeled_ident_stmt<'text>(
@@ -1294,6 +1306,42 @@ fn parse_labeled_ident_stmt<'text>(
 
     let (stmt, pos) = parse_stmt(tokens, pos + 2, ctx)?;
     Ok((LabeledStmt::Ident(ident, Box::new(stmt)), pos))
+}
+
+fn parse_labeled_case_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(LabeledStmt<'text>, usize), ParseError> {
+    let Some(Token::Keyword("case")) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedIdent(pos));
+    };
+
+    let (expr, pos) = parse_constant_expr(tokens, pos + 1, ctx)?;
+
+    let Some(Token::Colon) = tokens.get(pos) else {
+        return Err(ParseError::Expected(Token::Colon, pos));
+    };
+
+    let (stmt, pos) = parse_stmt(tokens, pos + 1, ctx)?;
+    Ok((LabeledStmt::Case(expr, Box::new(stmt)), pos))
+}
+
+fn parse_labeled_default_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(LabeledStmt<'text>, usize), ParseError> {
+    let Some(Token::Keyword("default")) = tokens.get(pos) else {
+        return Err(ParseError::ExpectedIdent(pos));
+    };
+
+    let Some(Token::Colon) = tokens.get(pos + 1) else {
+        return Err(ParseError::Expected(Token::Colon, pos));
+    };
+
+    let (stmt, pos) = parse_stmt(tokens, pos + 2, ctx)?;
+    Ok((LabeledStmt::Default(Box::new(stmt)), pos))
 }
 
 fn parse_empty_stmt<'text>(
@@ -1379,9 +1427,30 @@ pub enum SelectionStmt<'text> {
         pass: Box<Stmt<'text>>,
         fail: Box<Stmt<'text>>,
     },
+    Switch {
+        test: Expr<'text>,
+        pass: Box<Stmt<'text>>,
+    },
 }
 
 fn parse_selection_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(SelectionStmt<'text>, usize), ParseError> {
+    combine_parsers(
+        tokens,
+        pos,
+        ctx,
+        &[
+            Box::new(parse_selection_if_else_stmt),
+            Box::new(parse_selection_switch_stmt),
+        ],
+        "cannot parse selection statement",
+    )
+}
+
+fn parse_selection_if_else_stmt<'text>(
     tokens: &[Token<'text>],
     pos: usize,
     ctx: &mut ParseContext<'text>,
@@ -1411,6 +1480,31 @@ fn parse_selection_stmt<'text>(
     let fail = Box::new(fail);
 
     Ok((SelectionStmt::IfElse { test, pass, fail }, pos))
+}
+
+fn parse_selection_switch_stmt<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(SelectionStmt<'text>, usize), ParseError> {
+    let Some(Token::Keyword("switch")) = tokens.get(pos) else {
+        return Err(ParseError::Expected(Token::Keyword("switch"), pos));
+    };
+
+    let Some(Token::LParen) = tokens.get(pos + 1) else {
+        return Err(ParseError::Expected(Token::LParen, pos + 1));
+    };
+
+    let (test, pos) = parse_expr(tokens, pos + 2, ctx)?;
+
+    let Some(Token::RParen) = tokens.get(pos) else {
+        return Err(ParseError::Expected(Token::RParen, pos));
+    };
+
+    let (pass, pos) = parse_stmt(tokens, pos + 1, ctx)?;
+    let pass = Box::new(pass);
+
+    Ok((SelectionStmt::Switch { test, pass }, pos))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -2751,6 +2845,8 @@ impl<'text> Display for LabeledStmt<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             LabeledStmt::Ident(ident, stmt) => write!(f, "{} : {}", ident, stmt),
+            LabeledStmt::Case(expr, stmt) => write!(f, "case {} : {}", expr, stmt),
+            LabeledStmt::Default(stmt) => write!(f, "default : {}", stmt),
         }
     }
 }
@@ -2781,6 +2877,7 @@ impl<'text> Display for SelectionStmt<'text> {
             SelectionStmt::IfElse { test, pass, fail } => {
                 write!(f, "if ({}) {} else {}", test, pass, fail)
             }
+            SelectionStmt::Switch { test, pass } => write!(f, "switch ({}) {}", test, pass),
         }
     }
 }
@@ -3614,10 +3711,12 @@ mod tests {
         check!(parse_stmt, &mut ctx, "a : { }");
         check!(parse_stmt, &mut ctx, "a : b;");
         check!(parse_stmt, &mut ctx, "a : { b; }");
+        check!(parse_stmt, &mut ctx, "case 10 : { b; }");
+        check!(parse_stmt, &mut ctx, "default : { b; }");
     }
 
     #[test]
-    fn test_if_stmt() {
+    fn test_if_else_stmt() {
         let mut ctx = ParseContext::new();
 
         check!(parse_stmt, &mut ctx, "if (a) ;");
@@ -3647,6 +3746,32 @@ mod tests {
             }
             "#,
             "if ((a == 1)) { b++; } else if ((a == 2)) { b--; } else { b; }"
+        );
+    }
+
+    #[test]
+    fn test_switch_stmt() {
+        let mut ctx = ParseContext::new();
+
+        check!(
+            parse_stmt,
+            &mut ctx,
+            r#"
+            switch (a) {
+                case 1:
+                    printf("C1");
+                    break;
+
+                case 2:
+                    printf("C2");
+                    break;
+
+                default:
+                    printf("D");
+                    break;
+            }
+            "#,
+            r#"switch (a) { case 1 : printf("C1"); break; case 2 : printf("C2"); break; default : printf("D"); break; }"#
         );
     }
 
