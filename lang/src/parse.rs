@@ -88,6 +88,7 @@ fn parse_external_declaration<'text>(
 pub struct FunctionDefinition<'text> {
     pub return_type: Vec<DeclarationSpecifier<'text>>,
     pub declarator: Declarator<'text>,
+    pub declarations: Vec<Declaration<'text>>,
     pub body: CompoundStmt<'text>,
 }
 
@@ -96,7 +97,20 @@ fn parse_function_definition<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
-    todo!()
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
+    let (declarator, pos) = parse_declarator(tokens, pos, ctx)?;
+    let (declarations, pos) = many(tokens, pos, ctx, parse_declaration, None);
+    let (body, pos) = parse_compound_stmt(tokens, pos, ctx)?;
+
+    Ok((
+        FunctionDefinition {
+            return_type: dss,
+            declarator,
+            declarations,
+            body,
+        },
+        pos,
+    ))
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -2299,6 +2313,25 @@ fn parse_primary_expr<'text>(
     }
 }
 
+impl<'text> Display for FunctionDefinition<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        if !self.return_type.is_empty() {
+            write_arr(f, &self.return_type, " ")?;
+            write!(f, " ")?;
+        }
+
+        write!(f, "{}", self.declarator)?;
+        write!(f, " ")?;
+
+        if !self.declarations.is_empty() {
+            write_arr(f, &self.declarations, " ")?;
+            write!(f, " ")?;
+        }
+
+        write!(f, "{}", self.body)
+    }
+}
+
 impl<'text> Display for StructOrUnionSpecifier<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -3093,43 +3126,43 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
     }
 }
 
-macro_rules! check {
-    ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
-        let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
-        assert_eq!(pos, tokens.len(), "** Unable to parse all Tokens\n{}", stmt);
-        let stmt = format!("{}", stmt);
-        assert_eq!($expected, stmt);
-    };
-    ($f:ident, $ctx:expr, $src:expr) => {
-        check!($f, $ctx, $src, $src)
-    };
-}
-
-macro_rules! check_raw {
-    ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
-        let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
-        assert_eq!(pos, tokens.len());
-        assert_eq!($expected, stmt);
-    };
-}
-
-macro_rules! ast {
-    ($f:ident, $ctx:expr, $src:expr) => {{
-        let tokens = lex($src).expect("** LEX ERROR");
-        let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
-        assert_eq!(pos, tokens.len());
-        stmt
-    }};
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::lex;
 
     use pretty_assertions::assert_eq;
+
+    macro_rules! check {
+        ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
+            let tokens = lex($src).expect("** LEX ERROR");
+            let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
+            assert_eq!(pos, tokens.len(), "** Unable to parse all Tokens\n{}", stmt);
+            let stmt = format!("{}", stmt);
+            assert_eq!($expected, stmt);
+        };
+        ($f:ident, $ctx:expr, $src:expr) => {
+            check!($f, $ctx, $src, $src)
+        };
+    }
+
+    macro_rules! check_raw {
+        ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
+            let tokens = lex($src).expect("** LEX ERROR");
+            let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
+            assert_eq!(pos, tokens.len());
+            assert_eq!($expected, stmt);
+        };
+    }
+
+    macro_rules! ast {
+        ($f:ident, $ctx:expr, $src:expr) => {{
+            let tokens = lex($src).expect("** LEX ERROR");
+            let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
+            assert_eq!(pos, tokens.len());
+            stmt
+        }};
+    }
 
     const STRUCT_UNION: [&'static str; 6] = [
         "struct Point",
@@ -3170,6 +3203,31 @@ mod tests {
         ("const", TypeQualifier::Const),
         ("volatile", TypeQualifier::Volatile),
     ];
+
+    #[test]
+    fn test_function_definition() {
+        let mut ctx = ParseContext::new();
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            "int add1(int a) { return ++a; }"
+        );
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            "int add(int a, int b) { return a + b; }",
+            "int add(int a, int b) { return (a + b); }"
+        );
+
+        // check!(
+        //     parse_function_definition,
+        //     &mut ctx,
+        //     "int euc(int x, int y) { return sqrt(x*x + y*y); }",
+        //     "int euc(int x, int y) { return sqrt(x*x + y*y); }"
+        // );
+    }
 
     #[test]
     fn test_struct_or_union() {
@@ -3605,6 +3663,7 @@ mod tests {
 
         check!(parse_expr, &mut ctx, "a++");
         check!(parse_expr, &mut ctx, "a--");
+        // check!(parse_expr, &mut ctx, "add(a, b)");
     }
 
     #[test]
