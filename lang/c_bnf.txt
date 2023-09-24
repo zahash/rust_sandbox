@@ -84,7 +84,7 @@ The syntax of C in Backus-Naur Form
                      | -- <unary-expression>
                      | <unary-operator> <cast-expression>
                      | sizeof <unary-expression>
-                     | sizeof <type-name>
+                     | sizeof ( <type-name> )
 
 <unary-operator> ::= &
                    | *

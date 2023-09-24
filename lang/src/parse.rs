@@ -2378,12 +2378,12 @@ fn parse_unary_expr<'text>(
 ) -> Result<(UnaryExpr<'text>, usize), ParseError> {
     match tokens.get(pos) {
         Some(Token::PlusPlus) => {
-            let (expr, pos) = parse_postfix_expr(tokens, pos + 1, ctx)?;
-            Ok((UnaryExpr::PreIncr(Box::new(expr.into())), pos))
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            Ok((UnaryExpr::PreIncr(Box::new(expr)), pos))
         }
         Some(Token::HyphenHyphen) => {
-            let (expr, pos) = parse_postfix_expr(tokens, pos + 1, ctx)?;
-            Ok((UnaryExpr::PreDecr(Box::new(expr.into())), pos))
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            Ok((UnaryExpr::PreDecr(Box::new(expr)), pos))
         }
         Some(Token::Ampersand) => {
             let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
@@ -2408,6 +2408,20 @@ fn parse_unary_expr<'text>(
         Some(Token::Exclamation) => {
             let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Not(Box::new(expr)), pos))
+        }
+        Some(Token::Keyword("sizeof")) => {
+            if let Some(Token::LParen) = tokens.get(pos + 1) {
+                // if its not a TypeName in parens, it must've been just a normal <primary-expression> ::= ( <expression> )
+                if let Ok((type_name, pos)) = parse_type_name(tokens, pos + 2, ctx) {
+                    let Some(Token::RParen) = tokens.get(pos) else {
+                        return Err(ParseError::Expected(Token::RParen, pos));
+                    };
+                    return Ok((UnaryExpr::SizeofTypeName(type_name), pos + 1));
+                }
+            }
+
+            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            Ok((UnaryExpr::SizeofExpr(Box::new(expr)), pos))
         }
         _ => {
             let (expr, pos) = parse_postfix_expr(tokens, pos, ctx)?;
@@ -3138,7 +3152,7 @@ impl<'text> Display for UnaryExpr<'text> {
             UnaryExpr::OnesComplement(expr) => write!(f, "~{}", expr),
             UnaryExpr::Not(expr) => write!(f, "!{}", expr),
             UnaryExpr::SizeofExpr(expr) => write!(f, "sizeof {}", expr),
-            UnaryExpr::SizeofTypeName(type_name) => write!(f, "sizeof {}", type_name),
+            UnaryExpr::SizeofTypeName(type_name) => write!(f, "sizeof ({})", type_name),
         }
     }
 }
@@ -3971,6 +3985,13 @@ mod tests {
         check!(parse_expr, &mut ctx, "+a", "a");
         check!(parse_expr, &mut ctx, "-a");
         check!(parse_expr, &mut ctx, "~a");
+
+        check!(parse_expr, &mut ctx, "sizeof a");
+        check!(parse_expr, &mut ctx, "sizeof (int)");
+        check!(parse_expr, &mut ctx, "sizeof *ptr");
+        check!(parse_expr, &mut ctx, "sizeof (struct Person)");
+        check!(parse_expr, &mut ctx, "sizeof (double[10])");
+        check!(parse_expr, &mut ctx, "sizeof (struct Point*)");
     }
 
     #[test]
