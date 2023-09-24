@@ -3507,6 +3507,30 @@ mod tests {
         check!(
             parse_function_definition,
             &mut ctx,
+            "static double calculateAverage(int values[], int size) { return 0; }"
+        );
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            r#"const char *getMessage() { return "Hello, World!"; }"#
+        );
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            r#"unsigned long long factorial(int n) { }"#
+        );
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
+            "float add(a, b) int a; float b; { return ++a; }"
+        );
+
+        check!(
+            parse_function_definition,
+            &mut ctx,
             "int add(int a, int b) { return a + b; }",
             "int add(int a, int b) { return (a + b); }"
         );
