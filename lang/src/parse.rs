@@ -424,7 +424,7 @@ fn parse_direct_declarator_tail<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeName<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
-    pub abstract_declarator: Option<AbstractDeclarator<'text>>,
+    pub abstract_declarator: Box<Option<AbstractDeclarator<'text>>>,
 }
 
 fn parse_type_name<'text>(
@@ -445,7 +445,7 @@ fn parse_type_name<'text>(
     Ok((
         TypeName {
             specifier_qualifiers: sqs,
-            abstract_declarator: ad,
+            abstract_declarator: Box::new(ad),
         },
         pos,
     ))
@@ -2294,10 +2294,10 @@ fn parse_additive_expr<'text>(
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum MultiplicativeExpr<'text> {
-    UnaryExpr(UnaryExpr<'text>),
-    Mul(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
-    Div(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
-    Mod(Box<MultiplicativeExpr<'text>>, UnaryExpr<'text>),
+    CastExpr(CastExpr<'text>),
+    Mul(Box<MultiplicativeExpr<'text>>, CastExpr<'text>),
+    Div(Box<MultiplicativeExpr<'text>>, CastExpr<'text>),
+    Mod(Box<MultiplicativeExpr<'text>>, CastExpr<'text>),
 }
 
 fn parse_multiplicative_expr<'text>(
@@ -2305,22 +2305,22 @@ fn parse_multiplicative_expr<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(MultiplicativeExpr<'text>, usize), ParseError> {
-    let (lhs, mut pos) = parse_unary_expr(tokens, pos, ctx)?;
+    let (lhs, mut pos) = parse_cast_expr(tokens, pos, ctx)?;
     let mut lhs = lhs.into();
     while let Some(token) = tokens.get(pos) {
         match token {
             Token::Asterisk => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+                let (rhs, next_pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Mul(Box::new(lhs), rhs);
             }
             Token::Slash => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+                let (rhs, next_pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Div(Box::new(lhs), rhs);
             }
             Token::Percent => {
-                let (rhs, next_pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+                let (rhs, next_pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
                 pos = next_pos;
                 lhs = MultiplicativeExpr::Mod(Box::new(lhs), rhs);
             }
@@ -2331,16 +2331,44 @@ fn parse_multiplicative_expr<'text>(
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum CastExpr<'text> {
+    UnaryExpr(UnaryExpr<'text>),
+    Cast(TypeName<'text>, Box<CastExpr<'text>>),
+}
+
+fn parse_cast_expr<'text>(
+    tokens: &[Token<'text>],
+    pos: usize,
+    ctx: &mut ParseContext<'text>,
+) -> Result<(CastExpr<'text>, usize), ParseError> {
+    if let Some(Token::LParen) = tokens.get(pos) {
+        // if its not a TypeName in parens, it must've been just a normal <primary-expression> ::= ( <expression> )
+        if let Ok((type_name, pos)) = parse_type_name(tokens, pos + 1, ctx) {
+            let Some(Token::RParen) = tokens.get(pos) else {
+                return Err(ParseError::Expected(Token::RParen, pos));
+            };
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
+            return Ok((CastExpr::Cast(type_name, Box::new(expr)), pos));
+        }
+    }
+
+    let (expr, pos) = parse_unary_expr(tokens, pos, ctx)?;
+    Ok((CastExpr::UnaryExpr(expr), pos))
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum UnaryExpr<'text> {
     PostfixExpr(PostfixExpr<'text>),
     PreIncr(Box<UnaryExpr<'text>>),
     PreDecr(Box<UnaryExpr<'text>>),
-    Ref(Box<UnaryExpr<'text>>),
-    Deref(Box<UnaryExpr<'text>>),
-    UnaryAdd(Box<UnaryExpr<'text>>),
-    UnarySub(Box<UnaryExpr<'text>>),
-    OnesComplement(Box<UnaryExpr<'text>>),
-    Not(Box<UnaryExpr<'text>>),
+    Ref(Box<CastExpr<'text>>),
+    Deref(Box<CastExpr<'text>>),
+    UnaryAdd(Box<CastExpr<'text>>),
+    UnarySub(Box<CastExpr<'text>>),
+    OnesComplement(Box<CastExpr<'text>>),
+    Not(Box<CastExpr<'text>>),
+    SizeofExpr(Box<UnaryExpr<'text>>),
+    SizeofTypeName(TypeName<'text>),
 }
 
 fn parse_unary_expr<'text>(
@@ -2358,27 +2386,27 @@ fn parse_unary_expr<'text>(
             Ok((UnaryExpr::PreDecr(Box::new(expr.into())), pos))
         }
         Some(Token::Ampersand) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Ref(Box::new(expr)), pos))
         }
         Some(Token::Asterisk) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Deref(Box::new(expr)), pos))
         }
         Some(Token::Plus) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::UnaryAdd(Box::new(expr)), pos))
         }
         Some(Token::Hyphen) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::UnarySub(Box::new(expr)), pos))
         }
         Some(Token::Tilde) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::OnesComplement(Box::new(expr)), pos))
         }
         Some(Token::Exclamation) => {
-            let (expr, pos) = parse_unary_expr(tokens, pos + 1, ctx)?;
+            let (expr, pos) = parse_cast_expr(tokens, pos + 1, ctx)?;
             Ok((UnaryExpr::Not(Box::new(expr)), pos))
         }
         _ => {
@@ -2731,7 +2759,7 @@ impl<'text> Display for DirectDeclaratorTail<'text> {
 impl<'text> Display for TypeName<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write_arr(f, &self.specifier_qualifiers, " ")?;
-        if let Some(ad) = &self.abstract_declarator {
+        if let Some(ad) = &self.abstract_declarator.deref() {
             write!(f, "{}", ad)?;
         }
         Ok(())
@@ -3080,10 +3108,19 @@ impl<'text> Display for AdditiveExpr<'text> {
 impl<'text> Display for MultiplicativeExpr<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            MultiplicativeExpr::UnaryExpr(expr) => write!(f, "{}", expr),
+            MultiplicativeExpr::CastExpr(expr) => write!(f, "{}", expr),
             MultiplicativeExpr::Mul(lhs, rhs) => write!(f, "({} * {})", lhs, rhs),
             MultiplicativeExpr::Div(lhs, rhs) => write!(f, "({} / {})", lhs, rhs),
             MultiplicativeExpr::Mod(lhs, rhs) => write!(f, "({} % {})", lhs, rhs),
+        }
+    }
+}
+
+impl<'text> Display for CastExpr<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            CastExpr::UnaryExpr(expr) => write!(f, "{}", expr),
+            CastExpr::Cast(type_name, expr) => write!(f, "({}){}", type_name, expr),
         }
     }
 }
@@ -3100,6 +3137,8 @@ impl<'text> Display for UnaryExpr<'text> {
             UnaryExpr::UnarySub(expr) => write!(f, "-{}", expr),
             UnaryExpr::OnesComplement(expr) => write!(f, "~{}", expr),
             UnaryExpr::Not(expr) => write!(f, "!{}", expr),
+            UnaryExpr::SizeofExpr(expr) => write!(f, "sizeof {}", expr),
+            UnaryExpr::SizeofTypeName(type_name) => write!(f, "sizeof {}", type_name),
         }
     }
 }
@@ -3305,9 +3344,9 @@ impl<'text> From<MultiplicativeExpr<'text>> for AdditiveExpr<'text> {
     }
 }
 
-impl<'text> From<UnaryExpr<'text>> for MultiplicativeExpr<'text> {
-    fn from(value: UnaryExpr<'text>) -> Self {
-        MultiplicativeExpr::UnaryExpr(value)
+impl<'text> From<CastExpr<'text>> for MultiplicativeExpr<'text> {
+    fn from(value: CastExpr<'text>) -> Self {
+        MultiplicativeExpr::CastExpr(value)
     }
 }
 
@@ -3897,7 +3936,8 @@ mod tests {
         check!(parse_expr, &mut ctx, "'c'");
         check!(parse_expr, &mut ctx, "123.123");
         check!(parse_expr, &mut ctx, r#""string""#);
-        check!(parse_expr, &mut ctx, r#"(a)"#);
+        check!(parse_expr, &mut ctx, "(a)");
+        check!(parse_expr, &mut ctx, "(add(a, b))");
     }
 
     #[test]
@@ -3910,6 +3950,14 @@ mod tests {
         check!(parse_expr, &mut ctx, "arr[10]");
         check!(parse_expr, &mut ctx, "person.name");
         check!(parse_expr, &mut ctx, "person->name");
+    }
+
+    #[test]
+    fn test_cast_expr() {
+        let mut ctx = ParseContext::new();
+
+        check!(parse_expr, &mut ctx, "(float)10");
+        check!(parse_expr, &mut ctx, "(const int*(*)(int[5]))my_var");
     }
 
     #[test]
