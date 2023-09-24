@@ -7,19 +7,31 @@ use crate::Token;
 
 pub struct ParseContext<'text> {
     typedefs: Vec<&'text str>,
+    enum_consts: Vec<&'text str>,
 }
 
 impl<'text> ParseContext<'text> {
-    pub fn new() -> Self {
-        Self { typedefs: vec![] }
+    fn new() -> Self {
+        Self {
+            typedefs: vec![],
+            enum_consts: vec![],
+        }
     }
 
-    pub fn set_typedef(&mut self, name: &'text str) {
+    fn set_typedef(&mut self, name: &'text str) {
         self.typedefs.push(name);
     }
 
-    pub fn is_typedef(&self, name: &str) -> bool {
+    fn is_typedef(&self, name: &str) -> bool {
         self.typedefs.contains(&name)
+    }
+
+    fn set_enum_constant(&mut self, name: &'text str) {
+        self.enum_consts.push(name);
+    }
+
+    fn is_enum_constant(&self, name: &str) -> bool {
+        self.enum_consts.contains(&name)
     }
 }
 
@@ -1213,13 +1225,18 @@ fn parse_enum_specifier<'text>(
             return Err(ParseError::Expected(Token::LCurly, pos));
         };
 
-        let (list, pos) = many(tokens, pos + 1, ctx, parse_enumerator, Some(Token::Comma));
+        let (enum_constants, pos) =
+            many(tokens, pos + 1, ctx, parse_enumerator, Some(Token::Comma));
+
+        for Enumerator::Implicit(c) | Enumerator::Explicit(c, _) in &enum_constants {
+            ctx.set_enum_constant(c);
+        }
 
         let Some(Token::RCurly) = tokens.get(pos) else {
             return Err(ParseError::Expected(Token::RCurly, pos));
         };
 
-        return Ok((list, pos + 1));
+        return Ok((enum_constants, pos + 1));
     }
 
     if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {
@@ -2501,6 +2518,7 @@ pub enum Primary<'text> {
     Int(isize),
     Char(char),
     Float(f64),
+    EnumConstant(&'text str),
     String(&'text str),
     Parens(Box<Expr<'text>>),
 }
@@ -2511,7 +2529,10 @@ fn parse_primary_expr<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(Primary<'text>, usize), ParseError> {
     match tokens.get(pos) {
-        Some(Token::Ident(ident)) => Ok((Primary::Ident(ident), pos + 1)),
+        Some(Token::Ident(ident)) => match ctx.is_enum_constant(ident) {
+            true => Ok((Primary::EnumConstant(ident), pos + 1)),
+            false => Ok((Primary::Ident(ident), pos + 1)),
+        },
         Some(Token::Whole(n)) => Ok((Primary::Int(*n as isize), pos + 1)),
         Some(Token::Char(c)) => Ok((Primary::Char(*c), pos + 1)),
         Some(Token::Decimal(n)) => Ok((Primary::Float(*n), pos + 1)),
@@ -3183,6 +3204,7 @@ impl<'text> Display for Primary<'text> {
             Primary::Int(n) => write!(f, "{}", n),
             Primary::Char(c) => write!(f, "'{}'", c),
             Primary::Float(n) => write!(f, "{}", n),
+            Primary::EnumConstant(e) => write!(f, "{}", e),
             Primary::String(s) => write!(f, "\"{}\"", s),
             Primary::Parens(expr) => write!(f, "({})", expr),
         }
@@ -3376,6 +3398,24 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
     }
 }
 
+impl<'text> From<Primary<'text>> for Expr<'text> {
+    fn from(value: Primary<'text>) -> Self {
+        Expr::ConditionalExpr(ConditionalExpr::LogicalOrExpr(
+            LogicalOrExpr::LogicalAndExpr(LogicalAndExpr::BitOrExpr(BitOrExpr::XORExpr(
+                XORExpr::BitAndExpr(BitAndExpr::EqualityExpr(EqualityExpr::ComparisionExpr(
+                    ComparisionExpr::ShiftExpr(ShiftExpr::AdditiveExpr(
+                        AdditiveExpr::MultiplicativeExpr(MultiplicativeExpr::CastExpr(
+                            CastExpr::UnaryExpr(UnaryExpr::PostfixExpr(PostfixExpr::Primary(
+                                value,
+                            ))),
+                        )),
+                    )),
+                ))),
+            ))),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -3396,7 +3436,7 @@ mod tests {
         };
     }
 
-    macro_rules! check_raw {
+    macro_rules! check_ast {
         ($f:ident, $ctx:expr, $src:expr, $expected:expr) => {
             let tokens = lex($src).expect("** LEX ERROR");
             let (stmt, pos) = $f(&tokens, 0, $ctx).expect("** Unable to parse statement");
@@ -3643,7 +3683,7 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
-            check_raw!(
+            check_ast!(
                 parse_declaration_specifier,
                 &mut ctx,
                 src,
@@ -3652,7 +3692,7 @@ mod tests {
         }
 
         for (src, expected) in TYPE_SPECIFIER {
-            check_raw!(
+            check_ast!(
                 parse_declaration_specifier,
                 &mut ctx,
                 src,
@@ -3665,7 +3705,7 @@ mod tests {
         }
 
         for (src, expected) in TYPE_QUALIFIER {
-            check_raw!(
+            check_ast!(
                 parse_declaration_specifier,
                 &mut ctx,
                 src,
@@ -3679,7 +3719,7 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         for (src, expected) in STORAGE_CLASS_SPECIFIER {
-            check_raw!(parse_storage_class_specifier, &mut ctx, src, expected);
+            check_ast!(parse_storage_class_specifier, &mut ctx, src, expected);
         }
     }
 
@@ -3688,7 +3728,7 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         for (src, expected) in TYPE_SPECIFIER {
-            check_raw!(
+            check_ast!(
                 parse_specifier_qualifier,
                 &mut ctx,
                 src,
@@ -3701,7 +3741,7 @@ mod tests {
         }
 
         for (src, expected) in TYPE_QUALIFIER {
-            check_raw!(
+            check_ast!(
                 parse_specifier_qualifier,
                 &mut ctx,
                 src,
@@ -3715,7 +3755,7 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         check!(parse_declaration, &mut ctx, "typedef int A;");
-        check_raw!(
+        check_ast!(
             parse_type_specifier,
             &mut ctx,
             "A",
@@ -3723,7 +3763,7 @@ mod tests {
         );
 
         for (src, expected) in TYPE_SPECIFIER {
-            check_raw!(parse_type_specifier, &mut ctx, src, expected);
+            check_ast!(parse_type_specifier, &mut ctx, src, expected);
         }
 
         for src in STRUCT_UNION {
@@ -3779,7 +3819,7 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         for (src, expected) in TYPE_QUALIFIER {
-            check_raw!(parse_type_qualifier, &mut ctx, src, expected);
+            check_ast!(parse_type_qualifier, &mut ctx, src, expected);
         }
     }
 
@@ -3796,8 +3836,8 @@ mod tests {
     fn test_simple_stmt() {
         let mut ctx = ParseContext::new();
 
-        check_raw!(parse_stmt, &mut ctx, ";", Stmt::EmptyStmt);
-        check_raw!(
+        check_ast!(parse_stmt, &mut ctx, ";", Stmt::EmptyStmt);
+        check_ast!(
             parse_stmt,
             &mut ctx,
             "{ }",
@@ -3952,6 +3992,18 @@ mod tests {
         check!(parse_expr, &mut ctx, r#""string""#);
         check!(parse_expr, &mut ctx, "(a)");
         check!(parse_expr, &mut ctx, "(add(a, b))");
+
+        check!(
+            parse_declaration,
+            &mut ctx,
+            "typedef enum { RED, GREEN, BLUE } Color;"
+        );
+        check_ast!(
+            parse_expr,
+            &mut ctx,
+            "BLUE",
+            Expr::from(Primary::EnumConstant("BLUE"))
+        );
     }
 
     #[test]
