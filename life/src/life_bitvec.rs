@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bitvec::prelude::*;
 
 pub struct Game<const N: usize> {

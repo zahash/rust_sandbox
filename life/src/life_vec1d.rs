@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use rayon::prelude::*;
 
 pub struct Game<const R: usize, const C: usize> {

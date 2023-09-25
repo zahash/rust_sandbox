@@ -4,7 +4,7 @@ const GRID_SIZE: usize = 10_000;
 
 fn stack_benchmark(c: &mut Criterion) {
     let start = [[true; GRID_SIZE]; GRID_SIZE];
-    let mut game = game_of_life::Game::new(start);
+    let mut game = life::Game::new(Box::new(start));
 
     c.bench_function("stack", |b| {
         b.iter(|| {

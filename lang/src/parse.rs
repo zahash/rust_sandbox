@@ -10,6 +10,7 @@ pub struct ParseContext<'text> {
     enum_consts: Vec<&'text str>,
 }
 
+#[allow(dead_code)]
 impl<'text> ParseContext<'text> {
     fn new() -> Self {
         Self {

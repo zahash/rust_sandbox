@@ -16,6 +16,9 @@ Cargo.lock
 # yew build files
 dist/
 
+# wasm-pack
+pkg/
+
 .vscode/
 .idea/
 
