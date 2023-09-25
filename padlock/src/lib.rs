@@ -1,14 +1,13 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+// launch prompt. ask for master password
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// add name='some name with spaces' user=zahash pass=asdf url='https://asdf.com'
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// set 'some name with spaces' user=zahash.z
+
+// show name='some name with spaces' or (name contains asdf and url matches '.+asdf.+')
+// show 'some name'
+// show all
+
+// delete 'some name'
+
+// history 'some name'
