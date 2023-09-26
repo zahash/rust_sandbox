@@ -1,4 +1,4 @@
-use std::io::Write;
+use inquire::Text;
 
 use crate::eval::*;
 
@@ -8,19 +8,10 @@ pub fn run() {
     let mut state = State::new();
 
     loop {
-        print!("> ");
-        std::io::stdout().flush().unwrap();
-
-        let text = ask();
+        let text = Text::new("").prompt().expect("prompt error");
         match eval(&text, &mut state) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(e) => eprintln!("*** {:?}", e),
         }
     }
-}
-
-fn ask() -> String {
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).unwrap();
-    input
 }
