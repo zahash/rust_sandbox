@@ -11,7 +11,7 @@ pub enum Token<'text> {
 
 lazy_static! {
     static ref KEYWORD_REGEX: Regex =
-        Regex::new(r#"^(add|set|del|show|history|all|prev|and|or|contains|matches)\b"#).unwrap();
+        Regex::new(r#"^(set|del|show|history|all|prev|and|or|contains|matches|is)\b"#).unwrap();
     static ref ATTR_REGEX: Regex = Regex::new(r#"^(name|user|pass|url)\b"#).unwrap();
     static ref VALUE_REGEX: Regex = Regex::new(r#"^([^'\n\s\t]+|'[^'\n]+')"#).unwrap();
 }
@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_all() {
         let src = r#"
-        add set del show history all prev and or contains matches 
+        set del show history all prev and or contains matches is
         name user pass url
         ='🦀🦀🦀''N' look_mom   no_spaces   'oh wow spaces'
         "#;
@@ -125,7 +125,6 @@ mod tests {
         match lex(src) {
             Ok(tokens) => assert_eq!(
                 vec![
-                    Keyword("add"),
                     Keyword("set"),
                     Keyword("del"),
                     Keyword("show"),
@@ -136,6 +135,7 @@ mod tests {
                     Keyword("or"),
                     Keyword("contains"),
                     Keyword("matches"),
+                    Keyword("is"),
                     Attr("name"),
                     Attr("user"),
                     Attr("pass"),

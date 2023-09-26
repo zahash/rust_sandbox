@@ -1,13 +1,16 @@
+mod eval;
 mod lex;
 mod parse;
+mod prompt;
 
+pub use eval::*;
 pub use lex::*;
+pub use parse::*;
+pub use prompt::*;
 
 // launch prompt. ask for master password
 
 // add name='some name with spaces' user=zahash pass=asdf url='https://asdf.com'
-
-// prev stores name of last added/set name
 
 // set 'some name with spaces' user=zahash.z
 // set prev user=zahash.z
