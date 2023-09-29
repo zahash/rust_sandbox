@@ -22,3 +22,5 @@ gcc -Wall -Wextra -Werror -o main main.c -I./include/ -L./lib/ -l$LIB_NAME
 # LD_LIBRARY_PATH not required for staticlib
 # export LD_LIBRARY_PATH=./lib/:$LD_LIBRARY_PATH
 ./main
+
+rm main -f
