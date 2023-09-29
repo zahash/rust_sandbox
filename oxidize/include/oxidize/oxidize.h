@@ -3,4 +3,4 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-int32_t plus_one(int32_t a);
+int plus_one(int a);
