@@ -10,8 +10,8 @@ cbindgen --lang c --config cbindgen.toml --crate $LIB_NAME --output ./include/$L
 cargo build --release
 mkdir -p ./lib/
 # | true prevents crash if file not found
-cp ./target/release/*.a ./lib/ | true
-cp ./target/release/*.so ./lib/ | true
+cp ../target/release/*.a ./lib/ | true
+cp ../target/release/*.so ./lib/ | true
 
 rm main -f
 # The -I flag tells gcc where to look for the header files
