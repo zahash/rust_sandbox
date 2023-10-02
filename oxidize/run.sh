@@ -17,7 +17,9 @@ rm main -f
 # The -I flag tells gcc where to look for the header files
 # The -L flag where to look for the library
 # and the -l flag specifies the name of the library
-gcc -Wall -Wextra -Werror -o main main.c -I./include/ -L./lib/ -l$LIB_NAME
+gcc -Wall -Wextra -Werror -o main main.c -I./include/ -L./lib/ -l:lib$LIB_NAME.a # staticlink
+# gcc -Wall -Wextra -Werror -o main main.c -I./include/ -L./lib/ -l$LIB_NAME # dynlink
+
 
 # LD_LIBRARY_PATH not required for staticlib
 # export LD_LIBRARY_PATH=./lib/:$LD_LIBRARY_PATH
