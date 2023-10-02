@@ -18,6 +18,8 @@ int main()
     printf("%s\n", zahash.name);
     printf("%d\n", zahash.age);
 
+    greet("zahash");
+
     printf("(0c = 32f) %f\n", fahrenheit(0.));
     printf("(100c = 212f) %f\n", fahrenheit(100.));
     printf("(69c = 156.2f) %f\n", fahrenheit(69.));

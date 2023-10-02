@@ -4,3 +4,5 @@
 #include <stdlib.h>
 
 int plus_one(int a);
+
+void greet(const char *s);
