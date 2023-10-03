@@ -106,3 +106,34 @@ pub struct editorConfig {
 
 #[no_mangle]
 pub extern "C" fn use_editorConfig(_: &editorConfig) {}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub enum KEY_ACTION {
+    KEY_NULL = 0,
+    CTRL_C = 3,
+    CTRL_D = 4,
+    CTRL_F = 6,
+    CTRL_H = 8,
+    TAB = 9,
+    CTRL_L = 12,
+    ENTER = 13,
+    CTRL_Q = 17,
+    CTRL_S = 19,
+    CTRL_U = 21,
+    ESC = 27,
+    BACKSPACE = 127,
+    /// The following are just soft codes, not really reported by the terminal directly
+    ARROW_LEFT = 1000,
+    ARROW_RIGHT,
+    ARROW_UP,
+    ARROW_DOWN,
+    DEL_KEY,
+    HOME_KEY,
+    END_KEY,
+    PAGE_UP,
+    PAGE_DOWN,
+}
+
+#[no_mangle]
+pub extern "C" fn use_KEY_ACTION(_: &KEY_ACTION) {}
