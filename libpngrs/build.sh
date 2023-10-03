@@ -11,6 +11,5 @@ make
 make install
 cd ..
 
-rm -rf build
 rm -rf ./bin
 rm -rf ./share
