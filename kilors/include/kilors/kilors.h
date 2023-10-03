@@ -46,6 +46,14 @@ typedef struct erow {
   int hl_oc;
 } erow;
 
+typedef struct hlcolor {
+  int r;
+  int g;
+  int b;
+} hlcolor;
+
 void use_editorSyntax(const struct editorSyntax*);
 
 void use_erow(const struct erow*);
+
+void use_hlcolor(const struct hlcolor*);

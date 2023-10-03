@@ -47,3 +47,14 @@ pub struct erow {
 
 #[no_mangle]
 pub extern "C" fn use_erow(_: &erow) {}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub struct hlcolor {
+    r: c_int,
+    g: c_int,
+    b: c_int,
+}
+
+#[no_mangle]
+pub extern "C" fn use_hlcolor(_: &hlcolor) {}
