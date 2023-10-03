@@ -6,6 +6,8 @@ LIB_NAME="oxidize"
 # requires cbindgen.toml to be present (file can be empty).
 cbindgen --lang c --config cbindgen.toml --crate $LIB_NAME --output ./include/$LIB_NAME/$LIB_NAME.h
 
+cargo clean
+
 # CREATE .so (cdylib) or .a (staticlib) in target/release
 cargo build --release
 mkdir -p ./lib/

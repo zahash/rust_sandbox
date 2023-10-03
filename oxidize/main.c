@@ -1,12 +1,6 @@
 #include <stdio.h>
 #include <oxidize/oxidize.h>
 
-typedef struct Person
-{
-    char *name;
-    int age;
-} Person;
-
 double fahrenheit(double celsius)
 {
     return 32. + celsius * 9. / 5.;
