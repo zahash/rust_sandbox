@@ -52,8 +52,63 @@ typedef struct hlcolor {
   int b;
 } hlcolor;
 
+typedef struct editorConfig {
+  /**
+   * Cursor x position in characters
+   */
+  int cx;
+  /**
+   * Cursor y position in characters
+   */
+  int cy;
+  /**
+   * Offset of row displayed.
+   */
+  int rowoff;
+  /**
+   * Offset of column displayed.
+   */
+  int coloff;
+  /**
+   * Number of rows that we can show
+   */
+  int screenrows;
+  /**
+   * Number of cols that we can show
+   */
+  int screencols;
+  /**
+   * Number of rows
+   */
+  int numrows;
+  /**
+   * Is terminal raw mode enabled?
+   */
+  int rawmode;
+  /**
+   * Rows
+   */
+  struct erow *row;
+  /**
+   *  File modified but not saved.
+   */
+  int dirty;
+  /**
+   * Currently open filename
+   */
+  char *filename;
+  char statusmsg[80];
+  time_t statusmsg_time;
+  /**
+   * Current syntax highlight, or NULL.
+   */
+  struct editorSyntax *syntax;
+} editorConfig;
+
 void use_editorSyntax(const struct editorSyntax*);
 
 void use_erow(const struct erow*);
 
 void use_hlcolor(const struct hlcolor*);
+
+void use_editorConfig(const struct editorConfig*);

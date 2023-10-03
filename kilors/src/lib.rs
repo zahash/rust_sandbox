@@ -1,3 +1,4 @@
+use libc::time_t;
 use std::ffi::*;
 
 // #[no_mangle]
@@ -58,3 +59,50 @@ pub struct hlcolor {
 
 #[no_mangle]
 pub extern "C" fn use_hlcolor(_: &hlcolor) {}
+
+#[repr(C)]
+#[allow(non_camel_case_types)]
+pub struct editorConfig {
+    /// Cursor x position in characters
+    cx: c_int,
+
+    /// Cursor y position in characters
+    cy: c_int,
+
+    /// Offset of row displayed.
+    rowoff: c_int,
+
+    /// Offset of column displayed.
+    coloff: c_int,
+
+    /// Number of rows that we can show
+    screenrows: c_int,
+
+    /// Number of cols that we can show
+    screencols: c_int,
+
+    /// Number of rows
+    numrows: c_int,
+
+    /// Is terminal raw mode enabled?
+    rawmode: c_int,
+
+    /// Rows
+    row: *mut erow,
+
+    ///  File modified but not saved.
+    dirty: c_int,
+
+    /// Currently open filename
+    filename: *mut c_char,
+
+    statusmsg: [c_char; 80],
+
+    statusmsg_time: time_t,
+
+    /// Current syntax highlight, or NULL.
+    syntax: *mut editorSyntax,
+}
+
+#[no_mangle]
+pub extern "C" fn use_editorConfig(_: &editorConfig) {}

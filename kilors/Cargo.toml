@@ -10,3 +10,4 @@ crate-type = ["staticlib", "cdylib"]
 
 
 [dependencies]
+libc = { version = "0.2" }
