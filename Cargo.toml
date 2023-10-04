@@ -21,6 +21,7 @@ members = [
     "random_words",
     "run",
     "sat",
+    "sc",
     "spice",
     "static_assert",
     "sura",
