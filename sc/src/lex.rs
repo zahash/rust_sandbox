@@ -114,19 +114,14 @@ fn lex_decimal(text: &str, pos: usize) -> Option<(Token, usize)> {
     Some((Token::Decimal(token.parse().ok()?), pos))
 }
 
-fn lex_symbol<'text>(
-    text: &'text str,
-    pos: usize,
-    symbol: &'static str,
-) -> Option<(Token<'text>, usize)> {
-    Some((Token::Symbol(symbol), lex_with_prefix(text, pos, symbol)?))
-}
-
-fn lex_with_prefix<'text>(text: &'text str, pos: usize, prefix: &str) -> Option<usize> {
-    match &text[pos..].starts_with(prefix) {
-        true => Some(pos + prefix.len()),
-        false => None,
+fn lex_symbol(text: &str, pos: usize, symbol: &'static str) -> Option<(Token<'static>, usize)> {
+    if let Some(substr) = text.get(pos..) {
+        if substr.starts_with(symbol) {
+            return Some((Token::Symbol(symbol), pos + symbol.len()));
+        }
     }
+
+    None
 }
 
 fn lex_with_pattern<'text>(
