@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 regex = { version = "1" }
 lazy_static = { version = "1" }
+rustyline = { version = "12" }
 
 [dev-dependencies]
 pretty_assertions = { version = "1" }

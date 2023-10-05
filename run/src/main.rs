@@ -2,5 +2,5 @@
 // async fn main() {}
 
 fn main() {
-    padlock::run();
+    sc::run();
 }

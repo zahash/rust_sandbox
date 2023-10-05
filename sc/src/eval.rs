@@ -4,12 +4,11 @@ use crate::lex::*;
 use crate::parse::*;
 
 #[derive(Debug)]
-pub enum EvaluatorError<'text> {
+pub enum EvalError<'text> {
     LexError(LexError),
     ParseError(ParseError),
     VarNotFound(&'text str),
-    FnNotFound(&'text str),
-    InvalidFnArgs(&'text str),
+    InvalidFnCall(&'text str),
     CannotChangeConstant(&'text str),
 }
 
@@ -39,9 +38,9 @@ impl State {
         self.constants.get(var).or(self.variables.get(var)).cloned()
     }
 
-    fn set_var<'text>(&mut self, var: &'text str, val: f64) -> Result<(), EvaluatorError<'text>> {
+    fn set_var<'text>(&mut self, var: &'text str, val: f64) -> Result<(), EvalError<'text>> {
         match self.constants.contains_key(var) {
-            true => Err(EvaluatorError::CannotChangeConstant(var)),
+            true => Err(EvalError::CannotChangeConstant(var)),
             false => {
                 self.variables.insert(var.to_string(), val);
                 Ok(())
@@ -51,17 +50,17 @@ impl State {
 }
 
 pub trait Eval<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>>;
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>>;
 }
 
-pub fn eval<'text>(text: &'text str, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+pub fn eval<'text>(text: &'text str, state: &mut State) -> Result<f64, EvalError<'text>> {
     let tokens = lex(text)?;
     let expr = parse(&tokens)?;
     expr.eval(state)
 }
 
 impl<'text> Eval<'text> for AssignmentExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             AssignmentExpr::Assign(lhs, rhs) => {
                 let rhs = rhs.eval(state)?;
@@ -69,42 +68,32 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                 Ok(rhs)
             }
             AssignmentExpr::MulAssign(lhs, rhs) => {
-                let rhs = state
-                    .value_of(lhs)
-                    .ok_or(EvaluatorError::VarNotFound(lhs))?
-                    * rhs.eval(state)?;
+                let rhs =
+                    state.value_of(lhs).ok_or(EvalError::VarNotFound(lhs))? * rhs.eval(state)?;
                 state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::DivAssign(lhs, rhs) => {
-                let rhs = state
-                    .value_of(lhs)
-                    .ok_or(EvaluatorError::VarNotFound(lhs))?
-                    / rhs.eval(state)?;
+                let rhs =
+                    state.value_of(lhs).ok_or(EvalError::VarNotFound(lhs))? / rhs.eval(state)?;
                 state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::ModAssign(lhs, rhs) => {
-                let rhs = state
-                    .value_of(lhs)
-                    .ok_or(EvaluatorError::VarNotFound(lhs))?
-                    % rhs.eval(state)?;
+                let rhs =
+                    state.value_of(lhs).ok_or(EvalError::VarNotFound(lhs))? % rhs.eval(state)?;
                 state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::AddAssign(lhs, rhs) => {
-                let rhs = state
-                    .value_of(lhs)
-                    .ok_or(EvaluatorError::VarNotFound(lhs))?
-                    + rhs.eval(state)?;
+                let rhs =
+                    state.value_of(lhs).ok_or(EvalError::VarNotFound(lhs))? + rhs.eval(state)?;
                 state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::SubAssign(lhs, rhs) => {
-                let rhs = state
-                    .value_of(lhs)
-                    .ok_or(EvaluatorError::VarNotFound(lhs))?
-                    - rhs.eval(state)?;
+                let rhs =
+                    state.value_of(lhs).ok_or(EvalError::VarNotFound(lhs))? - rhs.eval(state)?;
                 state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
@@ -114,7 +103,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
 }
 
 impl<'text> Eval<'text> for AdditiveExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             AdditiveExpr::Add(lhs, rhs) => Ok(lhs.eval(state)? + rhs.eval(state)?),
             AdditiveExpr::Sub(lhs, rhs) => Ok(lhs.eval(state)? - rhs.eval(state)?),
@@ -124,7 +113,7 @@ impl<'text> Eval<'text> for AdditiveExpr<'text> {
 }
 
 impl<'text> Eval<'text> for MultiplicativeExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             MultiplicativeExpr::Mul(lhs, rhs) => Ok(lhs.eval(state)? * rhs.eval(state)?),
             MultiplicativeExpr::Div(lhs, rhs) => Ok(lhs.eval(state)? / rhs.eval(state)?),
@@ -135,7 +124,7 @@ impl<'text> Eval<'text> for MultiplicativeExpr<'text> {
 }
 
 impl<'text> Eval<'text> for ExponentialExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             ExponentialExpr::Pow(base, exp) => Ok(base.eval(state)?.powf(exp.eval(state)?)),
             ExponentialExpr::UnaryExpr(expr) => expr.eval(state),
@@ -144,7 +133,7 @@ impl<'text> Eval<'text> for ExponentialExpr<'text> {
 }
 
 impl<'text> Eval<'text> for UnaryExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             UnaryExpr::PostfixExpr(expr) => expr.eval(state),
             UnaryExpr::UnaryAdd(expr) => expr.eval(state),
@@ -154,41 +143,46 @@ impl<'text> Eval<'text> for UnaryExpr<'text> {
 }
 
 impl<'text> Eval<'text> for PostfixExpr<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             PostfixExpr::Primary(expr) => expr.eval(state),
-            PostfixExpr::FunctionCall(name, args) => match *name {
-                "ln" => match args.as_slice() {
-                    [x] => Ok(x.eval(state)?.ln()),
-                    _ => Err(EvaluatorError::InvalidFnArgs(name)),
-                },
-                _ => Err(EvaluatorError::FnNotFound(name)),
+            PostfixExpr::FunctionCall(name, args) => match (*name, args.as_slice()) {
+                ("ln", [x]) => Ok(x.eval(state)?.ln()),
+                ("log2", [x]) => Ok(x.eval(state)?.log2()),
+                ("log10", [x]) => Ok(x.eval(state)?.log10()),
+                ("log", [x, b]) => Ok(x.eval(state)?.log(b.eval(state)?)),
+                ("sin", [rad]) => Ok(rad.eval(state)?.sin()),
+                ("asin" | "arcsin", [rad]) => Ok(rad.eval(state)?.asin()),
+                ("sinh", [rad]) => Ok(rad.eval(state)?.sinh()),
+                ("cos", [rad]) => Ok(rad.eval(state)?.cos()),
+                ("acos" | "arccos", [rad]) => Ok(rad.eval(state)?.acos()),
+                ("cosh", [rad]) => Ok(rad.eval(state)?.cosh()),
+                ("tan", [rad]) => Ok(rad.eval(state)?.tan()),
+                _ => Err(EvalError::InvalidFnCall(name)),
             },
         }
     }
 }
 
 impl<'text> Eval<'text> for Primary<'text> {
-    fn eval(&self, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
+    fn eval(&self, state: &mut State) -> Result<f64, EvalError<'text>> {
         match self {
             Primary::Parens(expr) => expr.eval(state),
-            Primary::Ident(ident) => state
-                .value_of(ident)
-                .ok_or(EvaluatorError::VarNotFound(ident)),
+            Primary::Ident(ident) => state.value_of(ident).ok_or(EvalError::VarNotFound(ident)),
             Primary::Float(n) => Ok(*n),
         }
     }
 }
 
-impl<'text> From<LexError> for EvaluatorError<'text> {
+impl<'text> From<LexError> for EvalError<'text> {
     fn from(value: LexError) -> Self {
-        EvaluatorError::LexError(value)
+        EvalError::LexError(value)
     }
 }
 
-impl<'text> From<ParseError> for EvaluatorError<'text> {
+impl<'text> From<ParseError> for EvalError<'text> {
     fn from(value: ParseError) -> Self {
-        EvaluatorError::ParseError(value)
+        EvalError::ParseError(value)
     }
 }
 
@@ -201,7 +195,7 @@ mod tests {
     fn test_eval() {
         let mut state = State::new();
 
-        let result = eval("a = ln(10)", &mut state).unwrap();
+        let result = eval("a = 2^(1/2)", &mut state).unwrap();
         println!("{}", result);
         println!("{:?}", state);
     }
