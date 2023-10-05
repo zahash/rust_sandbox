@@ -5,14 +5,12 @@ use regex::Regex;
 pub enum Token<'text> {
     Symbol(&'static str),
     Ident(&'text str),
-    Whole(usize),
     Decimal(f64),
 }
 
 lazy_static! {
     static ref IDENT_REGEX: Regex = Regex::new(r#"^[A-Za-z_][A-Za-z0-9_]*"#).unwrap();
-    static ref WHOLE_REGEX: Regex = Regex::new(r"^[0-9]+").unwrap();
-    static ref FLOAT_REGEX: Regex = Regex::new(r"^([0-9]+\.[0-9]+|[0-9]+\.|\.[0-9]+)").unwrap();
+    static ref FLOAT_REGEX: Regex = Regex::new(r"^(\d+\.\d+|\d+\.|\.\d+|\d+)").unwrap();
 }
 
 #[derive(Debug)]
@@ -49,7 +47,6 @@ pub fn lex(text: &str) -> Result<Vec<Token>, LexError> {
 fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
     lex_ident(text, pos)
         .or(lex_decimal(text, pos))
-        .or(lex_whole(text, pos))
         .or(lex_symbol(text, pos, "{"))
         .or(lex_symbol(text, pos, "}"))
         .or(lex_symbol(text, pos, "["))
@@ -102,11 +99,6 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
 fn lex_ident(text: &str, pos: usize) -> Option<(Token, usize)> {
     let (token, pos) = lex_with_pattern(text, pos, &IDENT_REGEX)?;
     Some((Token::Ident(token), pos))
-}
-
-fn lex_whole(text: &str, pos: usize) -> Option<(Token, usize)> {
-    let (token, pos) = lex_with_pattern(text, pos, &WHOLE_REGEX)?;
-    Some((Token::Whole(token.parse().ok()?), pos))
 }
 
 fn lex_decimal(text: &str, pos: usize) -> Option<(Token, usize)> {
@@ -162,7 +154,7 @@ mod tests {
             Ok(tokens) => assert_eq!(
                 vec![
                     Ident("idEnt_123"),
-                    Whole(123),
+                    Decimal(123.0),
                     Decimal(123.0),
                     Decimal(0.123),
                     Decimal(123.123),
