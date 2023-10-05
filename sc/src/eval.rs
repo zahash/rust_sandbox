@@ -9,34 +9,41 @@ pub enum EvaluatorError<'text> {
     ParseError(ParseError),
     VarNotFound(&'text str),
     FunctionNotFound(&'text str),
+    CannotChangeConstant(&'text str),
 }
 
 #[derive(Debug)]
 pub struct State {
+    constants: HashMap<&'static str, f64>,
     variables: HashMap<String, f64>,
 }
 
 impl State {
     pub fn new() -> Self {
         Self {
-            variables: {
+            constants: {
                 use std::f64::consts::*;
 
                 let mut map = HashMap::new();
-                map.insert("PI".to_string(), PI);
-                map.insert("TAU".to_string(), TAU);
-                map.insert("E".to_string(), E);
+                map.insert("PI", PI);
+                map.insert("TAU", TAU);
+                map.insert("E", E);
                 map
             },
+            variables: HashMap::new(),
         }
     }
 
     fn value_of(&self, var: &str) -> Option<f64> {
-        self.variables.get(var).cloned()
+        self.constants.get(var).or(self.variables.get(var)).cloned()
     }
 
-    fn set_var(&mut self, var: &str, val: f64) {
+    fn set_var<'text>(&mut self, var: &'text str, val: f64) -> Result<(), EvaluatorError<'text>> {
+        if self.constants.contains_key(var) {
+            return Err(EvaluatorError::CannotChangeConstant(var));
+        }
         self.variables.insert(var.to_string(), val);
+        Ok(())
     }
 }
 
@@ -58,7 +65,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
         match self {
             AssignmentExpr::Assign(lhs, rhs) => {
                 let rhs = rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::MulAssign(lhs, rhs) => {
@@ -66,7 +73,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                     .value_of(lhs)
                     .ok_or(EvaluatorError::VarNotFound(lhs))?
                     * rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::DivAssign(lhs, rhs) => {
@@ -74,7 +81,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                     .value_of(lhs)
                     .ok_or(EvaluatorError::VarNotFound(lhs))?
                     / rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::ModAssign(lhs, rhs) => {
@@ -82,7 +89,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                     .value_of(lhs)
                     .ok_or(EvaluatorError::VarNotFound(lhs))?
                     % rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::AddAssign(lhs, rhs) => {
@@ -90,7 +97,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                     .value_of(lhs)
                     .ok_or(EvaluatorError::VarNotFound(lhs))?
                     + rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::SubAssign(lhs, rhs) => {
@@ -98,7 +105,7 @@ impl<'text> Eval<'text> for AssignmentExpr<'text> {
                     .value_of(lhs)
                     .ok_or(EvaluatorError::VarNotFound(lhs))?
                     - rhs.eval(state)?;
-                state.set_var(lhs, rhs);
+                state.set_var(lhs, rhs)?;
                 Ok(rhs)
             }
             AssignmentExpr::AdditiveExpr(a) => a.eval(state),
