@@ -8,13 +8,15 @@ pub enum ParseError {
     ExpectedIdent(usize),
     Expected(Token<'static>, usize),
     ExpectedOneOf(Vec<Token<'static>>, usize),
+    IncompleteParse(usize),
 }
 
-pub fn parse<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-) -> Result<(Expr<'text>, usize), ParseError> {
-    parse_expr(tokens, pos)
+pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<Expr<'text>, ParseError> {
+    let (expr, pos) = parse_expr(&tokens, 0)?;
+    match pos < tokens.len() {
+        true => Err(ParseError::IncompleteParse(pos).into()),
+        false => Ok(expr),
+    }
 }
 
 pub type Expr<'text> = AssignmentExpr<'text>;

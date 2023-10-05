@@ -8,7 +8,8 @@ pub enum EvaluatorError<'text> {
     LexError(LexError),
     ParseError(ParseError),
     VarNotFound(&'text str),
-    FunctionNotFound(&'text str),
+    FnNotFound(&'text str),
+    InvalidFnArgs(&'text str),
     CannotChangeConstant(&'text str),
 }
 
@@ -39,11 +40,13 @@ impl State {
     }
 
     fn set_var<'text>(&mut self, var: &'text str, val: f64) -> Result<(), EvaluatorError<'text>> {
-        if self.constants.contains_key(var) {
-            return Err(EvaluatorError::CannotChangeConstant(var));
+        match self.constants.contains_key(var) {
+            true => Err(EvaluatorError::CannotChangeConstant(var)),
+            false => {
+                self.variables.insert(var.to_string(), val);
+                Ok(())
+            }
         }
-        self.variables.insert(var.to_string(), val);
-        Ok(())
     }
 }
 
@@ -53,10 +56,7 @@ pub trait Eval<'text> {
 
 pub fn eval<'text>(text: &'text str, state: &mut State) -> Result<f64, EvaluatorError<'text>> {
     let tokens = lex(text)?;
-    let (expr, pos) = parse(&tokens, 0)?;
-    if pos < tokens.len() {
-        return Err(ParseError::SyntaxError(pos, "cannot parse expr fully").into());
-    }
+    let expr = parse(&tokens)?;
     expr.eval(state)
 }
 
@@ -158,8 +158,11 @@ impl<'text> Eval<'text> for PostfixExpr<'text> {
         match self {
             PostfixExpr::Primary(expr) => expr.eval(state),
             PostfixExpr::FunctionCall(name, args) => match *name {
-                // "ln" => todo!(),
-                _ => Err(EvaluatorError::FunctionNotFound(name)),
+                "ln" => match args.as_slice() {
+                    [x] => Ok(x.eval(state)?.ln()),
+                    _ => Err(EvaluatorError::InvalidFnArgs(name)),
+                },
+                _ => Err(EvaluatorError::FnNotFound(name)),
             },
         }
     }
@@ -198,7 +201,7 @@ mod tests {
     fn test_eval() {
         let mut state = State::new();
 
-        let result = eval("a = 3 - 4/7", &mut state).unwrap();
+        let result = eval("a = ln(10)", &mut state).unwrap();
         println!("{}", result);
         println!("{:?}", state);
     }
