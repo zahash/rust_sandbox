@@ -8,7 +8,7 @@ pub enum EvalError<'text> {
     LexError(LexError),
     ParseError(ParseError),
     VarNotFound(&'text str),
-    InvalidFnCall(&'text str),
+    InvalidFnCall(String),
     CannotChangeConstant(&'text str),
 }
 
@@ -158,7 +158,7 @@ impl<'text> Eval<'text> for PostfixExpr<'text> {
                 ("acos" | "arccos", [rad]) => Ok(rad.eval(state)?.acos()),
                 ("cosh", [rad]) => Ok(rad.eval(state)?.cosh()),
                 ("tan", [rad]) => Ok(rad.eval(state)?.tan()),
-                _ => Err(EvalError::InvalidFnCall(name)),
+                _ => Err(EvalError::InvalidFnCall(format!("{}", self))),
             },
         }
     }
