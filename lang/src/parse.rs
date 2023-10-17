@@ -3,6 +3,8 @@ use std::{
     ops::Deref,
 };
 
+use chainchomp::ctx_sensitive::{combine_parsers, maybe};
+
 use crate::Token;
 
 pub struct ParseContext<'text> {
@@ -84,7 +86,7 @@ fn parse_external_declaration<'text>(
             Box::new(parse_function_definition),
             Box::new(parse_declaration),
         ],
-        "cannot parse external declaration",
+        ParseError::SyntaxError(pos, "cannot parse external declaration"),
     )
 }
 
@@ -338,7 +340,7 @@ fn parse_direct_declarator<'text>(
         pos,
         ctx,
         &[Box::new(parse_ident), Box::new(parse_parens)],
-        "cannot parse direct declarator",
+        ParseError::SyntaxError(pos, "cannot parse direct declarator"),
     )
 }
 
@@ -430,7 +432,7 @@ fn parse_direct_declarator_tail<'text>(
             Box::new(parse_function),
             Box::new(parse_parameters),
         ],
-        "cannot parse direct declarator tail",
+        ParseError::SyntaxError(pos, "cannot parse direct declarator tail"),
     )
 }
 
@@ -661,7 +663,7 @@ fn parse_direct_abstract_declarator<'text>(
             Box::new(parse_array),
             Box::new(parse_function),
         ],
-        "cannot parse direct abstract declarator",
+        ParseError::SyntaxError(pos, "cannot parse direct abstract declarator"),
     )
 }
 
@@ -721,7 +723,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
         pos,
         ctx,
         &[Box::new(parse_array), Box::new(parse_function)],
-        "cannot parse direct abstract declarator tail",
+        ParseError::SyntaxError(pos, "cannot parse direct abstract declarator tail"),
     )
 }
 
@@ -976,7 +978,7 @@ fn parse_declaration_specifier<'text>(
             Box::new(parse_type_specifier),
             Box::new(parse_type_qualifier),
         ],
-        "cannot parse declaration specifier",
+        ParseError::SyntaxError(pos, "cannot parse declaration specifier"),
     )
 }
 
@@ -1032,7 +1034,7 @@ fn parse_specifier_qualifier<'text>(
             Box::new(parse_type_specifier),
             Box::new(parse_type_qualifier),
         ],
-        "cannot parse specifier qualifier",
+        ParseError::SyntaxError(pos, "cannot parse specifier qualifier"),
     )
 }
 
@@ -1112,7 +1114,7 @@ fn parse_type_specifier<'text>(
             Box::new(parse_enum_specifier),
             Box::new(parse_typedef_name),
         ],
-        "cannot parse type specifier",
+        ParseError::SyntaxError(pos, "cannot parse type specifier"),
     )
 }
 
@@ -1315,7 +1317,7 @@ fn parse_stmt<'text>(
             Box::new(parse_iteration_stmt),
             Box::new(parse_jump_stmt),
         ],
-        "cannot parse statement",
+        ParseError::SyntaxError(pos, "cannot parse statement"),
     )
 }
 
@@ -1340,7 +1342,7 @@ fn parse_labeled_stmt<'text>(
             Box::new(parse_labeled_case_stmt),
             Box::new(parse_labeled_default_stmt),
         ],
-        "cannot parse labeled statement",
+        ParseError::SyntaxError(pos, "cannot parse labeled statement"),
     )
 }
 
@@ -1499,7 +1501,7 @@ fn parse_selection_stmt<'text>(
             Box::new(parse_selection_if_else_stmt),
             Box::new(parse_selection_switch_stmt),
         ],
-        "cannot parse selection statement",
+        ParseError::SyntaxError(pos, "cannot parse selection statement"),
     )
 }
 
@@ -1592,7 +1594,7 @@ fn parse_iteration_stmt<'text>(
             Box::new(parse_iteration_do_while_stmt),
             Box::new(parse_iteration_for_stmt),
         ],
-        "cannot parse iteration statement",
+        ParseError::SyntaxError(pos, "cannot parse iteration statement"),
     )
 }
 
@@ -1740,7 +1742,7 @@ fn parse_jump_stmt<'text>(
             Box::new(parse_jump_break_stmt),
             Box::new(parse_jump_return_stmt),
         ],
-        "cannot parse jump statement",
+        ParseError::SyntaxError(pos, "cannot parse jump statement"),
     )
 }
 
@@ -1842,70 +1844,6 @@ fn many<'text, Ast>(
     }
 
     (list, pos)
-}
-
-fn maybe<'text, Ast>(
-    tokens: &[Token<'text>],
-    pos: usize,
-    ctx: &mut ParseContext<'text>,
-    parser: impl Fn(
-        &[Token<'text>],
-        usize,
-        &mut ParseContext<'text>,
-    ) -> Result<(Ast, usize), ParseError>,
-) -> (Option<Ast>, usize) {
-    match parser(tokens, pos, ctx) {
-        Ok((ast, pos)) => (Some(ast), pos),
-        Err(_) => (None, pos),
-    }
-}
-
-trait Parser<'text, Ast> {
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-        ctx: &mut ParseContext<'text>,
-    ) -> Result<(Ast, usize), ParseError>;
-}
-
-fn combine_parsers<'text, Ast>(
-    tokens: &[Token<'text>],
-    pos: usize,
-    ctx: &mut ParseContext<'text>,
-    parsers: &[Box<dyn Parser<'text, Ast>>],
-    msg: &'static str,
-) -> Result<(Ast, usize), ParseError> {
-    for parser in parsers {
-        match parser.parse(tokens, pos, ctx) {
-            Ok((ast, pos)) => return Ok((ast, pos)),
-            Err(_) => continue,
-        };
-    }
-
-    Err(ParseError::SyntaxError(pos, msg))
-}
-
-impl<'text, ParsedValue, F, Ast> Parser<'text, Ast> for F
-where
-    ParsedValue: Into<Ast>,
-    F: Fn(
-        &[Token<'text>],
-        usize,
-        &mut ParseContext<'text>,
-    ) -> Result<(ParsedValue, usize), ParseError>,
-{
-    fn parse(
-        &self,
-        tokens: &[Token<'text>],
-        pos: usize,
-        ctx: &mut ParseContext<'text>,
-    ) -> Result<(Ast, usize), ParseError> {
-        match self(tokens, pos, ctx) {
-            Ok((val, pos)) => Ok((val.into(), pos)),
-            Err(e) => Err(e),
-        }
-    }
 }
 
 pub type Expr<'text> = AssignmentExpr<'text>;
