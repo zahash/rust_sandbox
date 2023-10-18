@@ -3,7 +3,7 @@ use std::{
     ops::Deref,
 };
 
-use chainchomp::ctx_sensitive::{combine_parsers, maybe};
+use chainchomp::ctx_sensitive::{combine_parsers, many, many_delimited, maybe};
 
 use crate::Token;
 
@@ -63,7 +63,7 @@ fn parse_translation_unit<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(TranslationUnit<'text>, usize), ParseError> {
-    let (eds, pos) = many(tokens, pos, ctx, parse_external_declaration, None);
+    let (eds, pos) = many(tokens, pos, ctx, parse_external_declaration);
     Ok((TranslationUnit(eds), pos))
 }
 
@@ -103,9 +103,9 @@ fn parse_function_definition<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
-    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier);
     let (declarator, pos) = parse_declarator(tokens, pos, ctx)?;
-    let (declarations, pos) = many(tokens, pos, ctx, parse_declaration, None);
+    let (declarations, pos) = many(tokens, pos, ctx, parse_declaration);
     let (body, pos) = parse_compound_stmt(tokens, pos, ctx)?;
 
     Ok((
@@ -142,7 +142,7 @@ fn parse_struct_or_union_specifier<'text>(
             return Err(ParseError::Expected(Token::Symbol("{"), pos));
         };
 
-        let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_declaration, None);
+        let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_declaration);
 
         let Some(Token::Symbol("}")) = tokens.get(pos) else {
             return Err(ParseError::Expected(Token::Symbol("}"), pos));
@@ -197,13 +197,13 @@ fn parse_struct_declaration<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(StructDeclaration<'text>, usize), ParseError> {
-    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier, None);
-    let (ds, pos) = many(
+    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier);
+    let (ds, pos) = many_delimited(
         tokens,
         pos,
         ctx,
         parse_struct_declarator,
-        Some(Token::Symbol(",")),
+        &Token::Symbol(","),
     );
 
     let Some(Token::Symbol(";")) = tokens.get(pos) else {
@@ -409,7 +409,7 @@ fn parse_direct_declarator_tail<'text>(
             }
         }
 
-        let (idents, pos) = many(tokens, pos + 1, ctx, parse_ident, Some(Token::Symbol(",")));
+        let (idents, pos) = many_delimited(tokens, pos + 1, ctx, parse_ident, &Token::Symbol(","));
 
         let Some(Token::Symbol(")")) = tokens.get(pos) else {
             return Err(ParseError::Expected(Token::Symbol(")"), pos));
@@ -447,7 +447,7 @@ fn parse_type_name<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(TypeName<'text>, usize), ParseError> {
-    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier, None);
+    let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier);
     if sqs.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
@@ -477,12 +477,12 @@ fn parse_parameter_type_list<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(ParameterTypeList<'text>, usize), ParseError> {
-    let (declarations, pos) = many(
+    let (declarations, pos) = many_delimited(
         tokens,
         pos,
         ctx,
         parse_parameter_declaration,
-        Some(Token::Symbol(",")),
+        &Token::Symbol(","),
     );
 
     if let Some(Token::Symbol("...")) = tokens.get(pos) {
@@ -507,7 +507,7 @@ fn parse_parameter_declaration<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(ParameterDeclaration<'text>, usize), ParseError> {
-    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier);
     if dss.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
@@ -738,7 +738,7 @@ fn parse_declaration<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(Declaration<'text>, usize), ParseError> {
-    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier, None);
+    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier);
     if dss.is_empty() {
         return Err(ParseError::SyntaxError(
             pos,
@@ -746,13 +746,8 @@ fn parse_declaration<'text>(
         ));
     }
 
-    let (init_declarators, pos) = many(
-        tokens,
-        pos,
-        ctx,
-        parse_init_declarator,
-        Some(Token::Symbol(",")),
-    );
+    let (init_declarators, pos) =
+        many_delimited(tokens, pos, ctx, parse_init_declarator, &Token::Symbol(","));
 
     let Some(Token::Symbol(";")) = tokens.get(pos) else {
         return Err(ParseError::Expected(Token::Symbol(";"), pos));
@@ -1234,13 +1229,8 @@ fn parse_enum_specifier<'text>(
             return Err(ParseError::Expected(Token::Symbol("{"), pos));
         };
 
-        let (enum_constants, pos) = many(
-            tokens,
-            pos + 1,
-            ctx,
-            parse_enumerator,
-            Some(Token::Symbol(",")),
-        );
+        let (enum_constants, pos) =
+            many_delimited(tokens, pos + 1, ctx, parse_enumerator, &Token::Symbol(","));
 
         for Enumerator::Implicit(c) | Enumerator::Explicit(c, _) in &enum_constants {
             ctx.set_enum_constant(c);
@@ -1437,7 +1427,7 @@ fn parse_compound_stmt<'text>(
         return Err(ParseError::Expected(Token::Symbol("{"), pos));
     };
 
-    let (items, pos) = many(tokens, pos + 1, ctx, parse_block_item, None);
+    let (items, pos) = many(tokens, pos + 1, ctx, parse_block_item);
 
     let Some(Token::Symbol("}")) = tokens.get(pos) else {
         return Err(ParseError::Expected(Token::Symbol("}"), pos));
@@ -1814,36 +1804,6 @@ fn parse_jump_return_stmt<'text>(
     };
 
     return Ok((JumpStmt::Return(expr), pos + 1));
-}
-
-fn many<'text, Ast>(
-    tokens: &[Token<'text>],
-    mut pos: usize,
-    ctx: &mut ParseContext<'text>,
-    parser: impl Fn(
-        &[Token<'text>],
-        usize,
-        &mut ParseContext<'text>,
-    ) -> Result<(Ast, usize), ParseError>,
-    delimiter: Option<Token>,
-) -> (Vec<Ast>, usize) {
-    let mut list = vec![];
-
-    while let Ok((ast, next_pos)) = parser(tokens, pos, ctx) {
-        list.push(ast);
-        pos = next_pos;
-
-        if let Some(delimiter) = &delimiter {
-            match tokens.get(pos) {
-                Some(token) if token == delimiter => {
-                    pos += 1;
-                }
-                _ => break,
-            };
-        }
-    }
-
-    (list, pos)
 }
 
 pub type Expr<'text> = AssignmentExpr<'text>;
@@ -2427,12 +2387,12 @@ fn parse_postfix_expr<'text>(
             }
         }
         Some(Token::Symbol("(")) => {
-            let (args, pos) = many(
+            let (args, pos) = many_delimited(
                 tokens,
                 pos + 1,
                 ctx,
                 parse_assignment_expr,
-                Some(Token::Symbol(",")),
+                &Token::Symbol(","),
             );
             match tokens.get(pos) {
                 Some(Token::Symbol(")")) => Ok((
