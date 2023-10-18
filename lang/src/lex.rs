@@ -64,52 +64,52 @@ fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
         .or(lex_char(text, pos))
         .or(lex_decimal(text, pos))
         .or(lex_whole(text, pos))
-        .or(lex_lcurly(text, pos))
-        .or(lex_rcurly(text, pos))
-        .or(lex_lsquare(text, pos))
-        .or(lex_rsquare(text, pos))
-        .or(lex_lparen(text, pos))
-        .or(lex_rparen(text, pos))
-        .or(lex_dot_dot_dot(text, pos))
-        .or(lex_dot(text, pos))
-        .or(lex_comma(text, pos))
-        .or(lex_colon(text, pos))
-        .or(lex_semicolon(text, pos))
-        .or(lex_arrow(text, pos))
-        .or(lex_plus_plus(text, pos))
-        .or(lex_plus_equals(text, pos))
-        .or(lex_plus(text, pos))
-        .or(lex_hyphen_hyphen(text, pos))
-        .or(lex_hyphen_equals(text, pos))
-        .or(lex_hyphen(text, pos))
-        .or(lex_asterisk_equals(text, pos))
-        .or(lex_asterisk(text, pos))
-        .or(lex_slash_equals(text, pos))
-        .or(lex_slash(text, pos))
-        .or(lex_percent_equals(text, pos))
-        .or(lex_percent(text, pos))
-        .or(lex_caret_equals(text, pos))
-        .or(lex_caret(text, pos))
-        .or(lex_eq(text, pos))
-        .or(lex_ne(text, pos))
-        .or(lex_equals(text, pos))
-        .or(lex_ampersand_ampersand(text, pos))
-        .or(lex_ampersand_equals(text, pos))
-        .or(lex_ampersand(text, pos))
-        .or(lex_pipe_pipe(text, pos))
-        .or(lex_pipe_equals(text, pos))
-        .or(lex_pipe(text, pos))
-        .or(lex_exclamation(text, pos))
-        .or(lex_question(text, pos))
-        .or(lex_tilde(text, pos))
-        .or(lex_ltlt_equals(text, pos))
-        .or(lex_ltlt(text, pos))
-        .or(lex_gtgt_equals(text, pos))
-        .or(lex_gtgt(text, pos))
-        .or(lex_le(text, pos))
-        .or(lex_ge(text, pos))
-        .or(lex_lt(text, pos))
-        .or(lex_gt(text, pos))
+        .or(lex_symbol(text, pos, "{"))
+        .or(lex_symbol(text, pos, "}"))
+        .or(lex_symbol(text, pos, "["))
+        .or(lex_symbol(text, pos, "]"))
+        .or(lex_symbol(text, pos, "("))
+        .or(lex_symbol(text, pos, ")"))
+        .or(lex_symbol(text, pos, "..."))
+        .or(lex_symbol(text, pos, "."))
+        .or(lex_symbol(text, pos, ","))
+        .or(lex_symbol(text, pos, ":"))
+        .or(lex_symbol(text, pos, ";"))
+        .or(lex_symbol(text, pos, "->"))
+        .or(lex_symbol(text, pos, "++"))
+        .or(lex_symbol(text, pos, "+="))
+        .or(lex_symbol(text, pos, "+"))
+        .or(lex_symbol(text, pos, "--"))
+        .or(lex_symbol(text, pos, "-="))
+        .or(lex_symbol(text, pos, "-"))
+        .or(lex_symbol(text, pos, "*="))
+        .or(lex_symbol(text, pos, "*"))
+        .or(lex_symbol(text, pos, "/="))
+        .or(lex_symbol(text, pos, "/"))
+        .or(lex_symbol(text, pos, "%="))
+        .or(lex_symbol(text, pos, "%"))
+        .or(lex_symbol(text, pos, "^="))
+        .or(lex_symbol(text, pos, "^"))
+        .or(lex_symbol(text, pos, "=="))
+        .or(lex_symbol(text, pos, "!="))
+        .or(lex_symbol(text, pos, "="))
+        .or(lex_symbol(text, pos, "&&"))
+        .or(lex_symbol(text, pos, "&="))
+        .or(lex_symbol(text, pos, "&"))
+        .or(lex_symbol(text, pos, "||"))
+        .or(lex_symbol(text, pos, "|="))
+        .or(lex_symbol(text, pos, "|"))
+        .or(lex_symbol(text, pos, "!"))
+        .or(lex_symbol(text, pos, "?"))
+        .or(lex_symbol(text, pos, "~"))
+        .or(lex_symbol(text, pos, "<<="))
+        .or(lex_symbol(text, pos, "<<"))
+        .or(lex_symbol(text, pos, ">>="))
+        .or(lex_symbol(text, pos, ">>"))
+        .or(lex_symbol(text, pos, "<="))
+        .or(lex_symbol(text, pos, ">="))
+        .or(lex_symbol(text, pos, "<"))
+        .or(lex_symbol(text, pos, ">"))
         .ok_or(LexError::InvalidToken { pos })
 }
 
@@ -155,198 +155,13 @@ fn lex_bool(text: &str, pos: usize) -> Option<(Token, usize)> {
 }
 
 fn lex_null(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Null, lex_with_prefix(text, pos, "NULL")?))
-}
-
-fn lex_lcurly(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("{"), lex_with_prefix(text, pos, "{")?))
-}
-
-fn lex_rcurly(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("}"), lex_with_prefix(text, pos, "}")?))
-}
-
-fn lex_lsquare(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("["), lex_with_prefix(text, pos, "[")?))
-}
-
-fn lex_rsquare(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("]"), lex_with_prefix(text, pos, "]")?))
-}
-
-fn lex_lparen(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("("), lex_with_prefix(text, pos, "(")?))
-}
-
-fn lex_rparen(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(")"), lex_with_prefix(text, pos, ")")?))
-}
-
-fn lex_dot_dot_dot(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("..."), lex_with_prefix(text, pos, "...")?))
-}
-
-fn lex_dot(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("."), lex_with_prefix(text, pos, ".")?))
-}
-
-fn lex_comma(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(","), lex_with_prefix(text, pos, ",")?))
-}
-
-fn lex_colon(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(":"), lex_with_prefix(text, pos, ":")?))
-}
-
-fn lex_semicolon(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(";"), lex_with_prefix(text, pos, ";")?))
-}
-
-fn lex_arrow(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("->"), lex_with_prefix(text, pos, "->")?))
-}
-
-fn lex_plus(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("+"), lex_with_prefix(text, pos, "+")?))
-}
-
-fn lex_plus_plus(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("++"), lex_with_prefix(text, pos, "++")?))
-}
-
-fn lex_hyphen(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("-"), lex_with_prefix(text, pos, "-")?))
-}
-
-fn lex_hyphen_hyphen(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("--"), lex_with_prefix(text, pos, "--")?))
-}
-
-fn lex_asterisk(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("*"), lex_with_prefix(text, pos, "*")?))
-}
-
-fn lex_slash(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("/"), lex_with_prefix(text, pos, "/")?))
-}
-
-fn lex_percent(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("%"), lex_with_prefix(text, pos, "%")?))
-}
-
-fn lex_caret(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("^"), lex_with_prefix(text, pos, "^")?))
-}
-
-fn lex_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("="), lex_with_prefix(text, pos, "=")?))
-}
-
-fn lex_asterisk_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("*="), lex_with_prefix(text, pos, "*=")?))
-}
-
-fn lex_slash_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("/="), lex_with_prefix(text, pos, "/=")?))
-}
-
-fn lex_percent_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("%="), lex_with_prefix(text, pos, "%=")?))
-}
-
-fn lex_plus_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("+="), lex_with_prefix(text, pos, "+=")?))
-}
-
-fn lex_hyphen_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("-="), lex_with_prefix(text, pos, "-=")?))
-}
-
-fn lex_ltlt_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("<<="), lex_with_prefix(text, pos, "<<=")?))
-}
-
-fn lex_gtgt_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(">>="), lex_with_prefix(text, pos, ">>=")?))
-}
-
-fn lex_ampersand_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("&="), lex_with_prefix(text, pos, "&=")?))
-}
-
-fn lex_caret_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("^="), lex_with_prefix(text, pos, "^=")?))
-}
-
-fn lex_pipe_equals(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("|="), lex_with_prefix(text, pos, "|=")?))
-}
-
-fn lex_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("&"), lex_with_prefix(text, pos, "&")?))
-}
-
-fn lex_ampersand_ampersand(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("&&"), lex_with_prefix(text, pos, "&&")?))
-}
-
-fn lex_pipe(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("|"), lex_with_prefix(text, pos, "|")?))
-}
-
-fn lex_pipe_pipe(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("||"), lex_with_prefix(text, pos, "||")?))
-}
-
-fn lex_exclamation(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("!"), lex_with_prefix(text, pos, "!")?))
-}
-
-fn lex_question(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("?"), lex_with_prefix(text, pos, "?")?))
-}
-
-fn lex_tilde(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("~"), lex_with_prefix(text, pos, "~")?))
-}
-
-fn lex_lt(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("<"), lex_with_prefix(text, pos, "<")?))
-}
-
-fn lex_gt(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(">"), lex_with_prefix(text, pos, ">")?))
-}
-
-fn lex_le(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("<="), lex_with_prefix(text, pos, "<=")?))
-}
-
-fn lex_ge(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(">="), lex_with_prefix(text, pos, ">=")?))
-}
-
-fn lex_eq(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("=="), lex_with_prefix(text, pos, "==")?))
-}
-
-fn lex_ne(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("!="), lex_with_prefix(text, pos, "!=")?))
-}
-
-fn lex_ltlt(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol("<<"), lex_with_prefix(text, pos, "<<")?))
-}
-
-fn lex_gtgt(text: &str, pos: usize) -> Option<(Token, usize)> {
-    Some((Token::Symbol(">>"), lex_with_prefix(text, pos, ">>")?))
-}
-
-fn lex_with_prefix<'text>(text: &'text str, pos: usize, prefix: &str) -> Option<usize> {
-    match &text[pos..].starts_with(prefix) {
-        true => Some(pos + prefix.len()),
-        false => None,
+    if let Some(substr) = text.get(pos..) {
+        if substr.starts_with("NULL") {
+            return Some((Token::Null, pos + "NULL".len()));
+        }
     }
+
+    None
 }
 
 fn lex_with_pattern<'text>(
@@ -361,6 +176,16 @@ fn lex_with_pattern<'text>(
                 "put caret ^ to match the text from the `pos` (text is sliced to start from pos)"
             );
             return Some((m.as_str(), pos + m.end()));
+        }
+    }
+
+    None
+}
+
+fn lex_symbol(text: &str, pos: usize, symbol: &'static str) -> Option<(Token<'static>, usize)> {
+    if let Some(substr) = text.get(pos..) {
+        if substr.starts_with(symbol) {
+            return Some((Token::Symbol(symbol), pos + symbol.len()));
         }
     }
 
