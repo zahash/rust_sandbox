@@ -2764,7 +2764,7 @@ impl<'text> Display for DirectAbstractDeclarator<'text> {
                     Some(e) => write!(f, "[{}]", e),
                     None => write!(f, "[]"),
                 }?;
-                if let Some(tail) = tail.deref() {
+                if let Some(tail) = tail {
                     write!(f, "{}", tail)?;
                 }
                 Ok(())
@@ -2774,7 +2774,7 @@ impl<'text> Display for DirectAbstractDeclarator<'text> {
                     Some(p) => write!(f, "({})", p),
                     None => write!(f, "[]"),
                 }?;
-                if let Some(tail) = tail.deref() {
+                if let Some(tail) = tail {
                     write!(f, "{}", tail)?;
                 }
                 Ok(())
