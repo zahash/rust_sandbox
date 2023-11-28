@@ -20,8 +20,8 @@ lazy_static! {
     static ref STRING_REGEX: Regex = Regex::new(r#"^"[^"\n]+""#).unwrap();
     static ref CHAR_REGEX: Regex = Regex::new(r#"^'.'"#).unwrap();
     static ref WHOLE_REGEX: Regex = Regex::new(r"^[0-9]+").unwrap();
-    static ref FLOAT_REGEX: Regex = Regex::new(r"^([0-9]+\.[0-9]+|[0-9]+\.|\.[0-9]+)").unwrap();
-    static ref BOOL_REGEX: Regex = Regex::new(r"^(true|false)").unwrap();
+    static ref DECIMAL_REGEX: Regex = Regex::new(r"^([0-9]+\.[0-9]+|[0-9]+\.|\.[0-9]+)").unwrap();
+    static ref BOOL_REGEX: Regex = Regex::new(r"^(true|false)\b").unwrap();
 }
 
 #[derive(Debug)]
@@ -145,7 +145,7 @@ fn lex_whole(text: &str, pos: usize) -> Option<(Token, usize)> {
 }
 
 fn lex_decimal(text: &str, pos: usize) -> Option<(Token, usize)> {
-    let (token, pos) = lex_with_pattern(text, pos, &FLOAT_REGEX)?;
+    let (token, pos) = lex_with_pattern(text, pos, &DECIMAL_REGEX)?;
     Some((Token::Decimal(token.parse().ok()?), pos))
 }
 
@@ -207,6 +207,8 @@ mod tests {
         return short signed sizeof static struct switch typedef 
         union unsigned void volatile while
 
+        trueman
+
         idEnt_123"🦀"'c'123 123. .123 123.123 true false NULL{}[]()
         ....,:;+++--->-*/%^!===*=/=%=+=-=&=^=|==&&&|||!?~<<<<=<=<>>=>>>=>
         "#;
@@ -248,6 +250,7 @@ mod tests {
                     Keyword("void"),
                     Keyword("volatile"),
                     Keyword("while"),
+                    Ident("trueman"),
                     Ident("idEnt_123"),
                     String("🦀"),
                     Char('c'),
