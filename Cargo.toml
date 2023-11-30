@@ -18,7 +18,6 @@ members = [
     "marker_invariants",
     "nes",
     "oxidize",
-    "padlock",
     "random_words",
     "run",
     "sat",
