@@ -83,8 +83,8 @@ fn parse_external_declaration<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_function_definition),
-            Box::new(parse_declaration),
+            &parse_function_definition,
+            &parse_declaration,
         ],
         ParseError::SyntaxError(pos, "cannot parse external declaration"),
     )
@@ -339,7 +339,7 @@ fn parse_direct_declarator<'text>(
         tokens,
         pos,
         ctx,
-        &[Box::new(parse_ident), Box::new(parse_parens)],
+        &[&parse_ident, &parse_parens],
         ParseError::SyntaxError(pos, "cannot parse direct declarator"),
     )
 }
@@ -428,9 +428,9 @@ fn parse_direct_declarator_tail<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_array),
-            Box::new(parse_function),
-            Box::new(parse_parameters),
+            &parse_array,
+            &parse_function,
+            &parse_parameters,
         ],
         ParseError::SyntaxError(pos, "cannot parse direct declarator tail"),
     )
@@ -659,9 +659,9 @@ fn parse_direct_abstract_declarator<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_parens),
-            Box::new(parse_array),
-            Box::new(parse_function),
+            &parse_parens,
+            &parse_array,
+            &parse_function,
         ],
         ParseError::SyntaxError(pos, "cannot parse direct abstract declarator"),
     )
@@ -722,7 +722,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
         tokens,
         pos,
         ctx,
-        &[Box::new(parse_array), Box::new(parse_function)],
+        &[&parse_array, &parse_function],
         ParseError::SyntaxError(pos, "cannot parse direct abstract declarator tail"),
     )
 }
@@ -969,9 +969,9 @@ fn parse_declaration_specifier<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_storage_class_specifier),
-            Box::new(parse_type_specifier),
-            Box::new(parse_type_qualifier),
+            &parse_storage_class_specifier,
+            &parse_type_specifier,
+            &parse_type_qualifier,
         ],
         ParseError::SyntaxError(pos, "cannot parse declaration specifier"),
     )
@@ -1026,8 +1026,8 @@ fn parse_specifier_qualifier<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_type_specifier),
-            Box::new(parse_type_qualifier),
+            &parse_type_specifier,
+            &parse_type_qualifier,
         ],
         ParseError::SyntaxError(pos, "cannot parse specifier qualifier"),
     )
@@ -1104,10 +1104,10 @@ fn parse_type_specifier<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_basic_type_specifier),
-            Box::new(parse_struct_or_union_specifier),
-            Box::new(parse_enum_specifier),
-            Box::new(parse_typedef_name),
+            &parse_basic_type_specifier,
+            &parse_struct_or_union_specifier,
+            &parse_enum_specifier,
+            &parse_typedef_name,
         ],
         ParseError::SyntaxError(pos, "cannot parse type specifier"),
     )
@@ -1299,13 +1299,13 @@ fn parse_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_labeled_stmt),
-            Box::new(parse_empty_stmt),
-            Box::new(parse_expr_stmt),
-            Box::new(parse_compound_stmt),
-            Box::new(parse_selection_stmt),
-            Box::new(parse_iteration_stmt),
-            Box::new(parse_jump_stmt),
+            &parse_labeled_stmt,
+            &parse_empty_stmt,
+            &parse_expr_stmt,
+            &parse_compound_stmt,
+            &parse_selection_stmt,
+            &parse_iteration_stmt,
+            &parse_jump_stmt,
         ],
         ParseError::SyntaxError(pos, "cannot parse statement"),
     )
@@ -1328,9 +1328,9 @@ fn parse_labeled_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_labeled_ident_stmt),
-            Box::new(parse_labeled_case_stmt),
-            Box::new(parse_labeled_default_stmt),
+            &parse_labeled_ident_stmt,
+            &parse_labeled_case_stmt,
+            &parse_labeled_default_stmt,
         ],
         ParseError::SyntaxError(pos, "cannot parse labeled statement"),
     )
@@ -1488,8 +1488,8 @@ fn parse_selection_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_selection_if_else_stmt),
-            Box::new(parse_selection_switch_stmt),
+            &parse_selection_if_else_stmt,
+            &parse_selection_switch_stmt,
         ],
         ParseError::SyntaxError(pos, "cannot parse selection statement"),
     )
@@ -1580,9 +1580,9 @@ fn parse_iteration_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_iteration_while_stmt),
-            Box::new(parse_iteration_do_while_stmt),
-            Box::new(parse_iteration_for_stmt),
+            &parse_iteration_while_stmt,
+            &parse_iteration_do_while_stmt,
+            &parse_iteration_for_stmt,
         ],
         ParseError::SyntaxError(pos, "cannot parse iteration statement"),
     )
@@ -1727,10 +1727,10 @@ fn parse_jump_stmt<'text>(
         pos,
         ctx,
         &[
-            Box::new(parse_jump_goto_stmt),
-            Box::new(parse_jump_continue_stmt),
-            Box::new(parse_jump_break_stmt),
-            Box::new(parse_jump_return_stmt),
+            &parse_jump_goto_stmt,
+            &parse_jump_continue_stmt,
+            &parse_jump_break_stmt,
+            &parse_jump_return_stmt,
         ],
         ParseError::SyntaxError(pos, "cannot parse jump statement"),
     )
