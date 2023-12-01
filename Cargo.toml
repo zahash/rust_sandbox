@@ -6,6 +6,7 @@ members = [
     "betterjson",
     "calc",
     "chatgpt",
+    "dbdb",
     "fraction",
     "graph",
     "kilors",
