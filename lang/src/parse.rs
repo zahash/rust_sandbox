@@ -752,23 +752,30 @@ fn parse_declaration<'text>(
         return Err(ParseError::Expected(Token::Symbol(";"), pos));
     };
 
-    let validated_dss: ValidatedDeclarationSpecifiers<'text> = dss
-        .try_into()
-        .map_err(|err| ParseError::InvalidDeclarationSpecifiers(pos, err))?;
+    fn add_declarator_to_context<'text>(d: &Declarator<'text>, ctx: &mut ParseContext<'text>) {
+        match &d.d_declarator {
+            DirectDeclarator::Ident(ident, _) => ctx.set_typedef(ident),
+            DirectDeclarator::Parens(inner_d, _) => {
+                add_declarator_to_context(inner_d.as_ref(), ctx);
+            }
+        }
+    }
 
-    if validated_dss.storage_class_specifier == Some(StorageClassSpecifier::TypeDef) {
-        if let Some(InitDeclarator::Declared(Declarator {
-            pointer: None,
-            d_declarator: DirectDeclarator::Ident(ident, None),
-        })) = init_declarators.get(0)
-        {
-            ctx.set_typedef(ident);
+    for ds in &dss {
+        if let DeclarationSpecifier::StorageClassSpecifier(StorageClassSpecifier::TypeDef) = ds {
+            for init_d in &init_declarators {
+                match init_d {
+                    InitDeclarator::Declared(d) | InitDeclarator::Initialized(d, _) => {
+                        add_declarator_to_context(d, ctx);
+                    }
+                }
+            }
         }
     }
 
     Ok((
         Declaration {
-            declaration_specifiers: validated_dss.into(),
+            declaration_specifiers: dss,
             init_declarators,
         },
         pos + 1,
@@ -846,117 +853,117 @@ pub enum DeclarationSpecifier<'text> {
     TypeQualifier(TypeQualifier),
 }
 
-struct ValidatedDeclarationSpecifiers<'text> {
-    storage_class_specifier: Option<StorageClassSpecifier>,
-    type_qualifiers: Vec<TypeQualifier>,
-    type_specifiers: Vec<TypeSpecifier<'text>>,
-}
+// struct ValidatedDeclarationSpecifiers<'text> {
+//     storage_class_specifier: Option<StorageClassSpecifier>,
+//     type_qualifiers: Vec<TypeQualifier>,
+//     type_specifiers: Vec<TypeSpecifier<'text>>,
+// }
 
-impl<'text> From<ValidatedDeclarationSpecifiers<'text>> for Vec<DeclarationSpecifier<'text>> {
-    fn from(validated_dss: ValidatedDeclarationSpecifiers<'text>) -> Self {
-        let mut dss = vec![];
+// impl<'text> From<ValidatedDeclarationSpecifiers<'text>> for Vec<DeclarationSpecifier<'text>> {
+//     fn from(validated_dss: ValidatedDeclarationSpecifiers<'text>) -> Self {
+//         let mut dss = vec![];
 
-        if let Some(scs) = validated_dss.storage_class_specifier {
-            dss.push(DeclarationSpecifier::StorageClassSpecifier(scs));
-        }
-        dss.extend(
-            validated_dss
-                .type_qualifiers
-                .into_iter()
-                .map(|tq| DeclarationSpecifier::TypeQualifier(tq)),
-        );
-        dss.extend(
-            validated_dss
-                .type_specifiers
-                .into_iter()
-                .map(|ts| DeclarationSpecifier::TypeSpecifier(ts)),
-        );
-        dss
-    }
-}
+//         if let Some(scs) = validated_dss.storage_class_specifier {
+//             dss.push(DeclarationSpecifier::StorageClassSpecifier(scs));
+//         }
+//         dss.extend(
+//             validated_dss
+//                 .type_qualifiers
+//                 .into_iter()
+//                 .map(|tq| DeclarationSpecifier::TypeQualifier(tq)),
+//         );
+//         dss.extend(
+//             validated_dss
+//                 .type_specifiers
+//                 .into_iter()
+//                 .map(|ts| DeclarationSpecifier::TypeSpecifier(ts)),
+//         );
+//         dss
+//     }
+// }
 
-impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSpecifiers<'text> {
-    type Error = String;
+// impl<'text> TryFrom<Vec<DeclarationSpecifier<'text>>> for ValidatedDeclarationSpecifiers<'text> {
+//     type Error = String;
 
-    fn try_from(dss: Vec<DeclarationSpecifier<'text>>) -> Result<Self, Self::Error> {
-        let dss_len = dss.len();
+//     fn try_from(dss: Vec<DeclarationSpecifier<'text>>) -> Result<Self, Self::Error> {
+//         let dss_len = dss.len();
 
-        let mut storage_class_specifiers = vec![];
-        let mut type_specifiers = vec![];
-        let mut type_qualifiers = vec![];
+//         let mut storage_class_specifiers = vec![];
+//         let mut type_specifiers = vec![];
+//         let mut type_qualifiers = vec![];
 
-        for ds in dss {
-            match ds {
-                DeclarationSpecifier::StorageClassSpecifier(scs) => {
-                    storage_class_specifiers.push(scs)
-                }
-                DeclarationSpecifier::TypeSpecifier(ts) => type_specifiers.push(ts),
-                DeclarationSpecifier::TypeQualifier(tq) => type_qualifiers.push(tq),
-            }
-        }
+//         for ds in dss {
+//             match ds {
+//                 DeclarationSpecifier::StorageClassSpecifier(scs) => {
+//                     storage_class_specifiers.push(scs)
+//                 }
+//                 DeclarationSpecifier::TypeSpecifier(ts) => type_specifiers.push(ts),
+//                 DeclarationSpecifier::TypeQualifier(tq) => type_qualifiers.push(tq),
+//             }
+//         }
 
-        if storage_class_specifiers.len() > 1 {
-            return Err(format!(
-                "cannot have more than 1 storage class specifier. Found {}. {:?}",
-                storage_class_specifiers.len(),
-                storage_class_specifiers
-            ));
-        }
-        let storage_class_specifier = storage_class_specifiers.into_iter().next();
+//         if storage_class_specifiers.len() > 1 {
+//             return Err(format!(
+//                 "cannot have more than 1 storage class specifier. Found {}. {:?}",
+//                 storage_class_specifiers.len(),
+//                 storage_class_specifiers
+//             ));
+//         }
+//         let storage_class_specifier = storage_class_specifiers.into_iter().next();
 
-        let mut simple_type_specifiers = vec![];
-        let mut struct_or_union_specifiers = vec![];
-        let mut enum_specifiers = vec![];
-        let mut typedef_names = vec![];
-        for ts in &type_specifiers {
-            match ts {
-                TypeSpecifier::StructOrUnionSpecifier(sus) => struct_or_union_specifiers.push(sus),
-                TypeSpecifier::EnumSpecifier(es) => enum_specifiers.push(es),
-                TypeSpecifier::TypeDefName(name) => typedef_names.push(name),
-                _ => simple_type_specifiers.push(ts),
-            }
-        }
+//         let mut simple_type_specifiers = vec![];
+//         let mut struct_or_union_specifiers = vec![];
+//         let mut enum_specifiers = vec![];
+//         let mut typedef_names = vec![];
+//         for ts in &type_specifiers {
+//             match ts {
+//                 TypeSpecifier::StructOrUnionSpecifier(sus) => struct_or_union_specifiers.push(sus),
+//                 TypeSpecifier::EnumSpecifier(es) => enum_specifiers.push(es),
+//                 TypeSpecifier::TypeDefName(name) => typedef_names.push(name),
+//                 _ => simple_type_specifiers.push(ts),
+//             }
+//         }
 
-        let simple_type_specifiers_present = !simple_type_specifiers.is_empty();
-        let struct_or_union_specifiers_present = !struct_or_union_specifiers.is_empty();
-        let enum_specifiers_present = !enum_specifiers.is_empty();
-        let typedef_names_present = !typedef_names.is_empty();
+//         let simple_type_specifiers_present = !simple_type_specifiers.is_empty();
+//         let struct_or_union_specifiers_present = !struct_or_union_specifiers.is_empty();
+//         let enum_specifiers_present = !enum_specifiers.is_empty();
+//         let typedef_names_present = !typedef_names.is_empty();
 
-        let exactly_one_type_is_present = simple_type_specifiers_present
-            ^ struct_or_union_specifiers_present
-            ^ enum_specifiers_present
-            ^ typedef_names_present;
+//         let exactly_one_type_is_present = simple_type_specifiers_present
+//             ^ struct_or_union_specifiers_present
+//             ^ enum_specifiers_present
+//             ^ typedef_names_present;
 
-        if !exactly_one_type_is_present {
-            return Err(format!(
-            "either enum specifier or struct specifier or typedef name or simple specifier (void, int, ...) must be present. \
-            Eg: `long long unsigned` or `enum {{ A, B }}` or `struct {{ int a; }}` or `Person` are allowed \
-            but not `long enum {{ A, B }}` because it contains both simple specifier (long) and enum specifier. \
-            Right now, this contains {}{}{}{}
-            ",
-            if simple_type_specifiers_present {"simple type specifiers, "} else {""},
-            if struct_or_union_specifiers_present {"struct or union specifiers, "} else {""},
-            if enum_specifiers_present {"enum specifiers, "} else {""},
-            if typedef_names_present {"typedef names"} else {""},
-        ));
-        }
+//         if !exactly_one_type_is_present {
+//             return Err(format!(
+//             "either enum specifier or struct specifier or typedef name or simple specifier (void, int, ...) must be present. \
+//             Eg: `long long unsigned` or `enum {{ A, B }}` or `struct {{ int a; }}` or `Person` are allowed \
+//             but not `long enum {{ A, B }}` because it contains both simple specifier (long) and enum specifier. \
+//             Right now, this contains {}{}{}{}
+//             ",
+//             if simple_type_specifiers_present {"simple type specifiers, "} else {""},
+//             if struct_or_union_specifiers_present {"struct or union specifiers, "} else {""},
+//             if enum_specifiers_present {"enum specifiers, "} else {""},
+//             if typedef_names_present {"typedef names"} else {""},
+//         ));
+//         }
 
-        // just a sanity check
-        assert_eq!(
-            dss_len,
-            storage_class_specifier.is_some() as usize
-                + type_qualifiers.len()
-                + type_specifiers.len(),
-            "declaration specifiers length mismatch after validation"
-        );
+//         // just a sanity check
+//         assert_eq!(
+//             dss_len,
+//             storage_class_specifier.is_some() as usize
+//                 + type_qualifiers.len()
+//                 + type_specifiers.len(),
+//             "declaration specifiers length mismatch after validation"
+//         );
 
-        Ok(ValidatedDeclarationSpecifiers {
-            storage_class_specifier,
-            type_qualifiers,
-            type_specifiers,
-        })
-    }
-}
+//         Ok(ValidatedDeclarationSpecifiers {
+//             storage_class_specifier,
+//             type_qualifiers,
+//             type_specifiers,
+//         })
+//     }
+// }
 
 fn parse_declaration_specifier<'text>(
     tokens: &[Token<'text>],
@@ -3562,12 +3569,21 @@ mod tests {
             r#"const char *name = "zahash";"#
         );
 
-        check!(parse_stmt, &mut ctx, "{ typedef long long ll; ll a = 10; }");
+        check!(parse_declaration, &mut ctx, "typedef long long ll;");
+        check!(parse_declaration, &mut ctx, "ll a = 10;");
+
+        check!(parse_declaration, &mut ctx, "typedef int ((**((*TTT(int))[]))());");
+        check!(parse_declaration, &mut ctx, "TTT a = 10;");
 
         check!(
-            parse_stmt,
+            parse_declaration,
             &mut ctx,
-            "{ typedef struct { float x; float y; } Point; const Point origin = { 0, 0, }; }"
+            "typedef struct { float x; float y; } Point;"
+        );
+        check!(
+            parse_declaration,
+            &mut ctx,
+            "const Point origin = { 0, 0, };"
         );
 
         check!(
