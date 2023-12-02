@@ -7,7 +7,7 @@ use chainchomp::ctx_sensitive::{combine_parsers, many, many_delimited, maybe};
 
 use crate::Token;
 
-pub struct ParseContext<'text> {
+struct ParseContext<'text> {
     typedefs: Vec<&'text str>,
     enum_consts: Vec<&'text str>,
 }
@@ -40,6 +40,7 @@ impl<'text> ParseContext<'text> {
 
 #[derive(Debug)]
 pub enum ParseError {
+    EmptyInput,
     SyntaxError(usize, &'static str),
     ExpectedIdent(usize),
     Expected(Token<'static>, usize),
@@ -47,12 +48,21 @@ pub enum ParseError {
     InvalidDeclarationSpecifiers(usize, String),
 }
 
-pub fn parse<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-    ctx: &mut ParseContext<'text>,
-) -> Result<(TranslationUnit<'text>, usize), ParseError> {
-    parse_translation_unit(tokens, pos, ctx)
+pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<TranslationUnit<'text>, ParseError> {
+    if tokens.is_empty() {
+        return Err(ParseError::EmptyInput);
+    }
+
+    let (expr, pos) = parse_translation_unit(tokens, 0, &mut ParseContext::new())?;
+
+    if pos < tokens.len() {
+        return Err(ParseError::SyntaxError(
+            pos,
+            "cannot fully parse translation unit",
+        ));
+    }
+
+    Ok(expr)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -82,10 +92,7 @@ fn parse_external_declaration<'text>(
         tokens,
         pos,
         ctx,
-        &[
-            &parse_function_definition,
-            &parse_declaration,
-        ],
+        &[&parse_function_definition, &parse_declaration],
         ParseError::SyntaxError(pos, "cannot parse external declaration"),
     )
 }
@@ -257,7 +264,7 @@ fn parse_struct_declarator<'text>(
 #[derive(Debug, PartialEq, Clone)]
 pub struct Declarator<'text> {
     pub pointer: Option<Pointer>,
-    pub declarator: DirectDeclarator<'text>,
+    pub d_declarator: DirectDeclarator<'text>,
 }
 
 fn parse_declarator<'text>(
@@ -271,7 +278,7 @@ fn parse_declarator<'text>(
     Ok((
         Declarator {
             pointer,
-            declarator: dd,
+            d_declarator: dd,
         },
         pos,
     ))
@@ -427,11 +434,7 @@ fn parse_direct_declarator_tail<'text>(
         tokens,
         pos,
         ctx,
-        &[
-            &parse_array,
-            &parse_function,
-            &parse_parameters,
-        ],
+        &[&parse_array, &parse_function, &parse_parameters],
         ParseError::SyntaxError(pos, "cannot parse direct declarator tail"),
     )
 }
@@ -658,11 +661,7 @@ fn parse_direct_abstract_declarator<'text>(
         tokens,
         pos,
         ctx,
-        &[
-            &parse_parens,
-            &parse_array,
-            &parse_function,
-        ],
+        &[&parse_parens, &parse_array, &parse_function],
         ParseError::SyntaxError(pos, "cannot parse direct abstract declarator"),
     )
 }
@@ -760,7 +759,7 @@ fn parse_declaration<'text>(
     if validated_dss.storage_class_specifier == Some(StorageClassSpecifier::TypeDef) {
         if let Some(InitDeclarator::Declared(Declarator {
             pointer: None,
-            declarator: DirectDeclarator::Ident(ident, None),
+            d_declarator: DirectDeclarator::Ident(ident, None),
         })) = init_declarators.get(0)
         {
             ctx.set_typedef(ident);
@@ -1025,10 +1024,7 @@ fn parse_specifier_qualifier<'text>(
         tokens,
         pos,
         ctx,
-        &[
-            &parse_type_specifier,
-            &parse_type_qualifier,
-        ],
+        &[&parse_type_specifier, &parse_type_qualifier],
         ParseError::SyntaxError(pos, "cannot parse specifier qualifier"),
     )
 }
@@ -1487,10 +1483,7 @@ fn parse_selection_stmt<'text>(
         tokens,
         pos,
         ctx,
-        &[
-            &parse_selection_if_else_stmt,
-            &parse_selection_switch_stmt,
-        ],
+        &[&parse_selection_if_else_stmt, &parse_selection_switch_stmt],
         ParseError::SyntaxError(pos, "cannot parse selection statement"),
     )
 }
@@ -2461,6 +2454,21 @@ fn parse_primary_expr<'text>(
     }
 }
 
+impl<'text> Display for TranslationUnit<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write_arr(f, &self.0, " ")
+    }
+}
+
+impl<'text> Display for ExternalDeclaration<'text> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            ExternalDeclaration::FunctionDefinition(func) => write!(f, "{}", func),
+            ExternalDeclaration::Declaration(d) => write!(f, "{}", d),
+        }
+    }
+}
+
 impl<'text> Display for FunctionDefinition<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         if !self.return_type.is_empty() {
@@ -2643,7 +2651,7 @@ impl<'text> Display for Declarator<'text> {
         if let Some(pointer) = &self.pointer {
             write!(f, "{}", pointer)?;
         }
-        write!(f, "{}", self.declarator)
+        write!(f, "{}", self.d_declarator)
     }
 }
 
@@ -3580,6 +3588,8 @@ mod tests {
             r#"typedef enum { RED, GREEN, BLUE } Color;"#
         );
         check!(parse_declaration, &mut ctx, r#"Color c = RED;"#);
+
+        check!(parse_declaration, &mut ctx, "int add1(int a);");
     }
 
     #[test]
