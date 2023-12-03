@@ -7,8 +7,7 @@ mod declaration_specifier;
 mod declarator;
 mod direct_abstract_declarator;
 mod direct_declarator;
-mod enum_specifier;
-mod enumerator;
+mod r#enum;
 mod expression;
 mod external_declaration;
 mod function_definition;
@@ -32,8 +31,6 @@ pub use declaration_specifier::DeclarationSpecifier;
 pub use declarator::Declarator;
 pub use direct_abstract_declarator::DirectAbstractDeclarator;
 pub use direct_declarator::DirectDeclarator;
-pub use enum_specifier::EnumSpecifier;
-pub use enumerator::Enumerator;
 pub use external_declaration::ExternalDeclaration;
 pub use function_definition::FunctionDefinition;
 pub use init_declarator::InitDeclarator;
@@ -52,6 +49,9 @@ pub use struct_or_union::declaration::StructOrUnionDeclaration;
 pub use struct_or_union::declarator::StructOrUnionDeclarator;
 pub use struct_or_union::specifier::StructOrUnionSpecifier;
 pub use struct_or_union::StructOrUnion;
+
+pub use r#enum::enumerator::Enumerator;
+pub use r#enum::EnumSpecifier;
 
 pub use statement::compound::{BlockItem, CompoundStmt};
 pub use statement::iteration::IterationStmt;

@@ -1,4 +1,8 @@
-use super::{enumerator::parse_enumerator, write_arr, ParseContext};
+pub mod enumerator;
+
+use self::enumerator::parse_enumerator;
+use super::write_arr;
+use super::ParseContext;
 use crate::{Enumerator, ParseError, Token};
 use chainchomp::ctx_sensitive::many_delimited;
 use std::fmt::{self, Display, Formatter};
@@ -74,7 +78,7 @@ impl<'text> Display for EnumSpecifier<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::check, lex};
+    use crate::{lex, macros::check};
 
     const ENUM: [&'static str; 3] = [
         "enum Color",

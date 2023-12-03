@@ -1,4 +1,4 @@
-use super::{ParseContext, expression::constant::parse_constant_expr};
+use super::super::{expression::constant::parse_constant_expr, ParseContext};
 use crate::{ConstantExpr, ParseError, Token};
 use std::fmt::{self, Display, Formatter};
 
