@@ -1,4 +1,5 @@
-use super::{expression::parse_expr, ParseContext};
+use super::super::expression::parse_expr;
+use super::ParseContext;
 use crate::{Expr, ParseError, Token};
 use chainchomp::ctx_sensitive::{combine_parsers, maybe};
 use std::fmt::{self, Display, Formatter};

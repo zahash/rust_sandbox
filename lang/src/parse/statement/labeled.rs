@@ -1,4 +1,5 @@
-use super::{expression::constant::parse_constant_expr, statement::parse_stmt, ParseContext};
+use super::super::expression::constant::parse_constant_expr;
+use super::{parse_stmt, ParseContext};
 use crate::{ConstantExpr, ParseError, Stmt, Token};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};

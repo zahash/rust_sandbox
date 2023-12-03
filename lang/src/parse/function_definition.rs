@@ -1,6 +1,6 @@
 use super::{
-    compound_statement::parse_compound_stmt, declaration::parse_declaration,
-    declaration_specifier::parse_declaration_specifier, declarator::parse_declarator, write_arr,
+    declaration::parse_declaration, declaration_specifier::parse_declaration_specifier,
+    declarator::parse_declarator, statement::compound::parse_compound_stmt, write_arr,
     ParseContext,
 };
 use crate::{CompoundStmt, Declaration, DeclarationSpecifier, Declarator, ParseError, Token};

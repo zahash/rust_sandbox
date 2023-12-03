@@ -1,8 +1,15 @@
-use super::{
-    compound_statement::parse_compound_stmt, expression::parse_expr,
-    iteration_statement::parse_iteration_stmt, jump_statement::parse_jump_stmt,
-    labeled_statement::parse_labeled_stmt, selection_statement::parse_selection_stmt, ParseContext,
+pub mod compound;
+pub mod expression;
+pub mod iteration;
+pub mod jump;
+pub mod labeled;
+pub mod selection;
+
+use self::{
+    compound::parse_compound_stmt, expression::parse_expr_stmt, iteration::parse_iteration_stmt,
+    jump::parse_jump_stmt, labeled::parse_labeled_stmt, selection::parse_selection_stmt,
 };
+use super::ParseContext;
 use crate::{
     CompoundStmt, Expr, IterationStmt, JumpStmt, LabeledStmt, ParseError, SelectionStmt, Token,
 };
@@ -52,20 +59,6 @@ fn parse_empty_stmt<'text>(
     };
 
     Ok((Stmt::EmptyStmt, pos + 1))
-}
-
-fn parse_expr_stmt<'text>(
-    tokens: &[Token<'text>],
-    pos: usize,
-    ctx: &mut ParseContext<'text>,
-) -> Result<(Stmt<'text>, usize), ParseError> {
-    let (expr, pos) = parse_expr(tokens, pos, ctx)?;
-
-    let Some(Token::Symbol(";")) = tokens.get(pos) else {
-        return Err(ParseError::Expected(Token::Symbol(";"), pos));
-    };
-
-    Ok((Stmt::Expr(expr), pos + 1))
 }
 
 impl<'text> Display for Stmt<'text> {
@@ -131,7 +124,6 @@ mod tests {
             "{ }",
             Stmt::Compound(CompoundStmt(vec![]))
         );
-        check!(parse_stmt, &mut ctx, "a++;");
         check!(parse_stmt, &mut ctx, "{ a++; }");
         check!(parse_stmt, &mut ctx, "{ int a = 0; a++; }");
     }
