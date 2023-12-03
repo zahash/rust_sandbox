@@ -1,3 +1,7 @@
+pub mod declaration;
+pub mod declarator;
+pub mod specifier;
+
 use super::ParseContext;
 use crate::{ParseError, Token};
 use std::fmt::{self, Display, Formatter};

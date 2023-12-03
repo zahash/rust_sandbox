@@ -1,6 +1,6 @@
 use super::{
     enum_specifier::parse_enum_specifier,
-    struct_or_union_specifier::parse_struct_or_union_specifier, ParseContext,
+    struct_or_union::specifier::parse_struct_or_union_specifier, ParseContext,
 };
 use crate::{EnumSpecifier, ParseError, StructOrUnionSpecifier, Token};
 use chainchomp::ctx_sensitive::combine_parsers;

@@ -1,15 +1,17 @@
-use super::{
-    struct_declaration::parse_struct_declaration, struct_or_union::parse_struct_or_union,
-    write_arr, ParseContext,
-};
-use crate::{ParseError, StructDeclaration, StructOrUnion, Token};
+use super::super::write_arr;
+use super::{declaration::parse_struct_or_union_declaration, parse_struct_or_union, ParseContext};
+use crate::{ParseError, StructOrUnion, StructOrUnionDeclaration, Token};
 use chainchomp::ctx_sensitive::many;
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum StructOrUnionSpecifier<'text> {
-    Named(StructOrUnion, &'text str, Vec<StructDeclaration<'text>>),
-    Anonymous(StructOrUnion, Vec<StructDeclaration<'text>>),
+    Named(
+        StructOrUnion,
+        &'text str,
+        Vec<StructOrUnionDeclaration<'text>>,
+    ),
+    Anonymous(StructOrUnion, Vec<StructOrUnionDeclaration<'text>>),
     ForwardDeclaration(StructOrUnion, &'text str),
 }
 
@@ -24,12 +26,12 @@ pub fn parse_struct_or_union_specifier<'text>(
         tokens: &[Token<'text>],
         pos: usize,
         ctx: &mut ParseContext<'text>,
-    ) -> Result<(Vec<StructDeclaration<'text>>, usize), ParseError> {
+    ) -> Result<(Vec<StructOrUnionDeclaration<'text>>, usize), ParseError> {
         let Some(Token::Symbol("{")) = tokens.get(pos) else {
             return Err(ParseError::Expected(Token::Symbol("{"), pos));
         };
 
-        let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_declaration);
+        let (sds, pos) = many(tokens, pos + 1, ctx, parse_struct_or_union_declaration);
 
         let Some(Token::Symbol("}")) = tokens.get(pos) else {
             return Err(ParseError::Expected(Token::Symbol("}"), pos));

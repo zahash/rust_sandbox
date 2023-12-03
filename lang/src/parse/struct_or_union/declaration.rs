@@ -1,27 +1,26 @@
-use super::{
-    specifier_qualifier::parse_specifier_qualifier, struct_declarator::parse_struct_declarator, write_arr, ParseContext,
-};
-use crate::{ParseError, SpecifierQualifier, StructDeclarator, Token};
+use super::super::{specifier_qualifier::parse_specifier_qualifier, write_arr};
+use super::{declarator::parse_struct_or_union_declarator, ParseContext};
+use crate::{ParseError, SpecifierQualifier, StructOrUnionDeclarator, Token};
 use chainchomp::ctx_sensitive::{many, many_delimited};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct StructDeclaration<'text> {
+pub struct StructOrUnionDeclaration<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
-    pub declarators: Vec<StructDeclarator<'text>>,
+    pub declarators: Vec<StructOrUnionDeclarator<'text>>,
 }
 
-pub fn parse_struct_declaration<'text>(
+pub fn parse_struct_or_union_declaration<'text>(
     tokens: &[Token<'text>],
     pos: usize,
     ctx: &mut ParseContext<'text>,
-) -> Result<(StructDeclaration<'text>, usize), ParseError> {
+) -> Result<(StructOrUnionDeclaration<'text>, usize), ParseError> {
     let (sqs, pos) = many(tokens, pos, ctx, parse_specifier_qualifier);
     let (ds, pos) = many_delimited(
         tokens,
         pos,
         ctx,
-        parse_struct_declarator,
+        parse_struct_or_union_declarator,
         &Token::Symbol(","),
     );
 
@@ -30,7 +29,7 @@ pub fn parse_struct_declaration<'text>(
     };
 
     Ok((
-        StructDeclaration {
+        StructOrUnionDeclaration {
             specifier_qualifiers: sqs,
             declarators: ds,
         },
@@ -38,7 +37,7 @@ pub fn parse_struct_declaration<'text>(
     ))
 }
 
-impl<'text> Display for StructDeclaration<'text> {
+impl<'text> Display for StructOrUnionDeclaration<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write_arr(f, &self.specifier_qualifiers, " ")?;
         write!(f, " ")?;
