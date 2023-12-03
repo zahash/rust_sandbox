@@ -47,8 +47,8 @@ pub use type_specifier::TypeSpecifier;
 
 pub use struct_or_union::declaration::StructOrUnionDeclaration;
 pub use struct_or_union::declarator::StructOrUnionDeclarator;
-pub use struct_or_union::specifier::StructOrUnionSpecifier;
-pub use struct_or_union::StructOrUnion;
+pub use struct_or_union::keyword::StructOrUnionKeyword;
+pub use struct_or_union::StructOrUnionSpecifier;
 
 pub use r#enum::enumerator::Enumerator;
 pub use r#enum::EnumSpecifier;
