@@ -20,7 +20,7 @@ enum Type<'text> {
 
 #[derive(Debug)]
 enum BinOp<'ast, 'text> {
-    LogicalOr(&'ast LogicalAndExpr<'text>),
+    LogicalOr(&'ast LogicalOrExpr<'text>),
     LogicalAnd(&'ast LogicalAndExpr<'text>),
     BitOr(&'ast BitOrExpr<'text>),
     XOR(&'ast XORExpr<'text>),
@@ -350,7 +350,6 @@ fn analyze_conditional_expr<'ast, 'text>(
                     actual: ty,
                 });
             }
-
             let pass_ty = analyze_assignment_expr(pass, ctx)?;
             let fail_ty = analyze_conditional_expr(fail, ctx)?;
             match pass_ty == fail_ty {
@@ -371,11 +370,8 @@ fn analyze_logicalor_expr<'ast, 'text>(
             analyze_logicalor_expr(lhs, ctx)?,
             analyze_logicaland_expr(rhs, ctx)?,
         ) {
-            (Type::Int, Type::Int) => Ok(Type::Int),
-            (Type::Int, ty) | (ty, Type::Int) | (ty, _) => Err(SemanticError::UnexpectedType {
-                expected: Type::Int,
-                actual: ty,
-            }),
+            (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::LogicalOr(expr))),
         },
     }
 }
@@ -390,11 +386,10 @@ fn analyze_logicaland_expr<'ast, 'text>(
             analyze_logicaland_expr(lhs, ctx)?,
             analyze_bitor_expr(rhs, ctx)?,
         ) {
-            (Type::Int, Type::Int) => Ok(Type::Int),
-            (Type::Int, ty) | (ty, Type::Int) | (ty, _) => Err(SemanticError::UnexpectedType {
-                expected: Type::Int,
-                actual: ty,
-            }),
+            (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::LogicalAnd(
+                expr,
+            ))),
         },
     }
 }
@@ -404,8 +399,13 @@ fn analyze_bitor_expr<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        BitOrExpr::XORExpr(expr) => analyze_xor_expr(expr, ctx),
-        BitOrExpr::BitOr(lhs, rhs) => todo!(),
+        BitOrExpr::XORExpr(xor_expr) => analyze_xor_expr(xor_expr, ctx),
+        BitOrExpr::BitOr(lhs, rhs) => {
+            match (analyze_bitor_expr(lhs, ctx)?, analyze_xor_expr(rhs, ctx)?) {
+                (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
+                _ => Err(SemanticError::InvalidBinaryOperands(BinOp::BitOr(expr))),
+            }
+        }
     }
 }
 
@@ -414,9 +414,8 @@ fn analyze_xor_expr<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        XORExpr::BitAndExpr(bit_and_expr) => analyze_bitand_expr(bit_and_expr, ctx),
+        XORExpr::BitAndExpr(expr) => analyze_bitand_expr(expr, ctx),
         XORExpr::XOR(lhs, rhs) => {
-            // Assuming XOR can only be applied to both ints and both chars. i.e., no implicit casting for now.
             match (analyze_xor_expr(lhs, ctx)?, analyze_bitand_expr(rhs, ctx)?) {
                 (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
                 _ => Err(SemanticError::InvalidBinaryOperands(BinOp::XOR(expr))),
@@ -430,8 +429,101 @@ fn analyze_bitand_expr<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        BitAndExpr::EqualityExpr(_) => todo!(),
-        BitAndExpr::BitAnd(_, _) => todo!(),
+        BitAndExpr::EqualityExpr(expr) => analyze_equality_expr(expr, ctx),
+        BitAndExpr::BitAnd(lhs, rhs) => match (
+            analyze_bitand_expr(lhs, ctx)?,
+            analyze_equality_expr(rhs, ctx)?,
+        ) {
+            (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::BitAnd(expr))),
+        },
+    }
+}
+
+fn analyze_equality_expr<'ast, 'text>(
+    expr: &'ast EqualityExpr<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    match expr {
+        EqualityExpr::ComparisionExpr(expr) => analyze_comparision_expr(expr, ctx),
+        EqualityExpr::EQ(lhs, rhs) | EqualityExpr::NE(lhs, rhs) => match (
+            analyze_equality_expr(lhs, ctx)?,
+            analyze_comparision_expr(rhs, ctx)?,
+        ) {
+            (Type::Int, Type::Int)
+            | (Type::Char, Type::Char)
+            | (Type::Float, Type::Float)
+            | (Type::Double, Type::Double)
+            | (Type::Char, Type::Int)
+            | (Type::Int, Type::Char) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Equality(expr))),
+        },
+    }
+}
+
+fn analyze_comparision_expr<'ast, 'text>(
+    expr: &'ast ComparisionExpr<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    match expr {
+        ComparisionExpr::ShiftExpr(shift_expr) => analyze_shift_expr(shift_expr, ctx),
+        ComparisionExpr::LT(lhs, rhs)
+        | ComparisionExpr::GT(lhs, rhs)
+        | ComparisionExpr::LE(lhs, rhs)
+        | ComparisionExpr::GE(lhs, rhs) => {
+            let lhs_ty = analyze_comparision_expr(lhs, ctx)?;
+            let rhs_ty = analyze_shift_expr(rhs, ctx)?;
+
+            // only same types; avoid implicit typecasts for simplicity
+            match (&lhs_ty, &rhs_ty) {
+                (Type::Int, Type::Int)
+                | (Type::Char, Type::Char)
+                | (Type::Float, Type::Float)
+                | (Type::Double, Type::Double) => Ok(lhs_ty),
+                _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Comparision(
+                    expr,
+                ))),
+            }
+        }
+    }
+}
+
+fn analyze_shift_expr<'ast, 'text>(
+    expr: &'ast ShiftExpr<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    match expr {
+        ShiftExpr::AdditiveExpr(additive_expr) => analyze_additive_expr(additive_expr, ctx),
+        ShiftExpr::ShiftLeft(lhs, rhs) | ShiftExpr::ShiftRight(lhs, rhs) => match (
+            analyze_shift_expr(lhs, ctx)?,
+            analyze_additive_expr(rhs, ctx)?,
+        ) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Shift(expr))),
+        },
+    }
+}
+
+fn analyze_additive_expr<'ast, 'text>(
+    expr: &'ast AdditiveExpr<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    match expr {
+        AdditiveExpr::MultiplicativeExpr(multiplicative_expr) => {
+            analyze_multiplicative_expr(multiplicative_expr, ctx)
+        }
+        AdditiveExpr::Add(lhs, rhs) | AdditiveExpr::Sub(lhs, rhs) => {
+            let lhs_ty = analyze_additive_expr(lhs, ctx)?;
+            let rhs_ty = analyze_multiplicative_expr(rhs, ctx)?;
+
+            // only same types; avoid implicit typecasts for simplicity
+            match (&lhs_ty, &rhs_ty) {
+                (Type::Int, Type::Int)
+                | (Type::Float, Type::Float)
+                | (Type::Double, Type::Double) => Ok(lhs_ty),
+                _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Additive(expr))),
+            }
+        }
     }
 }
 
@@ -440,10 +532,30 @@ fn analyze_multiplicative_expr<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        MultiplicativeExpr::CastExpr(_) => todo!(),
-        MultiplicativeExpr::Mul(_, _) => todo!(),
-        MultiplicativeExpr::Div(_, _) => todo!(),
-        MultiplicativeExpr::Mod(_, _) => todo!(),
+        MultiplicativeExpr::CastExpr(cast_expr) => analyze_cast_expr(cast_expr, ctx),
+        MultiplicativeExpr::Mul(lhs, rhs) | MultiplicativeExpr::Div(lhs, rhs) => {
+            let lhs_ty = analyze_multiplicative_expr(lhs, ctx)?;
+            let rhs_ty = analyze_cast_expr(rhs, ctx)?;
+
+            // only same types; avoid implicit typecasts for simplicity
+            match (&lhs_ty, &rhs_ty) {
+                (Type::Int, Type::Int)
+                | (Type::Float, Type::Float)
+                | (Type::Double, Type::Double) => Ok(lhs_ty),
+                _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Multiplicative(
+                    expr,
+                ))),
+            }
+        }
+        MultiplicativeExpr::Mod(lhs, rhs) => match (
+            analyze_multiplicative_expr(lhs, ctx)?,
+            analyze_cast_expr(rhs, ctx)?,
+        ) {
+            (Type::Int, Type::Int) => Ok(Type::Int),
+            _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Multiplicative(
+                expr,
+            ))),
+        },
     }
 }
 
