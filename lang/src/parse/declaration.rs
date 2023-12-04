@@ -69,7 +69,7 @@ impl<'text> Display for Declaration<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write_arr(f, &self.declaration_specifiers, " ")?;
         write!(f, " ")?;
-        write_arr(f, &self.init_declarators, " ")?;
+        write_arr(f, &self.init_declarators, ", ")?;
         write!(f, ";")
     }
 }
@@ -84,12 +84,14 @@ mod tests {
         let mut ctx = ParseContext::new();
 
         check!(parse_declaration, &mut ctx, "int x;");
+        check!(parse_declaration, &mut ctx, "int x, y;");
         check!(parse_declaration, &mut ctx, "int x = 10;");
+        check!(parse_declaration, &mut ctx, "int x = 10, y, z = 0;");
         check!(parse_declaration, &mut ctx, "int nums[] = { 1, 2, 3, };");
         check!(
             parse_declaration,
             &mut ctx,
-            "float mat[2][3] = { { 3.1, 0.6, 2.7, }, { 1.4, 4.7, 0.6, }, };"
+            "float mat[2][3] = { { 3.1, 0.6, 2.7, }, { 1.4, 4.7, 0.6, }, }, r = 2, c = 3;"
         );
         check!(
             parse_declaration,

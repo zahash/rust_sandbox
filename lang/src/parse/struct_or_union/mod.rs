@@ -45,7 +45,7 @@ pub fn parse_struct_or_union_specifier<'text>(
             return Err(ParseError::Expected(Token::Symbol("}"), pos));
         };
 
-        return Ok((sds, pos + 1));
+        Ok((sds, pos + 1))
     }
 
     if let Some(Token::Ident(ident)) = tokens.get(pos) {

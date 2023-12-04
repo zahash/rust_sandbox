@@ -1,10 +1,6 @@
 use super::super::ParseContext;
 use super::{conditional::parse_conditional_expr, unary::parse_unary_expr};
-use crate::{
-    AdditiveExpr, BitAndExpr, BitOrExpr, CastExpr, ComparisionExpr, ConditionalExpr, EqualityExpr,
-    LogicalAndExpr, LogicalOrExpr, MultiplicativeExpr, ParseError, PostfixExpr, Primary, ShiftExpr,
-    Token, UnaryExpr, XORExpr,
-};
+use crate::{ConditionalExpr, ParseError, Token, UnaryExpr};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -89,24 +85,6 @@ pub fn parse_assignment_expr<'text>(
 
     let (expr, pos) = parse_conditional_expr(tokens, pos, ctx)?;
     Ok((expr.into(), pos))
-}
-
-impl<'text> From<Primary<'text>> for AssignmentExpr<'text> {
-    fn from(value: Primary<'text>) -> Self {
-        AssignmentExpr::ConditionalExpr(ConditionalExpr::LogicalOrExpr(
-            LogicalOrExpr::LogicalAndExpr(LogicalAndExpr::BitOrExpr(BitOrExpr::XORExpr(
-                XORExpr::BitAndExpr(BitAndExpr::EqualityExpr(EqualityExpr::ComparisionExpr(
-                    ComparisionExpr::ShiftExpr(ShiftExpr::AdditiveExpr(
-                        AdditiveExpr::MultiplicativeExpr(MultiplicativeExpr::CastExpr(
-                            CastExpr::UnaryExpr(UnaryExpr::PostfixExpr(PostfixExpr::Primary(
-                                value,
-                            ))),
-                        )),
-                    )),
-                ))),
-            ))),
-        ))
-    }
 }
 
 impl<'text> Display for AssignmentExpr<'text> {

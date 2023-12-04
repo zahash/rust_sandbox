@@ -80,8 +80,8 @@ impl<'text> Display for PostfixExpr<'text> {
                 write_arr(f, args, ", ")?;
                 write!(f, ")")
             }
-            PostfixExpr::MemberAccess(expr, ident) => write!(f, "{}.{}", expr, ident),
-            PostfixExpr::PointerMemberAccess(expr, ident) => write!(f, "{}->{}", expr, ident),
+            PostfixExpr::MemberAccess(expr, field) => write!(f, "{}.{}", expr, field),
+            PostfixExpr::PointerMemberAccess(expr, field) => write!(f, "{}->{}", expr, field),
             PostfixExpr::PostIncr(expr) => write!(f, "{}++", expr),
             PostfixExpr::PostDecr(expr) => write!(f, "{}--", expr),
         }

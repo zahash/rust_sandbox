@@ -1,6 +1,10 @@
 use self::assignment::parse_assignment_expr;
 use super::ParseContext;
-use crate::{AssignmentExpr, ParseError, Token};
+use crate::{
+    AdditiveExpr, AssignmentExpr, BitAndExpr, BitOrExpr, CastExpr, ComparisionExpr,
+    ConditionalExpr, EqualityExpr, LogicalAndExpr, LogicalOrExpr, MultiplicativeExpr, ParseError,
+    PostfixExpr, Primary, ShiftExpr, Token, UnaryExpr, XORExpr,
+};
 
 pub mod additive;
 pub mod assignment;
@@ -27,4 +31,22 @@ pub fn parse_expr<'text>(
     ctx: &mut ParseContext<'text>,
 ) -> Result<(Expr<'text>, usize), ParseError> {
     parse_assignment_expr(tokens, pos, ctx)
+}
+
+impl<'text> From<Primary<'text>> for Expr<'text> {
+    fn from(value: Primary<'text>) -> Self {
+        AssignmentExpr::ConditionalExpr(ConditionalExpr::LogicalOrExpr(
+            LogicalOrExpr::LogicalAndExpr(LogicalAndExpr::BitOrExpr(BitOrExpr::XORExpr(
+                XORExpr::BitAndExpr(BitAndExpr::EqualityExpr(EqualityExpr::ComparisionExpr(
+                    ComparisionExpr::ShiftExpr(ShiftExpr::AdditiveExpr(
+                        AdditiveExpr::MultiplicativeExpr(MultiplicativeExpr::CastExpr(
+                            CastExpr::UnaryExpr(UnaryExpr::PostfixExpr(PostfixExpr::Primary(
+                                value,
+                            ))),
+                        )),
+                    )),
+                ))),
+            ))),
+        ))
+    }
 }

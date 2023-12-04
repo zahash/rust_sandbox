@@ -45,14 +45,14 @@ impl<'text> Display for ParameterDeclaration<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             ParameterDeclaration::WithDeclarator(dss, d) => {
-                write_arr(f, &dss, " ")?;
+                write_arr(f, dss, " ")?;
                 write!(f, " {}", d)
             }
             ParameterDeclaration::WithAbstractDeclarator(dss, ad) => {
-                write_arr(f, &dss, " ")?;
+                write_arr(f, dss, " ")?;
                 write!(f, "{}", ad)
             }
-            ParameterDeclaration::OnlySpecifiers(dss) => write_arr(f, &dss, " "),
+            ParameterDeclaration::OnlySpecifiers(dss) => write_arr(f, dss, " "),
         }
     }
 }

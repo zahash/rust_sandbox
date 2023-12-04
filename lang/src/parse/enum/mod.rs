@@ -43,7 +43,7 @@ pub fn parse_enum_specifier<'text>(
             return Err(ParseError::Expected(Token::Symbol("}"), pos));
         };
 
-        return Ok((enum_constants, pos + 1));
+        Ok((enum_constants, pos + 1))
     }
 
     if let Some(Token::Ident(ident)) = tokens.get(pos + 1) {

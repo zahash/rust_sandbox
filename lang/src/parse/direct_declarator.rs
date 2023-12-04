@@ -41,7 +41,7 @@ pub fn parse_direct_declarator<'text>(
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
-        Ok((DirectDeclarator::Ident(&ident, dd_tail), pos))
+        Ok((DirectDeclarator::Ident(ident, dd_tail), pos))
     }
 
     fn parse_parens<'text>(
