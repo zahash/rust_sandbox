@@ -15,6 +15,7 @@ pub enum IterationStmt<'text> {
         body: Box<Stmt<'text>>,
     },
     For {
+        /* Currently, for loop doesn't support declarations in the init section */
         init: Option<Expr<'text>>,
         test: Option<Expr<'text>>,
         update: Option<Expr<'text>>,

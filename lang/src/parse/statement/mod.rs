@@ -18,8 +18,8 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Stmt<'text> {
-    Labeled(LabeledStmt<'text>),
     EmptyStmt,
+    Labeled(LabeledStmt<'text>),
     Expr(Expr<'text>),
     Compound(CompoundStmt<'text>),
     Selection(SelectionStmt<'text>),
