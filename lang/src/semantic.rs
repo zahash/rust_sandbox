@@ -453,9 +453,7 @@ fn analyze_equality_expr<'ast, 'text>(
             (Type::Int, Type::Int)
             | (Type::Char, Type::Char)
             | (Type::Float, Type::Float)
-            | (Type::Double, Type::Double)
-            | (Type::Char, Type::Int)
-            | (Type::Int, Type::Char) => Ok(Type::Int),
+            | (Type::Double, Type::Double) => Ok(Type::Int),
             _ => Err(SemanticError::InvalidBinaryOperands(BinOp::Equality(expr))),
         },
     }
