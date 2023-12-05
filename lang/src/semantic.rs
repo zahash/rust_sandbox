@@ -59,12 +59,15 @@ enum SemanticError<'ast, 'text> {
         from: Type<'text>,
         to: Type<'text>,
     },
-    JumpNotInLoop(&'ast JumpStmt<'text>),
+    IllegalJump(&'ast JumpStmt<'text>),
     ReturnTypeMismatch {
         expected: Type<'text>,
         actual: Type<'text>,
     },
     ReturnOutsideFn(&'ast JumpStmt<'text>),
+    CaseOutsideSwitch(&'ast LabeledStmt<'text>),
+    DefaultOutsideSwitch(&'ast LabeledStmt<'text>),
+    LabelRedeclaration(&'ast LabeledStmt<'text>),
 }
 
 enum Symbol<'text> {
@@ -94,7 +97,7 @@ struct Scope<'text> {
 enum ScopeKind<'text> {
     Regular,
     Fn(Type<'text>),
-    Switch,
+    Switch(Type<'text>),
     Loop,
 }
 
@@ -134,6 +137,45 @@ impl<'text> SemanticContext<'text> {
             .expect("must have atleast one scope")
     }
 
+    fn curr_fn_scope<'ctx>(&'ctx self) -> Option<(&'ctx Type<'text>, &'ctx [Symbol<'text>])> {
+        self.symbol_table
+            .iter()
+            .rev()
+            .find_map(|scope| match &scope.kind {
+                ScopeKind::Fn(return_ty) => Some((return_ty, scope.symbols.as_slice())),
+                _ => None,
+            })
+    }
+
+    fn curr_switch_scope<'ctx>(&'ctx self) -> Option<(&'ctx Type<'text>, &'ctx [Symbol<'text>])> {
+        self.symbol_table
+            .iter()
+            .rev()
+            .find_map(|scope| match &scope.kind {
+                ScopeKind::Switch(ty) => Some((ty, scope.symbols.as_slice())),
+                _ => None,
+            })
+    }
+
+    fn in_loop<'ctx>(&'ctx self) -> bool {
+        self.symbol_table
+            .iter()
+            .rev()
+            .any(|scope| scope.kind == ScopeKind::Loop)
+    }
+
+    fn in_switch<'ctx>(&'ctx self) -> bool {
+        self.symbol_table
+            .iter()
+            .rev()
+            .any(|scope| match scope.kind {
+                ScopeKind::Switch(_) => true,
+                _ => false,
+            })
+    }
+
+    // fn curr_switch_scope<'ctx>
+
     fn declare_var(&mut self, var: Var<'text>) -> bool {
         let scope = self.curr_scope_mut();
 
@@ -158,14 +200,7 @@ impl<'text> SemanticContext<'text> {
         self.symbol_table
             .iter()
             .rev()
-            .flat_map(
-                /* C doesn't allow redeclaring variables (shadowing).
-                So, scope.iter() and scope.iter().rev() work the same.
-                scope.iter.rev() is used here because of a future possiblility to allow shadowing
-                NOTE: if shadowing is allowed, .rev() must be used everywhere where scope is accessed
-                */
-                |scope| scope.symbols.iter().rev(),
-            )
+            .flat_map(|scope| scope.symbols.iter().rev())
             .filter_map(|s| match s {
                 Symbol::Var(v) => Some(v),
                 _ => None,
@@ -173,10 +208,27 @@ impl<'text> SemanticContext<'text> {
             .find(|var| var.name == name)
     }
 
-    fn declare_label(&mut self, label: &'text str) {
+    fn declare_label(&mut self, label: &'text str) -> bool {
+        // labels are function scoped.
+        // so checking for label just inside local scope is not enough
+        if self
+            .symbol_table
+            .iter()
+            .rev()
+            .flat_map(|scope| scope.symbols.iter().rev())
+            .filter_map(|s| match s {
+                Symbol::Label(l) => Some(l),
+                _ => None,
+            })
+            .any(|l| l.0 == label)
+        {
+            return false;
+        }
+
         self.curr_scope_mut()
             .symbols
             .push(Symbol::Label(Label(label)));
+        true
     }
 
     fn find_label<'ctx>(&'ctx self, label: &'text str) -> Option<&'ctx Label<'text>> {
@@ -188,6 +240,10 @@ impl<'text> SemanticContext<'text> {
                 _ => None,
             })
             .find(|Label(label_)| *label_ == label)
+    }
+
+    fn contains_label(&self, label: &'text str) -> bool {
+        self.find_label(label).is_some()
     }
 
     fn declare_enum_invariant(&mut self, e: Enum<'text>) -> bool {
@@ -361,21 +417,31 @@ fn analyze_labeled_stmt<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        LabeledStmt::Ident(_, stmt) => {
-            // Analyze statements following an identifier (usually used for goto)
-            analyze_stmt(stmt, ctx)?;
+        LabeledStmt::Ident(label, inner_stmt) => {
+            if !ctx.declare_label(label) {
+                return Err(SemanticError::LabelRedeclaration(stmt));
+            }
+            analyze_stmt(inner_stmt, ctx)
         }
-        LabeledStmt::Case(_, stmt) => {
-            // Analyze the statement following a case label
-            analyze_stmt(stmt, ctx)?;
-        }
-        LabeledStmt::Default(stmt) => {
-            // Analyze the statement following the default label
-            analyze_stmt(stmt, ctx)?;
-        }
+        LabeledStmt::Case(expr, inner_stmt) => match ctx.curr_switch_scope() {
+            Some((switch_ty, _)) => {
+                match (switch_ty.clone(), analyze_conditional_expr(expr, ctx)?) {
+                    (Type::Int, Type::Int) | (Type::Char, Type::Char) => {
+                        analyze_stmt(inner_stmt, ctx)
+                    }
+                    (switch_ty, expr_ty) => Err(SemanticError::UnexpectedType {
+                        expected: switch_ty,
+                        actual: expr_ty,
+                    }),
+                }
+            }
+            None => Err(SemanticError::CaseOutsideSwitch(stmt)),
+        },
+        LabeledStmt::Default(inner_stmt) => match ctx.in_switch() {
+            true => analyze_stmt(inner_stmt, ctx),
+            false => Err(SemanticError::DefaultOutsideSwitch(stmt)),
+        },
     }
-
-    Ok(())
 }
 
 fn analyze_compound_stmt<'ast, 'text>(
@@ -389,7 +455,7 @@ fn analyze_compound_stmt<'ast, 'text>(
                 BlockItem::Declaration(d) => analyze_declaration(d, ctx),
                 BlockItem::Statement(stmt) => analyze_stmt(stmt, ctx),
             })
-            .find(|r| r.is_err())
+            .find(Result::is_err)
             .unwrap_or(Ok(()))
     })
 }
@@ -431,7 +497,7 @@ fn analyze_selection_stmt<'ast, 'text>(
                 });
             }
 
-            ctx.scoped(ScopeKind::Switch, |ctx| analyze_stmt(pass, ctx))
+            ctx.scoped(ScopeKind::Switch(test_ty), |ctx| analyze_stmt(pass, ctx))
         }
     }
 }
@@ -498,38 +564,48 @@ fn analyze_jump_stmt<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        JumpStmt::Goto(label) => ctx
-            .find_label(label)
-            .map(|_| ())
-            .ok_or(SemanticError::UndefinedLabel(label)),
-        JumpStmt::Continue | JumpStmt::Break => {
-            match ctx.curr_scope_mut().kind == ScopeKind::Loop {
-                true => Ok(()),
-                false => Err(SemanticError::JumpNotInLoop(stmt)),
-            }
-        }
-        JumpStmt::Return(expr) => match (ctx.curr_scope().kind.clone(), expr) {
-            (ScopeKind::Fn(Type::Void), None) => Ok(()),
-            (ScopeKind::Fn(Type::Void), Some(expr)) => Err(SemanticError::ReturnTypeMismatch {
-                expected: Type::Void,
-                actual: analyze_assignment_expr(expr, ctx)?,
-            }),
-            (ScopeKind::Fn(return_ty), None) => Err(SemanticError::ReturnTypeMismatch {
-                expected: return_ty,
-                actual: Type::Void,
-            }),
-            (ScopeKind::Fn(return_ty), Some(expr)) => {
-                let expr_ty = analyze_assignment_expr(expr, ctx)?;
-                match return_ty == expr_ty {
-                    true => Ok(()),
-                    false => Err(SemanticError::ReturnTypeMismatch {
-                        expected: return_ty,
-                        actual: expr_ty,
-                    }),
+        JumpStmt::Goto(label) => match ctx.contains_label(label) {
+            true => Ok(()),
+            false => Err(SemanticError::UndefinedLabel(label)),
+        },
+        JumpStmt::Continue => match ctx.in_loop() {
+            true => Ok(()),
+            false => Err(SemanticError::IllegalJump(stmt)),
+        },
+        JumpStmt::Break => match ctx.in_loop() || ctx.in_switch() {
+            true => Ok(()),
+            false => Err(SemanticError::IllegalJump(stmt)),
+        },
+        JumpStmt::Return(expr) => {
+            let Some((return_ty, _)) = ctx.curr_fn_scope() else {
+                // The parse won't allow return statement outside a function
+                // so this check is redundant and can be safely unwrapped
+                // instead of returning a Result::Err
+                return Err(SemanticError::ReturnOutsideFn(stmt));
+            };
+
+            match (return_ty.clone(), expr) {
+                (Type::Void, None) => Ok(()),
+                (Type::Void, Some(expr)) => Err(SemanticError::ReturnTypeMismatch {
+                    expected: Type::Void,
+                    actual: analyze_assignment_expr(expr, ctx)?,
+                }),
+                (return_ty, None) => Err(SemanticError::ReturnTypeMismatch {
+                    expected: return_ty,
+                    actual: Type::Void,
+                }),
+                (return_ty, Some(expr)) => {
+                    let expr_ty = analyze_assignment_expr(expr, ctx)?;
+                    match return_ty == expr_ty {
+                        true => Ok(()),
+                        false => Err(SemanticError::ReturnTypeMismatch {
+                            expected: return_ty.clone(),
+                            actual: expr_ty,
+                        }),
+                    }
                 }
             }
-            _ => Err(SemanticError::ReturnOutsideFn(stmt)),
-        },
+        }
     }
 }
 
