@@ -14,8 +14,28 @@ enum Type<'text> {
     String,
     Pointer(Box<Type<'text>>),
     Array(Box<Type<'text>>, usize),
-    Function(Box<Type<'text>>, Vec<Type<'text>>), // return type; parameter types
-    Struct(&'text str, Vec<(&'text str, Type<'text>)>),
+    Function {
+        return_ty: Box<Type<'text>>,
+        param_tys: Vec<Type<'text>>,
+    },
+    Struct {
+        name: &'text str,
+        members: Vec<(&'text str, Type<'text>)>,
+    },
+    TypeDef {
+        name: &'text str,
+        ty: Box<Type<'text>>,
+    },
+    SignedChar,
+    UnSignedChar,
+    Short,
+    UnSignedShort,
+    UnSigned,
+    Long,
+    UnSignedLong,
+    LongLong,
+    UnSignedLongLong,
+    LongDouble,
 }
 
 #[derive(Debug)]
@@ -68,6 +88,8 @@ enum SemanticError<'ast, 'text> {
     CaseOutsideSwitch(&'ast LabeledStmt<'text>),
     DefaultOutsideSwitch(&'ast LabeledStmt<'text>),
     LabelRedeclaration(&'ast LabeledStmt<'text>),
+    InvalidSpecifierQualifiers(&'ast [SpecifierQualifier<'text>]),
+    InvalidFunctionDefinition(&'ast FunctionDefinition<'text>),
 }
 
 enum Symbol<'text> {
@@ -282,6 +304,8 @@ impl<'text> SemanticContext<'text> {
             })
             .find(|e| e.name == name)
     }
+
+    // fn find_typedef<'ctx>(&'ctx self, name: &'text str) -> Option<>
 }
 
 fn analyze_translation_unit<'ast, 'text>(
@@ -309,7 +333,72 @@ fn analyze_function_definition<'ast, 'text>(
     f: &'ast FunctionDefinition<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
-    todo!()
+    let return_ty = analyze_declaration_specifiers(&f.declaration_specifiers, ctx)?;
+    let DirectDeclarator::Ident(name, Some(dd_tail)) = &f.declarator.d_declarator else {
+        // this error will never happen because its invalid grammar.
+        // it will never reach the semantic analysis phase because the parser will disallow it.
+        // but still, its nice to return Err instead of panic.
+        return Err(SemanticError::InvalidFunctionDefinition(f));
+    };
+
+    ctx.scoped(ScopeKind::Fn(return_ty), |ctx| {
+        match f.declarations.is_empty() {
+            true => {
+                /*
+                this is the normal function syntax as god intended.
+
+                int add(int a, int b) {
+                    return a + b;
+                }
+
+                */
+
+                let DirectDeclaratorTail::Function(params, None) = dd_tail else {
+                    return Err(SemanticError::InvalidFunctionDefinition(f));
+                };
+
+                match params {
+                    ParameterTypeList::ParameterList(params) => {
+                        for param in params {
+                            match param {
+                                ParameterDeclaration::WithDeclarator(dss, d) => {
+                                    let param_ty = analyze_declaration_specifiers(dss, ctx)?;
+                                    // let a = analyze_declarator(d, ctx)?;
+                                    todo!()
+                                }
+                                _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
+                            }
+                        }
+                    }
+                    ParameterTypeList::VariadicParameterList(_) => todo!(),
+                }
+            }
+            false => {
+                /*
+                this is also valid C syntax 💀💀 ...
+
+                int add(a, b) int a; int b; {
+                    return a + b;
+                }
+
+                int a; int b; are declarations
+                */
+
+                // let params = f.declarations.iter()
+                //     .map(|d| analyze_declaration(d, ctx))
+                // ;
+
+                // let DirectDeclaratorTail::Parameters(param_names, None) = dd_tail else {
+                //     return Err(SemanticError::InvalidFunctionDefinition(f));
+                // };
+
+                // check that param names and declarations match one to one.
+            }
+        };
+
+        analyze_compound_stmt(&f.body, ctx)?;
+        Ok(())
+    })
 }
 
 fn analyze_declaration<'ast, 'text>(
@@ -328,14 +417,10 @@ fn analyze_declaration<'ast, 'text>(
     Ok(())
 }
 
-struct Dss;
 fn analyze_declaration_specifiers<'ast, 'text>(
     declaration: &'ast [DeclarationSpecifier<'text>],
     ctx: &mut SemanticContext<'text>,
-) -> Result<Dss, SemanticError<'ast, 'text>> {
-    // can't just return Result<Type, ...> because declaration specifier
-    // could be a typedef
-
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
 }
 
@@ -394,7 +479,106 @@ fn analyze_type_name<'ast, 'text>(
     type_name: &'ast TypeName<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    let base_ty = analyze_specifier_qualifiers(&type_name.specifier_qualifiers, ctx)?;
+
+    match type_name.abstract_declarator.as_ref() {
+        Some(ad) => {
+            let declarator_ty = analyze_abstract_declarator(ad, ctx)?;
+
+            // let a = match (base_ty, declarator_ty) {
+            // }
+
+            todo!()
+
+            // match (base_ty, declarator_ty) {
+            // }
+        }
+        None => Ok(base_ty),
+    }
+}
+
+fn analyze_specifier_qualifiers<'ast, 'text>(
+    sqs: &'ast [SpecifierQualifier<'text>],
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    // TODO: check TypeQualifiers (const, volatile)
+
+    use TypeSpecifier::*;
+
+    let mut tss = sqs
+        .iter()
+        .filter_map(|sq| match sq {
+            SpecifierQualifier::TypeSpecifier(ts) => Some(ts),
+            _ => None,
+        })
+        .collect::<Vec<&TypeSpecifier<'text>>>();
+
+    tss.sort_by_key(|ts| match ts {
+        Void => 2,
+        Signed => 3,
+        UnSigned => 4,
+        Short => 5,
+        Long => 6,
+        Int => 7,
+        Char => 8,
+        Float => 9,
+        Double => 10,
+        StructOrUnionSpecifier(_) => 11,
+        EnumSpecifier(_) => 12,
+        TypeDefName(_) => 13,
+    });
+
+    match tss.as_slice() {
+        [Void] => Ok(Type::Void),
+        [Char] => Ok(Type::Char),
+        [Signed, Char] => Ok(Type::SignedChar),
+        [UnSigned, Char] => Ok(Type::UnSignedChar),
+        [Short] | [Signed, Short] | [Short, Int] | [Signed, Short, Int] => Ok(Type::Short),
+        [UnSigned, Short] | [UnSigned, Short, Int] => Ok(Type::UnSignedShort),
+        [Int] | [Signed] | [Signed, Int] => Ok(Type::Int),
+        [UnSigned] | [UnSigned, Int] => Ok(Type::UnSigned),
+        [Long] | [Signed, Long] | [Long, Int] | [Signed, Long, Int] => Ok(Type::Long),
+        [UnSigned, Long] | [UnSigned, Long, Int] => Ok(Type::UnSignedLong),
+        [Long, Long] | [Signed, Long, Long] | [Long, Long, Int] | [Signed, Long, Long, Int] => {
+            Ok(Type::LongLong)
+        }
+        [UnSigned, Long, Long] | [UnSigned, Long, Long, Int] => Ok(Type::UnSignedLongLong),
+        [Float] => Ok(Type::Float),
+        [Double] => Ok(Type::Double),
+        [Long, Double] => Ok(Type::LongDouble),
+        [StructOrUnionSpecifier(sou)] => analyze_struct_or_union_specifier(sou, ctx),
+        [EnumSpecifier(e)] => analyze_enum_specifier(e, ctx),
+        [TypeDefName(name)] => {
+            // ctx.find_typedef(name);
+            todo!()
+        }
+        _ => Err(SemanticError::InvalidSpecifierQualifiers(sqs)),
+    }
+}
+
+fn analyze_struct_or_union_specifier<'ast, 'text>(
+    sou: &StructOrUnionSpecifier<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
+}
+
+fn analyze_enum_specifier<'ast, 'text>(
+    e: &EnumSpecifier<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    todo!()
+}
+
+fn analyze_abstract_declarator<'ast, 'text>(
+    ad: &AbstractDeclarator<'text>,
+    ctx: &mut SemanticContext<'text>,
+) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
+    match ad {
+        AbstractDeclarator::Pointer(p) => todo!(),
+        AbstractDeclarator::PointerWithDirect(p, dad) => todo!(),
+        AbstractDeclarator::Direct(dad) => todo!(),
+    }
 }
 
 fn analyze_stmt<'ast, 'text>(
@@ -951,7 +1135,10 @@ fn analyze_postfix_expr<'ast, 'text>(
         },
         PostfixExpr::FunctionCall(inner_expr, args) => match analyze_postfix_expr(inner_expr, ctx)?
         {
-            Type::Function(return_ty, param_tys) => {
+            Type::Function {
+                return_ty,
+                param_tys,
+            } => {
                 if args.len() != param_tys.len() {
                     return Err(SemanticError::InvalidFnCall(expr));
                 }
@@ -965,7 +1152,10 @@ fn analyze_postfix_expr<'ast, 'text>(
                 Ok(*return_ty)
             }
             Type::Pointer(ty) => match *ty {
-                Type::Function(return_ty, param_tys) => {
+                Type::Function {
+                    return_ty,
+                    param_tys,
+                } => {
                     if args.len() != param_tys.len() {
                         return Err(SemanticError::InvalidFnCall(expr));
                     }
@@ -984,22 +1174,28 @@ fn analyze_postfix_expr<'ast, 'text>(
         },
         PostfixExpr::MemberAccess(inner_expr, field) => {
             match analyze_postfix_expr(inner_expr, ctx)? {
-                Type::Struct(struct_name, members) => members
+                Type::Struct { name, members } => members
                     .into_iter()
                     .find(|(name, _)| name == field)
                     .map(|(_, ty)| ty)
-                    .ok_or(SemanticError::UndefinedMember { struct_name, field }),
+                    .ok_or(SemanticError::UndefinedMember {
+                        struct_name: name,
+                        field,
+                    }),
                 _ => Err(SemanticError::NotAStruct(inner_expr)),
             }
         }
         PostfixExpr::PointerMemberAccess(inner_expr, field) => {
             match analyze_postfix_expr(inner_expr, ctx)? {
                 Type::Pointer(inner_ty) => match *inner_ty {
-                    Type::Struct(struct_name, members) => members
+                    Type::Struct { name, members } => members
                         .into_iter()
                         .find(|(name, _)| name == field)
                         .map(|(_, ty)| ty)
-                        .ok_or(SemanticError::UndefinedMember { struct_name, field }),
+                        .ok_or(SemanticError::UndefinedMember {
+                            struct_name: name,
+                            field,
+                        }),
                     _ => Err(SemanticError::NotAStruct(inner_expr)),
                 },
                 _ => Err(SemanticError::NotAPointerToStruct(inner_expr)),
