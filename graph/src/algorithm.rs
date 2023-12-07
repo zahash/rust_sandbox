@@ -7,15 +7,15 @@ use std::{
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Path<Node> {
     pub node: Node,
-    pub parent: Box<Option<Path<Node>>>,
+    pub parent: Option<Box<Path<Node>>>,
 }
 
 impl<Node> From<Path<Node>> for Vec<Node> {
     fn from(path: Path<Node>) -> Self {
         let mut result = vec![];
 
-        if let Some(parent) = *path.parent {
-            result.append(&mut parent.into())
+        if let Some(parent) = path.parent {
+            result.append(&mut (*parent).into())
         }
 
         result.push(path.node);
@@ -31,7 +31,7 @@ pub fn breadth_first_traverse<Node: Clone + Eq + Hash>(
     let mut frontier: VecDeque<Path<Node>> = VecDeque::new();
     frontier.push_back(Path {
         node: start.clone(),
-        parent: Box::default(),
+        parent: None,
     });
 
     let mut seen: HashSet<Node> = HashSet::new();
@@ -50,7 +50,7 @@ pub fn breadth_first_traverse<Node: Clone + Eq + Hash>(
 
             frontier.push_back(Path {
                 node: next_node,
-                parent: Box::new(Some(path.clone())),
+                parent: Some(Box::new(path.clone())),
             })
         }
     }
@@ -65,7 +65,7 @@ pub fn depth_first_traverse<Node: Clone + Eq + Hash>(
     let mut frontier: Vec<Path<Node>> = Vec::new();
     frontier.push(Path {
         node: start.clone(),
-        parent: Box::default(),
+        parent: None,
     });
 
     let mut seen: HashSet<Node> = HashSet::new();
@@ -84,7 +84,7 @@ pub fn depth_first_traverse<Node: Clone + Eq + Hash>(
 
             frontier.push(Path {
                 node: next_node,
-                parent: Box::new(Some(path.clone())),
+                parent: Some(Box::new(path.clone())),
             })
         }
     }
