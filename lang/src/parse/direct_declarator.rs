@@ -16,13 +16,13 @@ pub enum DirectDeclarator<'text> {
 pub enum DirectDeclaratorTail<'text> {
     Array(
         Option<ConstantExpr<'text>>,
-        Box<Option<DirectDeclaratorTail<'text>>>,
+        Option<Box<DirectDeclaratorTail<'text>>>,
     ),
     Function(
         ParameterTypeList<'text>,
-        Box<Option<DirectDeclaratorTail<'text>>>,
+        Option<Box<DirectDeclaratorTail<'text>>>,
     ),
-    Parameters(Vec<&'text str>, Box<Option<DirectDeclaratorTail<'text>>>),
+    Parameters(Vec<&'text str>, Option<Box<DirectDeclaratorTail<'text>>>),
 }
 
 pub fn parse_direct_declarator<'text>(
@@ -95,7 +95,7 @@ fn parse_direct_declarator_tail<'text>(
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
-        Ok((DirectDeclaratorTail::Array(expr, Box::new(dd_tail)), pos))
+        Ok((DirectDeclaratorTail::Array(expr, dd_tail.map(Box::new)), pos))
     }
 
     fn parse_function<'text>(
@@ -115,7 +115,7 @@ fn parse_direct_declarator_tail<'text>(
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
-        Ok((DirectDeclaratorTail::Function(list, Box::new(dd_tail)), pos))
+        Ok((DirectDeclaratorTail::Function(list, dd_tail.map(Box::new)), pos))
     }
 
     fn parse_parameters<'text>(
@@ -147,7 +147,7 @@ fn parse_direct_declarator_tail<'text>(
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
         Ok((
-            DirectDeclaratorTail::Parameters(idents, Box::new(dd_tail)),
+            DirectDeclaratorTail::Parameters(idents, dd_tail.map(Box::new)),
             pos,
         ))
     }

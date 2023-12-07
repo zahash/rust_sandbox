@@ -9,7 +9,7 @@ use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct FunctionDefinition<'text> {
-    pub return_type: Vec<DeclarationSpecifier<'text>>,
+    pub declaration_specifiers: Vec<DeclarationSpecifier<'text>>,
     pub declarator: Declarator<'text>,
     pub declarations: Vec<Declaration<'text>>,
     pub body: CompoundStmt<'text>,
@@ -20,14 +20,14 @@ pub fn parse_function_definition<'text>(
     pos: usize,
     ctx: &mut ParseContext<'text>,
 ) -> Result<(FunctionDefinition<'text>, usize), ParseError> {
-    let (dss, pos) = many(tokens, pos, ctx, parse_declaration_specifier);
+    let (declaration_specifiers, pos) = many(tokens, pos, ctx, parse_declaration_specifier);
     let (declarator, pos) = parse_declarator(tokens, pos, ctx)?;
     let (declarations, pos) = many(tokens, pos, ctx, parse_declaration);
     let (body, pos) = parse_compound_stmt(tokens, pos, ctx)?;
 
     Ok((
         FunctionDefinition {
-            return_type: dss,
+            declaration_specifiers,
             declarator,
             declarations,
             body,
@@ -38,8 +38,8 @@ pub fn parse_function_definition<'text>(
 
 impl<'text> Display for FunctionDefinition<'text> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if !self.return_type.is_empty() {
-            write_arr(f, &self.return_type, " ")?;
+        if !self.declaration_specifiers.is_empty() {
+            write_arr(f, &self.declaration_specifiers, " ")?;
             write!(f, " ")?;
         }
 

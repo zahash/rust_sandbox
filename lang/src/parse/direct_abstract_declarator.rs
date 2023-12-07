@@ -26,11 +26,11 @@ pub enum DirectAbstractDeclarator<'text> {
 pub enum DirectAbstractDeclaratorTail<'text> {
     Array(
         Option<ConstantExpr<'text>>,
-        Box<Option<DirectAbstractDeclaratorTail<'text>>>,
+        Option<Box<DirectAbstractDeclaratorTail<'text>>>,
     ),
     Function(
         Option<ParameterTypeList<'text>>,
-        Box<Option<DirectAbstractDeclaratorTail<'text>>>,
+        Option<Box<DirectAbstractDeclaratorTail<'text>>>,
     ),
 }
 
@@ -137,7 +137,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
-            DirectAbstractDeclaratorTail::Array(expr, Box::new(dad_tail)),
+            DirectAbstractDeclaratorTail::Array(expr, dad_tail.map(Box::new)),
             pos,
         ))
     }
@@ -160,7 +160,7 @@ fn parse_direct_abstract_declarator_tail<'text>(
         let (dad_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_abstract_declarator_tail);
 
         Ok((
-            DirectAbstractDeclaratorTail::Function(parameter_type_list, Box::new(dad_tail)),
+            DirectAbstractDeclaratorTail::Function(parameter_type_list, dad_tail.map(Box::new)),
             pos,
         ))
     }

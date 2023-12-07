@@ -9,7 +9,7 @@ use std::fmt::{self, Display, Formatter};
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypeName<'text> {
     pub specifier_qualifiers: Vec<SpecifierQualifier<'text>>,
-    pub abstract_declarator: Box<Option<AbstractDeclarator<'text>>>,
+    pub abstract_declarator: Option<Box<AbstractDeclarator<'text>>>,
 }
 
 pub fn parse_type_name<'text>(
@@ -30,7 +30,7 @@ pub fn parse_type_name<'text>(
     Ok((
         TypeName {
             specifier_qualifiers: sqs,
-            abstract_declarator: Box::new(ad),
+            abstract_declarator: ad.map(Box::new),
         },
         pos,
     ))

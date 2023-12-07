@@ -61,5 +61,8 @@ mod tests {
         check!(parse_declarator, &mut ctx, "print(const char *fmt, ...)");
         check!(parse_declarator, &mut ctx, "log(const char *message, ...)");
         check!(parse_declarator, &mut ctx, "f(a, b, c)");
+        check!(parse_declarator, &mut ctx, "f(int a,  float[], int)");
+
+        // println!("{:#?}", crate::macros::ast!(parse_declarator, &mut ctx, "add(int a, int, float[])"));
     }
 }

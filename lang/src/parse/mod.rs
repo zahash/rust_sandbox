@@ -30,7 +30,7 @@ pub use declaration::Declaration;
 pub use declaration_specifier::DeclarationSpecifier;
 pub use declarator::Declarator;
 pub use direct_abstract_declarator::DirectAbstractDeclarator;
-pub use direct_declarator::DirectDeclarator;
+pub use direct_declarator::{DirectDeclarator, DirectDeclaratorTail};
 pub use external_declaration::ExternalDeclaration;
 pub use function_definition::FunctionDefinition;
 pub use init_declarator::InitDeclarator;
