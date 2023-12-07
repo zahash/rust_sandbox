@@ -54,7 +54,7 @@ impl<'text> From<MultiplicativeExpr<'text>> for AdditiveExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::expression::parse_expr};
+    use crate::{lex, macros::check, ast::expression::parse_expr};
 
     #[test]
     fn test_additive_expr() {

@@ -115,7 +115,7 @@ impl<'text> From<ConditionalExpr<'text>> for AssignmentExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::expression::parse_expr};
+    use crate::{lex, macros::check, ast::expression::parse_expr};
 
     #[test]
     fn test_assignment_expr() {

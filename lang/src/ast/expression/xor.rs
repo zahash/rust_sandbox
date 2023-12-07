@@ -47,7 +47,7 @@ impl<'text> From<BitAndExpr<'text>> for XORExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::expression::parse_expr};
+    use crate::{lex, macros::check, ast::expression::parse_expr};
 
     #[test]
     fn test_xor_expr() {

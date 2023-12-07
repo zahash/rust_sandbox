@@ -1,7 +1,7 @@
 mod lex;
-mod parse;
+mod ast;
 mod semantic;
 
 pub use lex::*;
-pub use parse::*;
+pub use ast::*;
 pub use semantic::*;

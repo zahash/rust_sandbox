@@ -19,7 +19,7 @@ pub fn parse_expr_stmt<'text>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::statement::parse_stmt};
+    use crate::{lex, macros::check, ast::statement::parse_stmt};
 
     #[test]
     fn test_expr_stmt() {

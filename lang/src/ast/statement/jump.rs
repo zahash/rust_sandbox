@@ -118,7 +118,7 @@ impl<'text> Display for JumpStmt<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::statement::parse_stmt};
+    use crate::{lex, macros::check, ast::statement::parse_stmt};
 
     #[test]
     fn test_jump_stmt() {

@@ -62,7 +62,7 @@ mod tests {
     use crate::{
         lex,
         macros::{check, check_ast},
-        parse::declaration::parse_declaration,
+        ast::declaration::parse_declaration,
     };
 
     #[test]

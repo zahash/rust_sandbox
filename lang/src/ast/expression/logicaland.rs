@@ -47,7 +47,7 @@ impl<'text> From<BitOrExpr<'text>> for LogicalAndExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::expression::parse_expr};
+    use crate::{lex, macros::check, ast::expression::parse_expr};
 
     #[test]
     fn test_logical_and_expr() {

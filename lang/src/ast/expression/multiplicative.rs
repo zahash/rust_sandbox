@@ -61,7 +61,7 @@ impl<'text> From<CastExpr<'text>> for MultiplicativeExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, parse::expression::parse_expr};
+    use crate::{lex, macros::check, ast::expression::parse_expr};
 
     #[test]
     fn test_multiplicative_expr() {
