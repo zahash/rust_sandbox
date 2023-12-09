@@ -90,6 +90,7 @@ enum SemanticError<'ast, 'text> {
     LabelRedeclaration(&'ast LabeledStmt<'text>),
     InvalidSpecifierQualifiers(&'ast [SpecifierQualifier<'text>]),
     InvalidFunctionDefinition(&'ast FunctionDefinition<'text>),
+    InvalidDSS(&'ast [DeclarationSpecifier<'text>]),
 }
 
 enum Symbol<'text> {
@@ -329,77 +330,217 @@ fn analyze_external_declaration<'ast, 'text>(
     Ok(())
 }
 
+struct ValidatedDeclarationSpecifiers<'ast, 'text> {
+    pub storage_class_specifier: Option<&'ast StorageClassSpecifier>,
+    pub type_qualifiers: Vec<&'ast TypeQualifier>,
+    pub type_specifiers: Vec<&'ast TypeSpecifier<'text>>,
+}
+
+impl<'ast, 'text> TryFrom<&'ast [DeclarationSpecifier<'text>]>
+    for ValidatedDeclarationSpecifiers<'ast, 'text>
+{
+    type Error = SemanticError<'ast, 'text>;
+
+    fn try_from(dss: &'ast [DeclarationSpecifier<'text>]) -> Result<Self, Self::Error> {
+        let dss_len = dss.len();
+
+        let mut storage_class_specifiers = vec![];
+        let mut type_specifiers = vec![];
+        let mut type_qualifiers = vec![];
+
+        for ds in dss {
+            match ds {
+                DeclarationSpecifier::StorageClassSpecifier(scs) => {
+                    storage_class_specifiers.push(scs)
+                }
+                DeclarationSpecifier::TypeSpecifier(ts) => type_specifiers.push(ts),
+                DeclarationSpecifier::TypeQualifier(tq) => type_qualifiers.push(tq),
+            }
+        }
+
+        if storage_class_specifiers.len() > 1 {
+            return Err(SemanticError::InvalidDSS(dss));
+        }
+        let storage_class_specifier = storage_class_specifiers.into_iter().next();
+
+        let mut simple_type_specifiers = vec![];
+        let mut struct_or_union_specifiers = vec![];
+        let mut enum_specifiers = vec![];
+        let mut typedef_names = vec![];
+        for ts in &type_specifiers {
+            match ts {
+                TypeSpecifier::StructOrUnionSpecifier(sus) => struct_or_union_specifiers.push(sus),
+                TypeSpecifier::EnumSpecifier(es) => enum_specifiers.push(es),
+                TypeSpecifier::TypeDefName(name) => typedef_names.push(name),
+                _ => simple_type_specifiers.push(ts),
+            }
+        }
+
+        let simple_type_specifiers_present = !simple_type_specifiers.is_empty();
+        let struct_or_union_specifiers_present = !struct_or_union_specifiers.is_empty();
+        let enum_specifiers_present = !enum_specifiers.is_empty();
+        let typedef_names_present = !typedef_names.is_empty();
+
+        let exactly_one_type_is_present = simple_type_specifiers_present
+            ^ struct_or_union_specifiers_present
+            ^ enum_specifiers_present
+            ^ typedef_names_present;
+
+        if !exactly_one_type_is_present {
+            return Err(SemanticError::InvalidDSS(dss));
+        }
+
+        // just a sanity check
+        assert_eq!(
+            dss_len,
+            storage_class_specifier.is_some() as usize
+                + type_qualifiers.len()
+                + type_specifiers.len(),
+            "declaration specifiers length mismatch after validation"
+        );
+
+        Ok(ValidatedDeclarationSpecifiers {
+            storage_class_specifier,
+            type_qualifiers,
+            type_specifiers,
+        })
+    }
+}
+
 fn analyze_function_definition<'ast, 'text>(
     f: &'ast FunctionDefinition<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
-    let return_ty = analyze_declaration_specifiers(&f.declaration_specifiers, ctx)?;
-    let DirectDeclarator::Ident(name, Some(dd_tail)) = &f.declarator.d_declarator else {
-        // this error will never happen because its invalid grammar.
-        // it will never reach the semantic analysis phase because the parser will disallow it.
-        // but still, its nice to return Err instead of panic.
+    use ast::StorageClassSpecifier::*;
+    use ast::TypeQualifier::*;
+    use ast::TypeSpecifier::*;
+
+    let vdss: ValidatedDeclarationSpecifiers = f.declaration_specifiers.as_slice().try_into()?;
+
+    if let Some(Auto) | Some(Register) | Some(TypeDef) = vdss.storage_class_specifier {
         return Err(SemanticError::InvalidFunctionDefinition(f));
-    };
+    }
 
-    ctx.scoped(ScopeKind::Fn(return_ty), |ctx| {
-        match f.declarations.is_empty() {
-            true => {
-                /*
-                this is the normal function syntax as god intended.
+    
 
-                int add(int a, int b) {
-                    return a + b;
-                }
-
-                */
-
-                let DirectDeclaratorTail::Function(params, None) = dd_tail else {
-                    return Err(SemanticError::InvalidFunctionDefinition(f));
-                };
-
-                match params {
-                    ParameterTypeList::ParameterList(params) => {
-                        for param in params {
-                            match param {
-                                ParameterDeclaration::WithDeclarator(dss, d) => {
-                                    let param_ty = analyze_declaration_specifiers(dss, ctx)?;
-                                    // let a = analyze_declarator(d, ctx)?;
-                                    todo!()
-                                }
-                                _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
-                            }
-                        }
-                    }
-                    ParameterTypeList::VariadicParameterList(_) => todo!(),
-                }
-            }
-            false => {
-                /*
-                this is also valid C syntax 💀💀 ...
-
-                int add(a, b) int a; int b; {
-                    return a + b;
-                }
-
-                int a; int b; are declarations
-                */
-
-                // let params = f.declarations.iter()
-                //     .map(|d| analyze_declaration(d, ctx))
-                // ;
-
-                // let DirectDeclaratorTail::Parameters(param_names, None) = dd_tail else {
-                //     return Err(SemanticError::InvalidFunctionDefinition(f));
-                // };
-
-                // check that param names and declarations match one to one.
-            }
-        };
-
-        analyze_compound_stmt(&f.body, ctx)?;
-        Ok(())
-    })
+    todo!()
 }
+
+// fn analyze_function_definition<'ast, 'text>(
+//     f: &'ast FunctionDefinition<'text>,
+//     ctx: &mut SemanticContext<'text>,
+// ) -> Result<(), SemanticError<'ast, 'text>> {
+//     use ast::StorageClassSpecifier::*;
+//     use ast::TypeQualifier::*;
+//     use ast::TypeSpecifier::*;
+
+//     let a = match f.declaration_specifiers.as_slice() {
+//         [DeclarationSpecifier::StorageClassSpecifier(_)] => 0,
+//         _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
+//     };
+
+//     for ds in &f.declaration_specifiers {
+//         if let DeclarationSpecifier::StorageClassSpecifier(Auto)
+//         | DeclarationSpecifier::StorageClassSpecifier(Register)
+//         | DeclarationSpecifier::StorageClassSpecifier(TypeDef) = ds
+//         {
+//             return Err(SemanticError::InvalidFunctionDefinition(f))
+//         }
+
+//         match ds {
+//             DeclarationSpecifier::StorageClassSpecifier(scs) => match scs {
+//                 Auto => todo!(),
+//                 Register => todo!(),
+//                 Static => todo!(),
+//                 Extern => todo!(),
+//                 TypeDef => todo!(),
+//             },
+//             DeclarationSpecifier::TypeSpecifier(ts) => match ts {
+//                 Void => todo!(),
+//                 Char => todo!(),
+//                 Short => todo!(),
+//                 Int => todo!(),
+//                 Long => todo!(),
+//                 Float => todo!(),
+//                 Double => todo!(),
+//                 Signed => todo!(),
+//                 UnSigned => todo!(),
+//                 StructOrUnionSpecifier(_) => todo!(),
+//                 EnumSpecifier(_) => todo!(),
+//                 TypeDefName(_) => todo!(),
+//             },
+//             DeclarationSpecifier::TypeQualifier(tq) => match tq {
+//                 Const => todo!(),
+//                 Volatile => todo!(),
+//             },
+//         }
+//     }
+
+//     let return_ty = analyze_declaration_specifiers(&f.declaration_specifiers, ctx)?;
+//     let DirectDeclarator::Ident(name, Some(dd_tail)) = &f.declarator.d_declarator else {
+//         // this error will never happen because its invalid grammar.
+//         // it will never reach the semantic analysis phase because the parser will disallow it.
+//         // but still, its nice to return Err instead of panic.
+//         return Err(SemanticError::InvalidFunctionDefinition(f));
+//     };
+
+//     ctx.scoped(ScopeKind::Fn(return_ty), |ctx| {
+//         match f.declarations.is_empty() {
+//             true => {
+//                 /*
+//                 this is the normal function syntax as god intended.
+
+//                 int add(int a, int b) {
+//                     return a + b;
+//                 }
+
+//                 */
+//                 let DirectDeclaratorTail::Function(params, None) = dd_tail else {
+//                     return Err(SemanticError::InvalidFunctionDefinition(f));
+//                 };
+
+//                 match params {
+//                     ParameterTypeList::ParameterList(params) => {
+//                         for param in params {
+//                             match param {
+//                                 ParameterDeclaration::WithDeclarator(dss, d) => {
+//                                     let param_ty = analyze_declaration_specifiers(dss, ctx)?;
+//                                     // let a = analyze_declarator(d, ctx)?;
+//                                     todo!()
+//                                 }
+//                                 _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
+//                             }
+//                         }
+//                     }
+//                     ParameterTypeList::VariadicParameterList(_) => todo!(),
+//                 }
+//             }
+//             false => {
+//                 /*
+//                 this is also valid C syntax 💀💀 ...
+
+//                 int add(a, b) int a; int b; {
+//                     return a + b;
+//                 }
+
+//                 int a; int b; are declarations
+//                 */
+//                 // let params = f.declarations.iter()
+//                 //     .map(|d| analyze_declaration(d, ctx))
+//                 // ;
+
+//                 // let DirectDeclaratorTail::Parameters(param_names, None) = dd_tail else {
+//                 //     return Err(SemanticError::InvalidFunctionDefinition(f));
+//                 // };
+
+//                 // check that param names and declarations match one to one.
+//             }
+//         };
+
+//         analyze_compound_stmt(&f.body, ctx)?;
+//         Ok(())
+//     })
+// }
 
 fn analyze_declaration<'ast, 'text>(
     declaration: &'ast Declaration<'text>,
@@ -418,7 +559,7 @@ fn analyze_declaration<'ast, 'text>(
 }
 
 fn analyze_declaration_specifiers<'ast, 'text>(
-    declaration: &'ast [DeclarationSpecifier<'text>],
+    dss: &'ast [DeclarationSpecifier<'text>],
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
