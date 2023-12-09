@@ -2,7 +2,10 @@ use super::{
     abstract_declarator::parse_abstract_declarator, expression::constant::parse_constant_expr,
     parameter_type_list::parse_parameter_type_list, ParseContext,
 };
-use crate::{AbstractDeclarator, ConstantExpr, ParameterTypeList, ParseError, Token};
+use crate::{
+    ast::{AbstractDeclarator, ConstantExpr, ParameterTypeList, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{combine_parsers, maybe};
 use std::fmt::{self, Display, Formatter};
 

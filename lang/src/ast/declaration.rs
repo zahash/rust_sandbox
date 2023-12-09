@@ -3,8 +3,11 @@ use super::{
     write_arr, ParseContext,
 };
 use crate::{
-    DeclarationSpecifier, Declarator, DirectDeclarator, InitDeclarator, ParseError,
-    StorageClassSpecifier, Token,
+    ast::{
+        DeclarationSpecifier, Declarator, DirectDeclarator, InitDeclarator, ParseError,
+        StorageClassSpecifier,
+    },
+    lex::Token,
 };
 use chainchomp::ctx_sensitive::{many, many_delimited};
 use std::fmt::{self, Display, Formatter};
@@ -77,7 +80,7 @@ impl<'text> Display for Declaration<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::check, lex};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_declaration() {

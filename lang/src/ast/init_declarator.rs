@@ -1,5 +1,8 @@
 use super::{declarator::parse_declarator, initializer::parse_initializer, ParseContext};
-use crate::{Declarator, Initializer, ParseError, Token};
+use crate::{
+    ast::{Declarator, Initializer, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,7 +38,7 @@ impl<'text> Display for InitDeclarator<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_init_declarator() {

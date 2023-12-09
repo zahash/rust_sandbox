@@ -1,6 +1,9 @@
 use super::super::declaration::parse_declaration;
 use super::{parse_stmt, ParseContext};
-use crate::{Declaration, ParseError, Stmt, Token};
+use crate::{
+    ast::{Declaration, ParseError, Stmt},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{many, maybe};
 use std::fmt::{self, Display, Formatter};
 

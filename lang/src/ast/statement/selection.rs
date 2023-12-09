@@ -1,6 +1,9 @@
 use super::super::expression::parse_expr;
 use super::{parse_stmt, ParseContext};
-use crate::{Expr, ParseError, Stmt, Token};
+use crate::{
+    ast::{Expr, ParseError, Stmt},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
 
@@ -107,7 +110,7 @@ impl<'text> Display for SelectionStmt<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_if_else_stmt() {

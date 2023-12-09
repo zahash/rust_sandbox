@@ -2,7 +2,10 @@ use super::{
     declarator::parse_declarator, expression::constant::parse_constant_expr,
     parameter_type_list::parse_parameter_type_list, write_arr, ParseContext,
 };
-use crate::{ConstantExpr, Declarator, ParameterTypeList, ParseError, Token};
+use crate::{
+    ast::{ConstantExpr, Declarator, ParameterTypeList, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{combine_parsers, many_delimited, maybe};
 use std::fmt::{self, Display, Formatter};
 
@@ -95,7 +98,10 @@ fn parse_direct_declarator_tail<'text>(
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
-        Ok((DirectDeclaratorTail::Array(expr, dd_tail.map(Box::new)), pos))
+        Ok((
+            DirectDeclaratorTail::Array(expr, dd_tail.map(Box::new)),
+            pos,
+        ))
     }
 
     fn parse_function<'text>(
@@ -115,7 +121,10 @@ fn parse_direct_declarator_tail<'text>(
 
         let (dd_tail, pos) = maybe(tokens, pos + 1, ctx, parse_direct_declarator_tail);
 
-        Ok((DirectDeclaratorTail::Function(list, dd_tail.map(Box::new)), pos))
+        Ok((
+            DirectDeclaratorTail::Function(list, dd_tail.map(Box::new)),
+            pos,
+        ))
     }
 
     fn parse_parameters<'text>(

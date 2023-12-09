@@ -1,7 +1,10 @@
 use super::{
     r#enum::parse_enum_specifier, struct_or_union::parse_struct_or_union_specifier, ParseContext,
 };
-use crate::{EnumSpecifier, ParseError, StructOrUnionSpecifier, Token};
+use crate::{
+    ast::{EnumSpecifier, ParseError, StructOrUnionSpecifier},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
 
@@ -120,9 +123,11 @@ impl<'text> From<EnumSpecifier<'text>> for TypeSpecifier<'text> {
 mod tests {
     use super::*;
     use crate::{
-        lex,
-        macros::{check, check_ast},
-        ast::declaration::parse_declaration,
+        ast::{
+            declaration::parse_declaration,
+            macros::{check, check_ast},
+        },
+        lex::lex,
     };
 
     const STRUCT_UNION: [&'static str; 6] = [

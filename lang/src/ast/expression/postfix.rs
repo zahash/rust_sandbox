@@ -1,6 +1,9 @@
 use super::super::{write_arr, ParseContext};
 use super::{assignment::parse_assignment_expr, parse_expr, primary::parse_primary_expr};
-use crate::{AssignmentExpr, Expr, ParseError, Primary, Token};
+use crate::{
+    ast::{AssignmentExpr, Expr, ParseError, Primary},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many_delimited;
 use std::fmt::{self, Display, Formatter};
 
@@ -97,7 +100,7 @@ impl<'text> From<Primary<'text>> for PostfixExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_postfix_expr() {

@@ -1,5 +1,8 @@
 use super::{direct_declarator::parse_direct_declarator, pointer::parse_pointer, ParseContext};
-use crate::{DirectDeclarator, ParseError, Pointer, Token};
+use crate::{
+    ast::{DirectDeclarator, ParseError, Pointer},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::maybe;
 use std::fmt::{self, Display, Formatter};
 
@@ -38,7 +41,7 @@ impl<'text> Display for Declarator<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::check, lex};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_declarator() {
@@ -61,8 +64,6 @@ mod tests {
         check!(parse_declarator, &mut ctx, "print(const char *fmt, ...)");
         check!(parse_declarator, &mut ctx, "log(const char *message, ...)");
         check!(parse_declarator, &mut ctx, "f(a, b, c)");
-        check!(parse_declarator, &mut ctx, "f(int a,  float[], int)");
-
-        // println!("{:#?}", crate::macros::ast!(parse_declarator, &mut ctx, "add(int a, int, float[])"));
+        check!(parse_declarator, &mut ctx, "f(int a, float[], int)");
     }
 }

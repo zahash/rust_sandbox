@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::bitand::parse_bitand_expr;
-use crate::{BitAndExpr, ParseError, Token};
+use crate::{
+    ast::{BitAndExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,7 +50,10 @@ impl<'text> From<BitAndExpr<'text>> for XORExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::expression::parse_expr};
+    use crate::{
+        ast::{expression::parse_expr, macros::check},
+        lex::lex,
+    };
 
     #[test]
     fn test_xor_expr() {

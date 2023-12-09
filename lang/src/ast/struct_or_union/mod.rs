@@ -8,7 +8,10 @@ use self::{
 };
 use super::write_arr;
 use super::ParseContext;
-use crate::{ParseError, StructOrUnionDeclaration, Token};
+use crate::{
+    ast::{ParseError, StructOrUnionDeclaration},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many;
 use std::fmt::{self, Display, Formatter};
 
@@ -85,7 +88,7 @@ impl<'text> Display for StructOrUnionSpecifier<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     const STRUCT_UNION: [&'static str; 6] = [
         "struct Point",

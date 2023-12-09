@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::parse_expr;
-use crate::{Expr, ParseError, Token};
+use crate::{
+    ast::{Expr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -25,9 +28,7 @@ pub fn parse_primary_expr<'text>(
             false => Ok((Primary::Ident(ident), pos + 1)),
         },
         Some(Token::Whole(n)) => Ok((Primary::Int(*n as isize), pos + 1)),
-        Some(Token::Char(c)) => Ok((Primary::Char(*c), pos + 1)),
-        Some(Token::Decimal(n)) => Ok((Primary::Float(*n), pos + 1)),
-        Some(Token::String(s)) => Ok((Primary::String(s), pos + 1)),
+        Some(Token::Char(c)) => Ok((Primary::Char(*c), pos + 1)), Some(Token::Decimal(n)) => Ok((Primary::Float(*n), pos + 1)), Some(Token::String(s)) => Ok((Primary::String(s), pos + 1)),
         Some(Token::Symbol("(")) => {
             let (expr, pos) = parse_expr(tokens, pos + 1, ctx)?;
             match tokens.get(pos) {
@@ -60,9 +61,11 @@ impl<'text> Display for Primary<'text> {
 mod tests {
     use super::*;
     use crate::{
-        lex,
-        macros::{check, check_ast},
-        ast::declaration::parse_declaration,
+        ast::{
+            declaration::parse_declaration,
+            macros::{check, check_ast},
+        },
+        lex::lex,
     };
 
     #[test]

@@ -1,7 +1,10 @@
 use super::{
     type_qualifier::parse_type_qualifier, type_specifier::parse_type_specifier, ParseContext,
 };
-use crate::{ParseError, Token, TypeQualifier, TypeSpecifier};
+use crate::{
+    ast::{ParseError, TypeQualifier, TypeSpecifier},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
 
@@ -48,11 +51,10 @@ impl<'text> From<TypeQualifier> for SpecifierQualifier<'text> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::{
-        lex,
-        macros::{check, check_ast},
+        ast::macros::{check, check_ast},
+        lex::lex,
     };
 
     const ENUM: [&'static str; 3] = [

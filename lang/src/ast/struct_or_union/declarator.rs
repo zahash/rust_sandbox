@@ -1,6 +1,9 @@
 use super::super::{declarator::parse_declarator, expression::conditional::parse_conditional_expr};
 use super::ParseContext;
-use crate::{ConstantExpr, Declarator, ParseError, Token};
+use crate::{
+    ast::{ConstantExpr, Declarator, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::maybe;
 use std::fmt::{self, Display, Formatter};
 

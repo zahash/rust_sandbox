@@ -2,7 +2,10 @@ use super::{
     abstract_declarator::parse_abstract_declarator, specifier_qualifier::parse_specifier_qualifier,
     write_arr, ParseContext,
 };
-use crate::{AbstractDeclarator, ParseError, SpecifierQualifier, Token};
+use crate::{
+    ast::{AbstractDeclarator, ParseError, SpecifierQualifier},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{many, maybe};
 use std::fmt::{self, Display, Formatter};
 
@@ -49,7 +52,7 @@ impl<'text> Display for TypeName<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_type_name() {

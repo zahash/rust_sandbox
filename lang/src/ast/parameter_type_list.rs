@@ -1,5 +1,8 @@
 use super::{parameter_declaration::parse_parameter_declaration, write_arr, ParseContext};
-use crate::{ParameterDeclaration, ParseError, Token};
+use crate::{
+    ast::{ParameterDeclaration, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many_delimited;
 use std::fmt::{self, Display, Formatter};
 

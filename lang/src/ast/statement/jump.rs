@@ -1,6 +1,9 @@
 use super::super::expression::parse_expr;
 use super::ParseContext;
-use crate::{Expr, ParseError, Token};
+use crate::{
+    ast::{Expr, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{combine_parsers, maybe};
 use std::fmt::{self, Display, Formatter};
 
@@ -118,7 +121,10 @@ impl<'text> Display for JumpStmt<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::statement::parse_stmt};
+    use crate::{
+        ast::{macros::check, statement::parse_stmt},
+        lex::lex,
+    };
 
     #[test]
     fn test_jump_stmt() {

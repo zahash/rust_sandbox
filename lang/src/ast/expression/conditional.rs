@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::{logicalor::parse_logicalor_expr, parse_expr};
-use crate::{Expr, LogicalOrExpr, ParseError, Token};
+use crate::{
+    ast::{Expr, LogicalOrExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -62,7 +65,7 @@ impl<'text> From<LogicalOrExpr<'text>> for ConditionalExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_conditional_expr() {

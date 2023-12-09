@@ -1,9 +1,12 @@
 use self::assignment::parse_assignment_expr;
 use super::ParseContext;
 use crate::{
-    AdditiveExpr, AssignmentExpr, BitAndExpr, BitOrExpr, CastExpr, ComparisionExpr,
-    ConditionalExpr, EqualityExpr, LogicalAndExpr, LogicalOrExpr, MultiplicativeExpr, ParseError,
-    PostfixExpr, Primary, ShiftExpr, Token, UnaryExpr, XORExpr,
+    ast::{
+        AdditiveExpr, AssignmentExpr, BitAndExpr, BitOrExpr, CastExpr, ComparisionExpr,
+        ConditionalExpr, EqualityExpr, LogicalAndExpr, LogicalOrExpr, MultiplicativeExpr,
+        ParseError, PostfixExpr, Primary, ShiftExpr, UnaryExpr, XORExpr,
+    },
+    lex::Token,
 };
 
 pub mod additive;

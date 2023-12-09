@@ -3,7 +3,10 @@ use super::{
     declaration_specifier::parse_declaration_specifier, declarator::parse_declarator, write_arr,
     ParseContext,
 };
-use crate::{AbstractDeclarator, DeclarationSpecifier, Declarator, ParseError, Token};
+use crate::{
+    ast::{AbstractDeclarator, DeclarationSpecifier, Declarator, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{many, maybe};
 use std::fmt::{self, Display, Formatter};
 

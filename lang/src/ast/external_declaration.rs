@@ -1,7 +1,10 @@
 use super::{
     declaration::parse_declaration, function_definition::parse_function_definition, ParseContext,
 };
-use crate::{Declaration, FunctionDefinition, ParseError, Token};
+use crate::{
+    ast::{Declaration, FunctionDefinition, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
 

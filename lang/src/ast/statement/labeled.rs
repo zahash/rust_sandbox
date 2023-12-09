@@ -1,6 +1,9 @@
 use super::super::expression::constant::parse_constant_expr;
 use super::{parse_stmt, ParseContext};
-use crate::{ConstantExpr, ParseError, Stmt, Token};
+use crate::{
+    ast::{ConstantExpr, ParseError, Stmt},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
 
@@ -95,7 +98,7 @@ impl<'text> Display for LabeledStmt<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_labeled_stmt() {

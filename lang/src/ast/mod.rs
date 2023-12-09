@@ -80,7 +80,7 @@ pub use expression::xor::XORExpr;
 pub use expression::Expr;
 
 use self::translation_unit::parse_translation_unit;
-use crate::Token;
+use crate::lex::Token;
 use std::fmt::{self, Display, Formatter};
 
 pub fn parse<'text>(tokens: &[Token<'text>]) -> Result<TranslationUnit<'text>, ParseError> {

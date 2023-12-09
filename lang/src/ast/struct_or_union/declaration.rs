@@ -1,6 +1,9 @@
 use super::super::{specifier_qualifier::parse_specifier_qualifier, write_arr};
 use super::{declarator::parse_struct_or_union_declarator, ParseContext};
-use crate::{ParseError, SpecifierQualifier, StructOrUnionDeclarator, Token};
+use crate::{
+    ast::{ParseError, SpecifierQualifier, StructOrUnionDeclarator},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::{many, many_delimited};
 use std::fmt::{self, Display, Formatter};
 

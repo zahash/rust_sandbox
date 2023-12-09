@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::logicaland::parse_logicaland_expr;
-use crate::{LogicalAndExpr, ParseError, Token};
+use crate::{
+    ast::{LogicalAndExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -47,7 +50,10 @@ impl<'text> From<LogicalAndExpr<'text>> for LogicalOrExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::expression::parse_expr};
+    use crate::{
+        ast::{expression::parse_expr, macros::check},
+        lex::lex,
+    };
 
     #[test]
     fn test_logical_or_expr() {

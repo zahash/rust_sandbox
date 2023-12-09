@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::shift::parse_shift_expr;
-use crate::{ParseError, ShiftExpr, Token};
+use crate::{
+    ast::{ParseError, ShiftExpr},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -68,7 +71,10 @@ impl<'text> From<ShiftExpr<'text>> for ComparisionExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::expression::parse_expr};
+    use crate::{
+        ast::{expression::parse_expr, macros::check},
+        lex::lex,
+    };
 
     #[test]
     fn test_comparision_expr() {

@@ -1,5 +1,8 @@
 use super::{expression::assignment::parse_assignment_expr, ParseContext};
-use crate::{AssignmentExpr, ParseError, Token};
+use crate::{
+    ast::{AssignmentExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,7 +72,7 @@ impl<'text> From<AssignmentExpr<'text>> for Initializer<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::check, lex};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_initializer() {

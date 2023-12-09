@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::conditional::parse_conditional_expr;
-use crate::{ConditionalExpr, ParseError, Token};
+use crate::{
+    ast::{ConditionalExpr, ParseError},
+    lex::Token,
+};
 
 pub type ConstantExpr<'text> = ConditionalExpr<'text>;
 

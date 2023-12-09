@@ -3,7 +3,10 @@ pub mod enumerator;
 use self::enumerator::parse_enumerator;
 use super::write_arr;
 use super::ParseContext;
-use crate::{Enumerator, ParseError, Token};
+use crate::{
+    ast::{Enumerator, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many_delimited;
 use std::fmt::{self, Display, Formatter};
 
@@ -78,7 +81,7 @@ impl<'text> Display for EnumSpecifier<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     const ENUM: [&'static str; 3] = [
         "enum Color",

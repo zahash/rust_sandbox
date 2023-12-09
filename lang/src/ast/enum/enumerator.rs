@@ -1,5 +1,8 @@
 use super::super::{expression::constant::parse_constant_expr, ParseContext};
-use crate::{ConstantExpr, ParseError, Token};
+use crate::{
+    ast::{ConstantExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]

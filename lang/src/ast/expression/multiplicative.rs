@@ -1,6 +1,9 @@
 use super::super::ParseContext;
 use super::cast::parse_cast_expr;
-use crate::{CastExpr, ParseError, Token};
+use crate::{
+    ast::{CastExpr, ParseError},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -61,7 +64,10 @@ impl<'text> From<CastExpr<'text>> for MultiplicativeExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::expression::parse_expr};
+    use crate::{
+        ast::{expression::parse_expr, macros::check},
+        lex::lex,
+    };
 
     #[test]
     fn test_multiplicative_expr() {

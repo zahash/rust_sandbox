@@ -1,5 +1,5 @@
 use super::ParseContext;
-use crate::{ParseError, Token};
+use crate::{ast::ParseError, lex::Token};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -35,7 +35,7 @@ impl Display for TypeQualifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::check_ast, lex};
+    use crate::{ast::macros::check_ast, lex::lex};
 
     const TYPE_QUALIFIER: [(&'static str, TypeQualifier); 2] = [
         ("const", TypeQualifier::Const),

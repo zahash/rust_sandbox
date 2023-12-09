@@ -2,7 +2,10 @@ use super::{
     direct_abstract_declarator::parse_direct_abstract_declarator, pointer::parse_pointer,
     ParseContext,
 };
-use crate::{DirectAbstractDeclarator, ParseError, Pointer, Token};
+use crate::{
+    ast::{DirectAbstractDeclarator, ParseError, Pointer},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::maybe;
 use std::fmt::{self, Display, Formatter};
 
@@ -45,7 +48,7 @@ impl<'text> Display for AbstractDeclarator<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check};
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_abstract_declarator() {

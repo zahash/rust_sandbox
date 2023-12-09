@@ -1,6 +1,9 @@
 use super::super::{type_name::parse_type_name, ParseContext};
 use super::{cast::parse_cast_expr, postfix::parse_postfix_expr};
-use crate::{CastExpr, ParseError, PostfixExpr, Token, TypeName};
+use crate::{
+    ast::{CastExpr, ParseError, PostfixExpr, TypeName},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -104,7 +107,10 @@ impl<'text> From<PostfixExpr<'text>> for UnaryExpr<'text> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex, macros::check, ast::expression::parse_expr};
+    use crate::{
+        ast::{expression::parse_expr, macros::check},
+        lex::lex,
+    };
 
     #[test]
     fn test_unary_expr() {

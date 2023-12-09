@@ -1,5 +1,5 @@
 use super::super::ParseContext;
-use crate::{ParseError, Token};
+use crate::{ast::ParseError, lex::Token};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]

@@ -1,5 +1,8 @@
 use super::{external_declaration::parse_external_declaration, write_arr, ParseContext};
-use crate::{ExternalDeclaration, ParseError, Token};
+use crate::{
+    ast::{ExternalDeclaration, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many;
 use std::fmt::{self, Display, Formatter};
 

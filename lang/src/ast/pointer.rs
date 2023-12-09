@@ -1,5 +1,8 @@
 use super::{type_qualifier::parse_type_qualifier, ParseContext};
-use crate::{ParseError, Token, TypeQualifier};
+use crate::{
+    ast::{ParseError, TypeQualifier},
+    lex::Token,
+};
 use std::fmt::{self, Display, Formatter};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -90,7 +93,10 @@ impl Display for Pointer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{macros::{ast, check}, lex};
+    use crate::{
+        ast::macros::{ast, check},
+        lex::lex,
+    };
 
     #[test]
     fn test_pointer() {

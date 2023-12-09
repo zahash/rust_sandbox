@@ -2,7 +2,7 @@
 
 use std::fmt::Debug;
 
-use crate::*;
+use crate::ast::*;
 
 #[derive(Debug, PartialEq, Clone)]
 enum Type<'text> {
@@ -411,7 +411,7 @@ fn analyze_function_definition<'ast, 'text>(
     f: &'ast FunctionDefinition<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
-    use ast::StorageClassSpecifier::*;
+    use crate::ast::StorageClassSpecifier::*;
     // use ast::TypeQualifier::*;
     // use ast::TypeSpecifier::*;
 
@@ -420,8 +420,6 @@ fn analyze_function_definition<'ast, 'text>(
     if let Some(Auto) | Some(Register) | Some(TypeDef) = vdss.storage_class_specifier {
         return Err(SemanticError::InvalidFunctionDefinition(f));
     }
-
-    
 
     todo!()
 }

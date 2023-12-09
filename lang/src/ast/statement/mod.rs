@@ -11,7 +11,8 @@ use self::{
 };
 use super::ParseContext;
 use crate::{
-    CompoundStmt, Expr, IterationStmt, JumpStmt, LabeledStmt, ParseError, SelectionStmt, Token,
+    ast::{CompoundStmt, Expr, IterationStmt, JumpStmt, LabeledStmt, ParseError, SelectionStmt},
+    lex::Token,
 };
 use chainchomp::ctx_sensitive::combine_parsers;
 use std::fmt::{self, Display, Formatter};
@@ -109,8 +110,8 @@ impl<'text> From<JumpStmt<'text>> for Stmt<'text> {
 mod tests {
     use super::*;
     use crate::{
-        lex,
-        macros::{check, check_ast},
+        ast::macros::{check, check_ast},
+        lex::lex,
     };
 
     #[test]

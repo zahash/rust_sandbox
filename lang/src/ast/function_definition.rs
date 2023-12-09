@@ -3,7 +3,10 @@ use super::{
     declarator::parse_declarator, statement::compound::parse_compound_stmt, write_arr,
     ParseContext,
 };
-use crate::{CompoundStmt, Declaration, DeclarationSpecifier, Declarator, ParseError, Token};
+use crate::{
+    ast::{CompoundStmt, Declaration, DeclarationSpecifier, Declarator, ParseError},
+    lex::Token,
+};
 use chainchomp::ctx_sensitive::many;
 use std::fmt::{self, Display, Formatter};
 
@@ -57,9 +60,8 @@ impl<'text> Display for FunctionDefinition<'text> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{lex, macros::check};
-
     use super::*;
+    use crate::{ast::macros::check, lex::lex};
 
     #[test]
     fn test_function_definition() {
