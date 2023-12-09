@@ -412,8 +412,8 @@ fn analyze_function_definition<'ast, 'text>(
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     use ast::StorageClassSpecifier::*;
-    use ast::TypeQualifier::*;
-    use ast::TypeSpecifier::*;
+    // use ast::TypeQualifier::*;
+    // use ast::TypeSpecifier::*;
 
     let vdss: ValidatedDeclarationSpecifiers = f.declaration_specifiers.as_slice().try_into()?;
 
