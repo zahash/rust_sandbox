@@ -1,8 +1,7 @@
 #![allow(dead_code, unused_variables)]
 
+use crate::ast::{self, DeclarationSpecifier};
 use std::fmt::Debug;
-
-use crate::ast::*;
 
 #[derive(Debug, PartialEq, Clone)]
 enum Type<'text> {
@@ -40,16 +39,16 @@ enum Type<'text> {
 
 #[derive(Debug)]
 enum BinOp<'ast, 'text> {
-    LogicalOr(&'ast LogicalOrExpr<'text>),
-    LogicalAnd(&'ast LogicalAndExpr<'text>),
-    BitOr(&'ast BitOrExpr<'text>),
-    XOR(&'ast XORExpr<'text>),
-    BitAnd(&'ast BitAndExpr<'text>),
-    Equality(&'ast EqualityExpr<'text>),
-    Comparision(&'ast ComparisionExpr<'text>),
-    Shift(&'ast ShiftExpr<'text>),
-    Additive(&'ast AdditiveExpr<'text>),
-    Multiplicative(&'ast MultiplicativeExpr<'text>),
+    LogicalOr(&'ast ast::LogicalOrExpr<'text>),
+    LogicalAnd(&'ast ast::LogicalAndExpr<'text>),
+    BitOr(&'ast ast::BitOrExpr<'text>),
+    XOR(&'ast ast::XORExpr<'text>),
+    BitAnd(&'ast ast::BitAndExpr<'text>),
+    Equality(&'ast ast::EqualityExpr<'text>),
+    Comparision(&'ast ast::ComparisionExpr<'text>),
+    Shift(&'ast ast::ShiftExpr<'text>),
+    Additive(&'ast ast::AdditiveExpr<'text>),
+    Multiplicative(&'ast ast::MultiplicativeExpr<'text>),
 }
 
 #[derive(Debug)]
@@ -64,33 +63,33 @@ enum SemanticError<'ast, 'text> {
         actual: Type<'text>,
     },
     InvalidInitializer,
-    InvalidPostfixOperand(&'ast PostfixExpr<'text>),
-    NotAFunction(&'ast PostfixExpr<'text>),
-    InvalidFnCall(&'ast PostfixExpr<'text>),
+    InvalidPostfixOperand(&'ast ast::PostfixExpr<'text>),
+    NotAFunction(&'ast ast::PostfixExpr<'text>),
+    InvalidFnCall(&'ast ast::PostfixExpr<'text>),
     UndefinedMember {
         struct_name: &'text str,
         field: &'text str,
     },
-    NotAStruct(&'ast PostfixExpr<'text>),
-    NotAPointerToStruct(&'ast PostfixExpr<'text>),
-    InvalidUnaryOperand(&'ast UnaryExpr<'text>),
-    InvalidDereferenceOperand(&'ast UnaryExpr<'text>),
+    NotAStruct(&'ast ast::PostfixExpr<'text>),
+    NotAPointerToStruct(&'ast ast::PostfixExpr<'text>),
+    InvalidUnaryOperand(&'ast ast::UnaryExpr<'text>),
+    InvalidDereferenceOperand(&'ast ast::UnaryExpr<'text>),
     InvalidTypeCast {
         from: Type<'text>,
         to: Type<'text>,
     },
-    IllegalJump(&'ast JumpStmt<'text>),
+    IllegalJump(&'ast ast::JumpStmt<'text>),
     ReturnTypeMismatch {
         expected: Type<'text>,
         actual: Type<'text>,
     },
-    ReturnOutsideFn(&'ast JumpStmt<'text>),
-    CaseOutsideSwitch(&'ast LabeledStmt<'text>),
-    DefaultOutsideSwitch(&'ast LabeledStmt<'text>),
-    LabelRedeclaration(&'ast LabeledStmt<'text>),
-    InvalidSpecifierQualifiers(&'ast [SpecifierQualifier<'text>]),
-    InvalidFunctionDefinition(&'ast FunctionDefinition<'text>),
-    InvalidDSS(&'ast [DeclarationSpecifier<'text>]),
+    ReturnOutsideFn(&'ast ast::JumpStmt<'text>),
+    CaseOutsideSwitch(&'ast ast::LabeledStmt<'text>),
+    DefaultOutsideSwitch(&'ast ast::LabeledStmt<'text>),
+    LabelRedeclaration(&'ast ast::LabeledStmt<'text>),
+    InvalidSpecifierQualifiers(&'ast [ast::SpecifierQualifier<'text>]),
+    InvalidFunctionDefinition(&'ast ast::FunctionDefinition<'text>),
+    InvalidDSS(&'ast [ast::DeclarationSpecifier<'text>]),
 }
 
 enum Symbol<'text> {
@@ -310,7 +309,7 @@ impl<'text> SemanticContext<'text> {
 }
 
 fn analyze_translation_unit<'ast, 'text>(
-    translation_unit: &'ast TranslationUnit<'text>,
+    translation_unit: &'ast ast::TranslationUnit<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     for external_declaration in &translation_unit.0 {
@@ -320,228 +319,85 @@ fn analyze_translation_unit<'ast, 'text>(
 }
 
 fn analyze_external_declaration<'ast, 'text>(
-    external_declaration: &'ast ExternalDeclaration<'text>,
+    external_declaration: &'ast ast::ExternalDeclaration<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match external_declaration {
-        ExternalDeclaration::FunctionDefinition(f) => analyze_function_definition(f, ctx)?,
-        ExternalDeclaration::Declaration(d) => analyze_declaration(d, ctx)?,
+        ast::ExternalDeclaration::FunctionDefinition(f) => analyze_function_definition(f, ctx)?,
+        ast::ExternalDeclaration::Declaration(d) => analyze_declaration(d, ctx)?,
     }
     Ok(())
 }
 
-struct ValidatedDeclarationSpecifiers<'ast, 'text> {
-    pub storage_class_specifier: Option<&'ast StorageClassSpecifier>,
-    pub type_qualifiers: Vec<&'ast TypeQualifier>,
-    pub type_specifiers: Vec<&'ast TypeSpecifier<'text>>,
-}
-
-impl<'ast, 'text> TryFrom<&'ast [DeclarationSpecifier<'text>]>
-    for ValidatedDeclarationSpecifiers<'ast, 'text>
-{
-    type Error = SemanticError<'ast, 'text>;
-
-    fn try_from(dss: &'ast [DeclarationSpecifier<'text>]) -> Result<Self, Self::Error> {
-        let dss_len = dss.len();
-
-        let mut storage_class_specifiers = vec![];
-        let mut type_specifiers = vec![];
-        let mut type_qualifiers = vec![];
-
-        for ds in dss {
-            match ds {
-                DeclarationSpecifier::StorageClassSpecifier(scs) => {
-                    storage_class_specifiers.push(scs)
-                }
-                DeclarationSpecifier::TypeSpecifier(ts) => type_specifiers.push(ts),
-                DeclarationSpecifier::TypeQualifier(tq) => type_qualifiers.push(tq),
-            }
-        }
-
-        if storage_class_specifiers.len() > 1 {
-            return Err(SemanticError::InvalidDSS(dss));
-        }
-        let storage_class_specifier = storage_class_specifiers.into_iter().next();
-
-        let mut simple_type_specifiers = vec![];
-        let mut struct_or_union_specifiers = vec![];
-        let mut enum_specifiers = vec![];
-        let mut typedef_names = vec![];
-        for ts in &type_specifiers {
-            match ts {
-                TypeSpecifier::StructOrUnionSpecifier(sus) => struct_or_union_specifiers.push(sus),
-                TypeSpecifier::EnumSpecifier(es) => enum_specifiers.push(es),
-                TypeSpecifier::TypeDefName(name) => typedef_names.push(name),
-                _ => simple_type_specifiers.push(ts),
-            }
-        }
-
-        let simple_type_specifiers_present = !simple_type_specifiers.is_empty();
-        let struct_or_union_specifiers_present = !struct_or_union_specifiers.is_empty();
-        let enum_specifiers_present = !enum_specifiers.is_empty();
-        let typedef_names_present = !typedef_names.is_empty();
-
-        let exactly_one_type_is_present = simple_type_specifiers_present
-            ^ struct_or_union_specifiers_present
-            ^ enum_specifiers_present
-            ^ typedef_names_present;
-
-        if !exactly_one_type_is_present {
-            return Err(SemanticError::InvalidDSS(dss));
-        }
-
-        // just a sanity check
-        assert_eq!(
-            dss_len,
-            storage_class_specifier.is_some() as usize
-                + type_qualifiers.len()
-                + type_specifiers.len(),
-            "declaration specifiers length mismatch after validation"
-        );
-
-        Ok(ValidatedDeclarationSpecifiers {
-            storage_class_specifier,
-            type_qualifiers,
-            type_specifiers,
-        })
-    }
-}
-
 fn analyze_function_definition<'ast, 'text>(
-    f: &'ast FunctionDefinition<'text>,
+    f: &'ast ast::FunctionDefinition<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
-    use crate::ast::StorageClassSpecifier::*;
-    // use ast::TypeQualifier::*;
-    // use ast::TypeSpecifier::*;
+    use ast::StorageClassSpecifier as SCS;
+    use ast::TypeSpecifier as TS;
 
-    let vdss: ValidatedDeclarationSpecifiers = f.declaration_specifiers.as_slice().try_into()?;
+    let mut pos = 0;
 
-    if let Some(Auto) | Some(Register) | Some(TypeDef) = vdss.storage_class_specifier {
-        return Err(SemanticError::InvalidFunctionDefinition(f));
+    let scs = match f.declaration_specifiers.get(pos) {
+        None => None,
+        Some(DeclarationSpecifier::StorageClassSpecifier(scs))
+            if scs == &SCS::Static || scs == &SCS::Extern =>
+        {
+            pos += 1;
+            Some(scs)
+        }
+        _ => return Err(SemanticError::InvalidDSS(&f.declaration_specifiers)),
+    };
+
+    let mut tss = Vec::with_capacity(f.declaration_specifiers.len());
+    for ds in &f.declaration_specifiers[pos..] {
+        match ds {
+            DeclarationSpecifier::TypeSpecifier(ts) => tss.push(ts),
+            _ => return Err(SemanticError::InvalidDSS(&f.declaration_specifiers)),
+        }
     }
+
+    let a = match tss.as_slice() {
+        [TS::Void] => Ok(Type::Void),
+        [TS::Char] => Ok(Type::Char),
+        [TS::Signed, TS::Char] => Ok(Type::SignedChar),
+        [TS::UnSigned, TS::Char] => Ok(Type::UnSignedChar),
+        [TS::Short]
+        | [TS::Signed, TS::Short]
+        | [TS::Short, TS::Int]
+        | [TS::Signed, TS::Short, TS::Int] => Ok(Type::Short),
+        [TS::UnSigned, TS::Short] | [TS::UnSigned, TS::Short, TS::Int] => Ok(Type::UnSignedShort),
+        [TS::Int] | [TS::Signed] | [TS::Signed, TS::Int] => Ok(Type::Int),
+        [TS::UnSigned] | [TS::UnSigned, TS::Int] => Ok(Type::UnSigned),
+        [TS::Long]
+        | [TS::Signed, TS::Long]
+        | [TS::Long, TS::Int]
+        | [TS::Signed, TS::Long, TS::Int] => Ok(Type::Long),
+        [TS::UnSigned, TS::Long] | [TS::UnSigned, TS::Long, TS::Int] => Ok(Type::UnSignedLong),
+        [TS::Long, TS::Long]
+        | [TS::Signed, TS::Long, TS::Long]
+        | [TS::Long, TS::Long, TS::Int]
+        | [TS::Signed, TS::Long, TS::Long, TS::Int] => Ok(Type::LongLong),
+        [TS::UnSigned, TS::Long, TS::Long] | [TS::UnSigned, TS::Long, TS::Long, TS::Int] => {
+            Ok(Type::UnSignedLongLong)
+        }
+        [TS::Float] => Ok(Type::Float),
+        [TS::Double] => Ok(Type::Double),
+        [TS::Long, TS::Double] => Ok(Type::LongDouble),
+        [TS::StructOrUnionSpecifier(sou)] => analyze_struct_or_union_specifier(sou, ctx),
+        [TS::EnumSpecifier(e)] => analyze_enum_specifier(e, ctx),
+        [TS::TypeDefName(name)] => {
+            // ctx.find_typedef(name);
+            todo!()
+        }
+        _ => todo!(),
+    };
 
     todo!()
 }
 
-// fn analyze_function_definition<'ast, 'text>(
-//     f: &'ast FunctionDefinition<'text>,
-//     ctx: &mut SemanticContext<'text>,
-// ) -> Result<(), SemanticError<'ast, 'text>> {
-//     use ast::StorageClassSpecifier::*;
-//     use ast::TypeQualifier::*;
-//     use ast::TypeSpecifier::*;
-
-//     let a = match f.declaration_specifiers.as_slice() {
-//         [DeclarationSpecifier::StorageClassSpecifier(_)] => 0,
-//         _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
-//     };
-
-//     for ds in &f.declaration_specifiers {
-//         if let DeclarationSpecifier::StorageClassSpecifier(Auto)
-//         | DeclarationSpecifier::StorageClassSpecifier(Register)
-//         | DeclarationSpecifier::StorageClassSpecifier(TypeDef) = ds
-//         {
-//             return Err(SemanticError::InvalidFunctionDefinition(f))
-//         }
-
-//         match ds {
-//             DeclarationSpecifier::StorageClassSpecifier(scs) => match scs {
-//                 Auto => todo!(),
-//                 Register => todo!(),
-//                 Static => todo!(),
-//                 Extern => todo!(),
-//                 TypeDef => todo!(),
-//             },
-//             DeclarationSpecifier::TypeSpecifier(ts) => match ts {
-//                 Void => todo!(),
-//                 Char => todo!(),
-//                 Short => todo!(),
-//                 Int => todo!(),
-//                 Long => todo!(),
-//                 Float => todo!(),
-//                 Double => todo!(),
-//                 Signed => todo!(),
-//                 UnSigned => todo!(),
-//                 StructOrUnionSpecifier(_) => todo!(),
-//                 EnumSpecifier(_) => todo!(),
-//                 TypeDefName(_) => todo!(),
-//             },
-//             DeclarationSpecifier::TypeQualifier(tq) => match tq {
-//                 Const => todo!(),
-//                 Volatile => todo!(),
-//             },
-//         }
-//     }
-
-//     let return_ty = analyze_declaration_specifiers(&f.declaration_specifiers, ctx)?;
-//     let DirectDeclarator::Ident(name, Some(dd_tail)) = &f.declarator.d_declarator else {
-//         // this error will never happen because its invalid grammar.
-//         // it will never reach the semantic analysis phase because the parser will disallow it.
-//         // but still, its nice to return Err instead of panic.
-//         return Err(SemanticError::InvalidFunctionDefinition(f));
-//     };
-
-//     ctx.scoped(ScopeKind::Fn(return_ty), |ctx| {
-//         match f.declarations.is_empty() {
-//             true => {
-//                 /*
-//                 this is the normal function syntax as god intended.
-
-//                 int add(int a, int b) {
-//                     return a + b;
-//                 }
-
-//                 */
-//                 let DirectDeclaratorTail::Function(params, None) = dd_tail else {
-//                     return Err(SemanticError::InvalidFunctionDefinition(f));
-//                 };
-
-//                 match params {
-//                     ParameterTypeList::ParameterList(params) => {
-//                         for param in params {
-//                             match param {
-//                                 ParameterDeclaration::WithDeclarator(dss, d) => {
-//                                     let param_ty = analyze_declaration_specifiers(dss, ctx)?;
-//                                     // let a = analyze_declarator(d, ctx)?;
-//                                     todo!()
-//                                 }
-//                                 _ => return Err(SemanticError::InvalidFunctionDefinition(f)),
-//                             }
-//                         }
-//                     }
-//                     ParameterTypeList::VariadicParameterList(_) => todo!(),
-//                 }
-//             }
-//             false => {
-//                 /*
-//                 this is also valid C syntax 💀💀 ...
-
-//                 int add(a, b) int a; int b; {
-//                     return a + b;
-//                 }
-
-//                 int a; int b; are declarations
-//                 */
-//                 // let params = f.declarations.iter()
-//                 //     .map(|d| analyze_declaration(d, ctx))
-//                 // ;
-
-//                 // let DirectDeclaratorTail::Parameters(param_names, None) = dd_tail else {
-//                 //     return Err(SemanticError::InvalidFunctionDefinition(f));
-//                 // };
-
-//                 // check that param names and declarations match one to one.
-//             }
-//         };
-
-//         analyze_compound_stmt(&f.body, ctx)?;
-//         Ok(())
-//     })
-// }
-
 fn analyze_declaration<'ast, 'text>(
-    declaration: &'ast Declaration<'text>,
+    declaration: &'ast ast::Declaration<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     let ty = analyze_declaration_specifiers(&declaration.declaration_specifiers, ctx)?;
@@ -557,19 +413,19 @@ fn analyze_declaration<'ast, 'text>(
 }
 
 fn analyze_declaration_specifiers<'ast, 'text>(
-    dss: &'ast [DeclarationSpecifier<'text>],
+    dss: &'ast [ast::DeclarationSpecifier<'text>],
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
 }
 
 fn analyze_init_declarator<'ast, 'text>(
-    init_d: &'ast InitDeclarator<'text>,
+    init_d: &'ast ast::InitDeclarator<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match init_d {
-        InitDeclarator::Declared(d) => analyze_declarator(d, ctx),
-        InitDeclarator::Initialized(d, init) => {
+        ast::InitDeclarator::Declared(d) => analyze_declarator(d, ctx),
+        ast::InitDeclarator::Initialized(d, init) => {
             let d_ty = analyze_declarator(d, ctx)?;
             let init_ty = analyze_initializer(init, ctx)?;
             match d_ty == init_ty {
@@ -581,7 +437,7 @@ fn analyze_init_declarator<'ast, 'text>(
 }
 
 fn analyze_declarator<'ast, 'text>(
-    declarator: &'ast Declarator<'text>,
+    declarator: &'ast ast::Declarator<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     if let Some(pointer) = &declarator.pointer {
@@ -591,31 +447,31 @@ fn analyze_declarator<'ast, 'text>(
 }
 
 fn analyze_initializer<'ast, 'text>(
-    init: &'ast Initializer<'text>,
+    init: &'ast ast::Initializer<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match init {
-        Initializer::Assignment(expr) => analyze_assignment_expr(expr, ctx),
-        Initializer::InitializerList(inits) => todo!(),
+        ast::Initializer::Assignment(expr) => analyze_assignment_expr(expr, ctx),
+        ast::Initializer::InitializerList(inits) => todo!(),
     }
 }
 
 fn analyze_pointer<'ast, 'text>(
-    pointer: &'ast Pointer,
+    pointer: &'ast ast::Pointer,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     Ok(())
 }
 
 fn analyze_direct_declarator<'ast, 'text>(
-    d_declarator: &'ast DirectDeclarator<'text>,
+    d_declarator: &'ast ast::DirectDeclarator<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
 }
 
 fn analyze_type_name<'ast, 'text>(
-    type_name: &'ast TypeName<'text>,
+    type_name: &'ast ast::TypeName<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     let base_ty = analyze_specifier_qualifiers(&type_name.specifier_qualifiers, ctx)?;
@@ -637,57 +493,66 @@ fn analyze_type_name<'ast, 'text>(
 }
 
 fn analyze_specifier_qualifiers<'ast, 'text>(
-    sqs: &'ast [SpecifierQualifier<'text>],
+    sqs: &'ast [ast::SpecifierQualifier<'text>],
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     // TODO: check TypeQualifiers (const, volatile)
 
-    use TypeSpecifier::*;
+    use ast::TypeSpecifier as TS;
 
     let mut tss = sqs
         .iter()
         .filter_map(|sq| match sq {
-            SpecifierQualifier::TypeSpecifier(ts) => Some(ts),
+            ast::SpecifierQualifier::TypeSpecifier(ts) => Some(ts),
             _ => None,
         })
-        .collect::<Vec<&TypeSpecifier<'text>>>();
+        .collect::<Vec<&ast::TypeSpecifier<'text>>>();
 
     tss.sort_by_key(|ts| match ts {
-        Void => 2,
-        Signed => 3,
-        UnSigned => 4,
-        Short => 5,
-        Long => 6,
-        Int => 7,
-        Char => 8,
-        Float => 9,
-        Double => 10,
-        StructOrUnionSpecifier(_) => 11,
-        EnumSpecifier(_) => 12,
-        TypeDefName(_) => 13,
+        TS::Void => 2,
+        TS::Signed => 3,
+        TS::UnSigned => 4,
+        TS::Short => 5,
+        TS::Long => 6,
+        TS::Int => 7,
+        TS::Char => 8,
+        TS::Float => 9,
+        TS::Double => 10,
+        TS::StructOrUnionSpecifier(_) => 11,
+        TS::EnumSpecifier(_) => 12,
+        TS::TypeDefName(_) => 13,
     });
 
     match tss.as_slice() {
-        [Void] => Ok(Type::Void),
-        [Char] => Ok(Type::Char),
-        [Signed, Char] => Ok(Type::SignedChar),
-        [UnSigned, Char] => Ok(Type::UnSignedChar),
-        [Short] | [Signed, Short] | [Short, Int] | [Signed, Short, Int] => Ok(Type::Short),
-        [UnSigned, Short] | [UnSigned, Short, Int] => Ok(Type::UnSignedShort),
-        [Int] | [Signed] | [Signed, Int] => Ok(Type::Int),
-        [UnSigned] | [UnSigned, Int] => Ok(Type::UnSigned),
-        [Long] | [Signed, Long] | [Long, Int] | [Signed, Long, Int] => Ok(Type::Long),
-        [UnSigned, Long] | [UnSigned, Long, Int] => Ok(Type::UnSignedLong),
-        [Long, Long] | [Signed, Long, Long] | [Long, Long, Int] | [Signed, Long, Long, Int] => {
-            Ok(Type::LongLong)
+        [TS::Void] => Ok(Type::Void),
+        [TS::Char] => Ok(Type::Char),
+        [TS::Signed, TS::Char] => Ok(Type::SignedChar),
+        [TS::UnSigned, TS::Char] => Ok(Type::UnSignedChar),
+        [TS::Short]
+        | [TS::Signed, TS::Short]
+        | [TS::Short, TS::Int]
+        | [TS::Signed, TS::Short, TS::Int] => Ok(Type::Short),
+        [TS::UnSigned, TS::Short] | [TS::UnSigned, TS::Short, TS::Int] => Ok(Type::UnSignedShort),
+        [TS::Int] | [TS::Signed] | [TS::Signed, TS::Int] => Ok(Type::Int),
+        [TS::UnSigned] | [TS::UnSigned, TS::Int] => Ok(Type::UnSigned),
+        [TS::Long]
+        | [TS::Signed, TS::Long]
+        | [TS::Long, TS::Int]
+        | [TS::Signed, TS::Long, TS::Int] => Ok(Type::Long),
+        [TS::UnSigned, TS::Long] | [TS::UnSigned, TS::Long, TS::Int] => Ok(Type::UnSignedLong),
+        [TS::Long, TS::Long]
+        | [TS::Signed, TS::Long, TS::Long]
+        | [TS::Long, TS::Long, TS::Int]
+        | [TS::Signed, TS::Long, TS::Long, TS::Int] => Ok(Type::LongLong),
+        [TS::UnSigned, TS::Long, TS::Long] | [TS::UnSigned, TS::Long, TS::Long, TS::Int] => {
+            Ok(Type::UnSignedLongLong)
         }
-        [UnSigned, Long, Long] | [UnSigned, Long, Long, Int] => Ok(Type::UnSignedLongLong),
-        [Float] => Ok(Type::Float),
-        [Double] => Ok(Type::Double),
-        [Long, Double] => Ok(Type::LongDouble),
-        [StructOrUnionSpecifier(sou)] => analyze_struct_or_union_specifier(sou, ctx),
-        [EnumSpecifier(e)] => analyze_enum_specifier(e, ctx),
-        [TypeDefName(name)] => {
+        [TS::Float] => Ok(Type::Float),
+        [TS::Double] => Ok(Type::Double),
+        [TS::Long, TS::Double] => Ok(Type::LongDouble),
+        [TS::StructOrUnionSpecifier(sou)] => analyze_struct_or_union_specifier(sou, ctx),
+        [TS::EnumSpecifier(e)] => analyze_enum_specifier(e, ctx),
+        [TS::TypeDefName(name)] => {
             // ctx.find_typedef(name);
             todo!()
         }
@@ -696,57 +561,57 @@ fn analyze_specifier_qualifiers<'ast, 'text>(
 }
 
 fn analyze_struct_or_union_specifier<'ast, 'text>(
-    sou: &StructOrUnionSpecifier<'text>,
+    sou: &ast::StructOrUnionSpecifier<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
 }
 
 fn analyze_enum_specifier<'ast, 'text>(
-    e: &EnumSpecifier<'text>,
+    e: &ast::EnumSpecifier<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     todo!()
 }
 
 fn analyze_abstract_declarator<'ast, 'text>(
-    ad: &AbstractDeclarator<'text>,
+    ad: &ast::AbstractDeclarator<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match ad {
-        AbstractDeclarator::Pointer(p) => todo!(),
-        AbstractDeclarator::PointerWithDirect(p, dad) => todo!(),
-        AbstractDeclarator::Direct(dad) => todo!(),
+        ast::AbstractDeclarator::Pointer(p) => todo!(),
+        ast::AbstractDeclarator::PointerWithDirect(p, dad) => todo!(),
+        ast::AbstractDeclarator::Direct(dad) => todo!(),
     }
 }
 
 fn analyze_stmt<'ast, 'text>(
-    stmt: &'ast Stmt<'text>,
+    stmt: &'ast ast::Stmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        Stmt::EmptyStmt => Ok(()),
-        Stmt::Labeled(stmt) => analyze_labeled_stmt(stmt, ctx),
-        Stmt::Expr(expr) => analyze_assignment_expr(expr, ctx).map(|_| ()),
-        Stmt::Compound(stmt) => analyze_compound_stmt(stmt, ctx),
-        Stmt::Selection(stmt) => analyze_selection_stmt(stmt, ctx),
-        Stmt::Iteration(stmt) => analyze_iteration_stmt(stmt, ctx),
-        Stmt::Jump(stmt) => analyze_jump_stmt(stmt, ctx),
+        ast::Stmt::EmptyStmt => Ok(()),
+        ast::Stmt::Labeled(stmt) => analyze_labeled_stmt(stmt, ctx),
+        ast::Stmt::Expr(expr) => analyze_assignment_expr(expr, ctx).map(|_| ()),
+        ast::Stmt::Compound(stmt) => analyze_compound_stmt(stmt, ctx),
+        ast::Stmt::Selection(stmt) => analyze_selection_stmt(stmt, ctx),
+        ast::Stmt::Iteration(stmt) => analyze_iteration_stmt(stmt, ctx),
+        ast::Stmt::Jump(stmt) => analyze_jump_stmt(stmt, ctx),
     }
 }
 
 fn analyze_labeled_stmt<'ast, 'text>(
-    stmt: &'ast LabeledStmt<'text>,
+    stmt: &'ast ast::LabeledStmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        LabeledStmt::Ident(label, inner_stmt) => {
+        ast::LabeledStmt::Ident(label, inner_stmt) => {
             if !ctx.declare_label(label) {
                 return Err(SemanticError::LabelRedeclaration(stmt));
             }
             analyze_stmt(inner_stmt, ctx)
         }
-        LabeledStmt::Case(expr, inner_stmt) => match ctx.curr_switch_scope() {
+        ast::LabeledStmt::Case(expr, inner_stmt) => match ctx.curr_switch_scope() {
             Some((switch_ty, _)) => {
                 match (switch_ty.clone(), analyze_conditional_expr(expr, ctx)?) {
                     (Type::Int, Type::Int) | (Type::Char, Type::Char) => {
@@ -760,7 +625,7 @@ fn analyze_labeled_stmt<'ast, 'text>(
             }
             None => Err(SemanticError::CaseOutsideSwitch(stmt)),
         },
-        LabeledStmt::Default(inner_stmt) => match ctx.in_switch() {
+        ast::LabeledStmt::Default(inner_stmt) => match ctx.in_switch() {
             true => analyze_stmt(inner_stmt, ctx),
             false => Err(SemanticError::DefaultOutsideSwitch(stmt)),
         },
@@ -768,15 +633,15 @@ fn analyze_labeled_stmt<'ast, 'text>(
 }
 
 fn analyze_compound_stmt<'ast, 'text>(
-    stmt: &'ast CompoundStmt<'text>,
+    stmt: &'ast ast::CompoundStmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     ctx.scoped(ScopeKind::Regular, |ctx| {
         stmt.0
             .iter()
             .map(|item| match item {
-                BlockItem::Declaration(d) => analyze_declaration(d, ctx),
-                BlockItem::Statement(stmt) => analyze_stmt(stmt, ctx),
+                ast::BlockItem::Declaration(d) => analyze_declaration(d, ctx),
+                ast::BlockItem::Statement(stmt) => analyze_stmt(stmt, ctx),
             })
             .find(Result::is_err)
             .unwrap_or(Ok(()))
@@ -784,11 +649,11 @@ fn analyze_compound_stmt<'ast, 'text>(
 }
 
 fn analyze_selection_stmt<'ast, 'text>(
-    stmt: &'ast SelectionStmt<'text>,
+    stmt: &'ast ast::SelectionStmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        SelectionStmt::If { test, pass } => {
+        ast::SelectionStmt::If { test, pass } => {
             let test_ty = analyze_assignment_expr(test, ctx)?;
             if test_ty != Type::Int {
                 return Err(SemanticError::UnexpectedType {
@@ -799,7 +664,7 @@ fn analyze_selection_stmt<'ast, 'text>(
 
             ctx.scoped(ScopeKind::Regular, |ctx| analyze_stmt(pass, ctx))
         }
-        SelectionStmt::IfElse { test, pass, fail } => {
+        ast::SelectionStmt::IfElse { test, pass, fail } => {
             let test_ty = analyze_assignment_expr(test, ctx)?;
             if test_ty != Type::Int {
                 return Err(SemanticError::UnexpectedType {
@@ -811,7 +676,7 @@ fn analyze_selection_stmt<'ast, 'text>(
             ctx.scoped(ScopeKind::Regular, |ctx| analyze_stmt(pass, ctx))?;
             ctx.scoped(ScopeKind::Regular, |ctx| analyze_stmt(fail, ctx))
         }
-        SelectionStmt::Switch { test, pass } => {
+        ast::SelectionStmt::Switch { test, pass } => {
             let test_ty = analyze_assignment_expr(test, ctx)?;
             if test_ty != Type::Int {
                 return Err(SemanticError::UnexpectedType {
@@ -826,11 +691,11 @@ fn analyze_selection_stmt<'ast, 'text>(
 }
 
 fn analyze_iteration_stmt<'ast, 'text>(
-    stmt: &'ast IterationStmt<'text>,
+    stmt: &'ast ast::IterationStmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        IterationStmt::While { test, body } => {
+        ast::IterationStmt::While { test, body } => {
             let test_ty = analyze_assignment_expr(test, ctx)?;
             if test_ty != Type::Int {
                 return Err(SemanticError::UnexpectedType {
@@ -840,7 +705,7 @@ fn analyze_iteration_stmt<'ast, 'text>(
             }
             ctx.scoped(ScopeKind::Loop, |ctx| analyze_stmt(body, ctx))
         }
-        IterationStmt::DoWhile { test, body } => {
+        ast::IterationStmt::DoWhile { test, body } => {
             ctx.scoped(ScopeKind::Loop, |ctx| analyze_stmt(body, ctx))?;
 
             let test_ty = analyze_assignment_expr(test, ctx)?;
@@ -853,7 +718,7 @@ fn analyze_iteration_stmt<'ast, 'text>(
 
             Ok(())
         }
-        IterationStmt::For {
+        ast::IterationStmt::For {
             init,
             test,
             update,
@@ -883,23 +748,23 @@ fn analyze_iteration_stmt<'ast, 'text>(
 }
 
 fn analyze_jump_stmt<'ast, 'text>(
-    stmt: &'ast JumpStmt<'text>,
+    stmt: &'ast ast::JumpStmt<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<(), SemanticError<'ast, 'text>> {
     match stmt {
-        JumpStmt::Goto(label) => match ctx.contains_label(label) {
+        ast::JumpStmt::Goto(label) => match ctx.contains_label(label) {
             true => Ok(()),
             false => Err(SemanticError::UndefinedLabel(label)),
         },
-        JumpStmt::Continue => match ctx.in_loop() {
+        ast::JumpStmt::Continue => match ctx.in_loop() {
             true => Ok(()),
             false => Err(SemanticError::IllegalJump(stmt)),
         },
-        JumpStmt::Break => match ctx.in_loop() || ctx.in_switch() {
+        ast::JumpStmt::Break => match ctx.in_loop() || ctx.in_switch() {
             true => Ok(()),
             false => Err(SemanticError::IllegalJump(stmt)),
         },
-        JumpStmt::Return(expr) => {
+        ast::JumpStmt::Return(expr) => {
             let Some((return_ty, _)) = ctx.curr_fn_scope() else {
                 // The parse won't allow return statement outside a function
                 // so this check is redundant and can be safely unwrapped
@@ -933,22 +798,22 @@ fn analyze_jump_stmt<'ast, 'text>(
 }
 
 fn analyze_assignment_expr<'ast, 'text>(
-    expr: &'ast AssignmentExpr<'text>,
+    expr: &'ast ast::AssignmentExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        AssignmentExpr::ConditionalExpr(expr) => analyze_conditional_expr(expr, ctx),
-        AssignmentExpr::Assign(lhs, rhs)
-        | AssignmentExpr::MulAssign(lhs, rhs)
-        | AssignmentExpr::DivAssign(lhs, rhs)
-        | AssignmentExpr::ModAssign(lhs, rhs)
-        | AssignmentExpr::AddAssign(lhs, rhs)
-        | AssignmentExpr::SubAssign(lhs, rhs)
-        | AssignmentExpr::ShiftLeftAssign(lhs, rhs)
-        | AssignmentExpr::ShiftRightAssign(lhs, rhs)
-        | AssignmentExpr::BitAndAssign(lhs, rhs)
-        | AssignmentExpr::XORAssign(lhs, rhs)
-        | AssignmentExpr::BitOrAssign(lhs, rhs) => {
+        ast::AssignmentExpr::ConditionalExpr(expr) => analyze_conditional_expr(expr, ctx),
+        ast::AssignmentExpr::Assign(lhs, rhs)
+        | ast::AssignmentExpr::MulAssign(lhs, rhs)
+        | ast::AssignmentExpr::DivAssign(lhs, rhs)
+        | ast::AssignmentExpr::ModAssign(lhs, rhs)
+        | ast::AssignmentExpr::AddAssign(lhs, rhs)
+        | ast::AssignmentExpr::SubAssign(lhs, rhs)
+        | ast::AssignmentExpr::ShiftLeftAssign(lhs, rhs)
+        | ast::AssignmentExpr::ShiftRightAssign(lhs, rhs)
+        | ast::AssignmentExpr::BitAndAssign(lhs, rhs)
+        | ast::AssignmentExpr::XORAssign(lhs, rhs)
+        | ast::AssignmentExpr::BitOrAssign(lhs, rhs) => {
             let lhs_ty = analyze_unary_expr(lhs, ctx)?;
             let rhs_ty = analyze_assignment_expr(rhs, ctx)?;
             match lhs_ty == rhs_ty {
@@ -960,12 +825,12 @@ fn analyze_assignment_expr<'ast, 'text>(
 }
 
 fn analyze_conditional_expr<'ast, 'text>(
-    expr: &'ast ConditionalExpr<'text>,
+    expr: &'ast ast::ConditionalExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        ConditionalExpr::LogicalOrExpr(expr) => analyze_logicalor_expr(expr, ctx),
-        ConditionalExpr::Ternary { test, pass, fail } => {
+        ast::ConditionalExpr::LogicalOrExpr(expr) => analyze_logicalor_expr(expr, ctx),
+        ast::ConditionalExpr::Ternary { test, pass, fail } => {
             let ty = analyze_logicalor_expr(test, ctx)?;
             if ty != Type::Int {
                 return Err(SemanticError::UnexpectedType {
@@ -984,12 +849,12 @@ fn analyze_conditional_expr<'ast, 'text>(
 }
 
 fn analyze_logicalor_expr<'ast, 'text>(
-    expr: &'ast LogicalOrExpr<'text>,
+    expr: &'ast ast::LogicalOrExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        LogicalOrExpr::LogicalAndExpr(expr) => todo!(),
-        LogicalOrExpr::LogicalOr(lhs, rhs) => match (
+        ast::LogicalOrExpr::LogicalAndExpr(expr) => todo!(),
+        ast::LogicalOrExpr::LogicalOr(lhs, rhs) => match (
             analyze_logicalor_expr(lhs, ctx)?,
             analyze_logicaland_expr(rhs, ctx)?,
         ) {
@@ -1000,12 +865,12 @@ fn analyze_logicalor_expr<'ast, 'text>(
 }
 
 fn analyze_logicaland_expr<'ast, 'text>(
-    expr: &'ast LogicalAndExpr<'text>,
+    expr: &'ast ast::LogicalAndExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        LogicalAndExpr::BitOrExpr(expr) => analyze_bitor_expr(expr, ctx),
-        LogicalAndExpr::LogicalAnd(lhs, rhs) => match (
+        ast::LogicalAndExpr::BitOrExpr(expr) => analyze_bitor_expr(expr, ctx),
+        ast::LogicalAndExpr::LogicalAnd(lhs, rhs) => match (
             analyze_logicaland_expr(lhs, ctx)?,
             analyze_bitor_expr(rhs, ctx)?,
         ) {
@@ -1018,12 +883,12 @@ fn analyze_logicaland_expr<'ast, 'text>(
 }
 
 fn analyze_bitor_expr<'ast, 'text>(
-    expr: &'ast BitOrExpr<'text>,
+    expr: &'ast ast::BitOrExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        BitOrExpr::XORExpr(xor_expr) => analyze_xor_expr(xor_expr, ctx),
-        BitOrExpr::BitOr(lhs, rhs) => {
+        ast::BitOrExpr::XORExpr(xor_expr) => analyze_xor_expr(xor_expr, ctx),
+        ast::BitOrExpr::BitOr(lhs, rhs) => {
             match (analyze_bitor_expr(lhs, ctx)?, analyze_xor_expr(rhs, ctx)?) {
                 (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
                 _ => Err(SemanticError::InvalidBinaryOperands(BinOp::BitOr(expr))),
@@ -1033,12 +898,12 @@ fn analyze_bitor_expr<'ast, 'text>(
 }
 
 fn analyze_xor_expr<'ast, 'text>(
-    expr: &'ast XORExpr<'text>,
+    expr: &'ast ast::XORExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        XORExpr::BitAndExpr(expr) => analyze_bitand_expr(expr, ctx),
-        XORExpr::XOR(lhs, rhs) => {
+        ast::XORExpr::BitAndExpr(expr) => analyze_bitand_expr(expr, ctx),
+        ast::XORExpr::XOR(lhs, rhs) => {
             match (analyze_xor_expr(lhs, ctx)?, analyze_bitand_expr(rhs, ctx)?) {
                 (Type::Int, Type::Int) | (Type::Char, Type::Char) => Ok(Type::Int),
                 _ => Err(SemanticError::InvalidBinaryOperands(BinOp::XOR(expr))),
@@ -1048,12 +913,12 @@ fn analyze_xor_expr<'ast, 'text>(
 }
 
 fn analyze_bitand_expr<'ast, 'text>(
-    expr: &'ast BitAndExpr<'text>,
+    expr: &'ast ast::BitAndExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        BitAndExpr::EqualityExpr(expr) => analyze_equality_expr(expr, ctx),
-        BitAndExpr::BitAnd(lhs, rhs) => match (
+        ast::BitAndExpr::EqualityExpr(expr) => analyze_equality_expr(expr, ctx),
+        ast::BitAndExpr::BitAnd(lhs, rhs) => match (
             analyze_bitand_expr(lhs, ctx)?,
             analyze_equality_expr(rhs, ctx)?,
         ) {
@@ -1064,12 +929,12 @@ fn analyze_bitand_expr<'ast, 'text>(
 }
 
 fn analyze_equality_expr<'ast, 'text>(
-    expr: &'ast EqualityExpr<'text>,
+    expr: &'ast ast::EqualityExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        EqualityExpr::ComparisionExpr(expr) => analyze_comparision_expr(expr, ctx),
-        EqualityExpr::EQ(lhs, rhs) | EqualityExpr::NE(lhs, rhs) => match (
+        ast::EqualityExpr::ComparisionExpr(expr) => analyze_comparision_expr(expr, ctx),
+        ast::EqualityExpr::EQ(lhs, rhs) | ast::EqualityExpr::NE(lhs, rhs) => match (
             analyze_equality_expr(lhs, ctx)?,
             analyze_comparision_expr(rhs, ctx)?,
         ) {
@@ -1083,15 +948,15 @@ fn analyze_equality_expr<'ast, 'text>(
 }
 
 fn analyze_comparision_expr<'ast, 'text>(
-    expr: &'ast ComparisionExpr<'text>,
+    expr: &'ast ast::ComparisionExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        ComparisionExpr::ShiftExpr(shift_expr) => analyze_shift_expr(shift_expr, ctx),
-        ComparisionExpr::LT(lhs, rhs)
-        | ComparisionExpr::GT(lhs, rhs)
-        | ComparisionExpr::LE(lhs, rhs)
-        | ComparisionExpr::GE(lhs, rhs) => {
+        ast::ComparisionExpr::ShiftExpr(shift_expr) => analyze_shift_expr(shift_expr, ctx),
+        ast::ComparisionExpr::LT(lhs, rhs)
+        | ast::ComparisionExpr::GT(lhs, rhs)
+        | ast::ComparisionExpr::LE(lhs, rhs)
+        | ast::ComparisionExpr::GE(lhs, rhs) => {
             let lhs_ty = analyze_comparision_expr(lhs, ctx)?;
             let rhs_ty = analyze_shift_expr(rhs, ctx)?;
 
@@ -1110,12 +975,12 @@ fn analyze_comparision_expr<'ast, 'text>(
 }
 
 fn analyze_shift_expr<'ast, 'text>(
-    expr: &'ast ShiftExpr<'text>,
+    expr: &'ast ast::ShiftExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        ShiftExpr::AdditiveExpr(additive_expr) => analyze_additive_expr(additive_expr, ctx),
-        ShiftExpr::ShiftLeft(lhs, rhs) | ShiftExpr::ShiftRight(lhs, rhs) => match (
+        ast::ShiftExpr::AdditiveExpr(additive_expr) => analyze_additive_expr(additive_expr, ctx),
+        ast::ShiftExpr::ShiftLeft(lhs, rhs) | ast::ShiftExpr::ShiftRight(lhs, rhs) => match (
             analyze_shift_expr(lhs, ctx)?,
             analyze_additive_expr(rhs, ctx)?,
         ) {
@@ -1126,14 +991,14 @@ fn analyze_shift_expr<'ast, 'text>(
 }
 
 fn analyze_additive_expr<'ast, 'text>(
-    expr: &'ast AdditiveExpr<'text>,
+    expr: &'ast ast::AdditiveExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        AdditiveExpr::MultiplicativeExpr(multiplicative_expr) => {
+        ast::AdditiveExpr::MultiplicativeExpr(multiplicative_expr) => {
             analyze_multiplicative_expr(multiplicative_expr, ctx)
         }
-        AdditiveExpr::Add(lhs, rhs) | AdditiveExpr::Sub(lhs, rhs) => {
+        ast::AdditiveExpr::Add(lhs, rhs) | ast::AdditiveExpr::Sub(lhs, rhs) => {
             let lhs_ty = analyze_additive_expr(lhs, ctx)?;
             let rhs_ty = analyze_multiplicative_expr(rhs, ctx)?;
 
@@ -1149,12 +1014,12 @@ fn analyze_additive_expr<'ast, 'text>(
 }
 
 fn analyze_multiplicative_expr<'ast, 'text>(
-    expr: &'ast MultiplicativeExpr<'text>,
+    expr: &'ast ast::MultiplicativeExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        MultiplicativeExpr::CastExpr(cast_expr) => analyze_cast_expr(cast_expr, ctx),
-        MultiplicativeExpr::Mul(lhs, rhs) | MultiplicativeExpr::Div(lhs, rhs) => {
+        ast::MultiplicativeExpr::CastExpr(cast_expr) => analyze_cast_expr(cast_expr, ctx),
+        ast::MultiplicativeExpr::Mul(lhs, rhs) | ast::MultiplicativeExpr::Div(lhs, rhs) => {
             let lhs_ty = analyze_multiplicative_expr(lhs, ctx)?;
             let rhs_ty = analyze_cast_expr(rhs, ctx)?;
 
@@ -1168,7 +1033,7 @@ fn analyze_multiplicative_expr<'ast, 'text>(
                 ))),
             }
         }
-        MultiplicativeExpr::Mod(lhs, rhs) => match (
+        ast::MultiplicativeExpr::Mod(lhs, rhs) => match (
             analyze_multiplicative_expr(lhs, ctx)?,
             analyze_cast_expr(rhs, ctx)?,
         ) {
@@ -1181,12 +1046,12 @@ fn analyze_multiplicative_expr<'ast, 'text>(
 }
 
 fn analyze_cast_expr<'ast, 'text>(
-    expr: &'ast CastExpr<'text>,
+    expr: &'ast ast::CastExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        CastExpr::UnaryExpr(unary_expr) => analyze_unary_expr(unary_expr, ctx),
-        CastExpr::Cast(type_name, sub_expr) => {
+        ast::CastExpr::UnaryExpr(unary_expr) => analyze_unary_expr(unary_expr, ctx),
+        ast::CastExpr::Cast(type_name, sub_expr) => {
             let target_type = analyze_type_name(type_name, ctx)?;
             let curr_type = analyze_cast_expr(sub_expr, ctx)?;
 
@@ -1208,51 +1073,51 @@ fn analyze_cast_expr<'ast, 'text>(
 }
 
 fn analyze_unary_expr<'ast, 'text>(
-    expr: &'ast UnaryExpr<'text>,
+    expr: &'ast ast::UnaryExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        UnaryExpr::PostfixExpr(postfix_expr) => analyze_postfix_expr(postfix_expr, ctx),
-        UnaryExpr::PreIncr(inner_expr) | UnaryExpr::PreDecr(inner_expr) => {
+        ast::UnaryExpr::PostfixExpr(postfix_expr) => analyze_postfix_expr(postfix_expr, ctx),
+        ast::UnaryExpr::PreIncr(inner_expr) | ast::UnaryExpr::PreDecr(inner_expr) => {
             let ty = analyze_unary_expr(inner_expr, ctx)?;
             match ty {
                 Type::Int | Type::Char | Type::Float | Type::Double | Type::Pointer(_) => Ok(ty),
                 _ => Err(SemanticError::InvalidUnaryOperand(expr)),
             }
         }
-        UnaryExpr::Ref(inner_expr) => {
+        ast::UnaryExpr::Ref(inner_expr) => {
             Ok(Type::Pointer(Box::new(analyze_cast_expr(inner_expr, ctx)?)))
         }
-        UnaryExpr::Deref(inner_expr) => match analyze_cast_expr(inner_expr, ctx)? {
+        ast::UnaryExpr::Deref(inner_expr) => match analyze_cast_expr(inner_expr, ctx)? {
             Type::Pointer(ty) => Ok(*ty),
             _ => Err(SemanticError::InvalidDereferenceOperand(expr)),
         },
-        UnaryExpr::UnaryAdd(inner_expr) | UnaryExpr::UnarySub(inner_expr) => {
+        ast::UnaryExpr::UnaryAdd(inner_expr) | ast::UnaryExpr::UnarySub(inner_expr) => {
             let ty = analyze_cast_expr(inner_expr, ctx)?;
             match ty {
                 Type::Int | Type::Char | Type::Float | Type::Double => Ok(ty),
                 _ => Err(SemanticError::InvalidUnaryOperand(expr)),
             }
         }
-        UnaryExpr::OnesComplement(inner_expr) => {
+        ast::UnaryExpr::OnesComplement(inner_expr) => {
             let ty = analyze_cast_expr(inner_expr, ctx)?;
             match ty {
                 Type::Int | Type::Char => Ok(ty),
                 _ => Err(SemanticError::InvalidUnaryOperand(expr)),
             }
         }
-        UnaryExpr::Not(inner_expr) => {
+        ast::UnaryExpr::Not(inner_expr) => {
             let ty = analyze_cast_expr(inner_expr, ctx)?;
             match ty {
                 Type::Int => Ok(ty),
                 _ => Err(SemanticError::InvalidUnaryOperand(expr)),
             }
         }
-        UnaryExpr::SizeofExpr(inner_expr) => {
+        ast::UnaryExpr::SizeofExpr(inner_expr) => {
             analyze_unary_expr(inner_expr, ctx)?;
             Ok(Type::Int) // Sizeof always results in an integer value
         }
-        UnaryExpr::SizeofTypeName(inner_expr) => {
+        ast::UnaryExpr::SizeofTypeName(inner_expr) => {
             analyze_type_name(inner_expr, ctx)?;
             Ok(Type::Int) // Sizeof always results in an integer value
         }
@@ -1260,37 +1125,20 @@ fn analyze_unary_expr<'ast, 'text>(
 }
 
 fn analyze_postfix_expr<'ast, 'text>(
-    expr: &'ast PostfixExpr<'text>,
+    expr: &'ast ast::PostfixExpr<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        PostfixExpr::Primary(expr) => analyze_primary_expr(expr, ctx),
-        PostfixExpr::ArrayAccess(inner_expr, access) => match (
+        ast::PostfixExpr::Primary(expr) => analyze_primary_expr(expr, ctx),
+        ast::PostfixExpr::ArrayAccess(inner_expr, access) => match (
             analyze_postfix_expr(inner_expr, ctx)?,
             analyze_assignment_expr(access, ctx)?,
         ) {
             (Type::Pointer(ty) | Type::Array(ty, _), Type::Int) => Ok(*ty),
             _ => Err(SemanticError::InvalidPostfixOperand(expr)),
         },
-        PostfixExpr::FunctionCall(inner_expr, args) => match analyze_postfix_expr(inner_expr, ctx)?
-        {
-            Type::Function {
-                return_ty,
-                param_tys,
-            } => {
-                if args.len() != param_tys.len() {
-                    return Err(SemanticError::InvalidFnCall(expr));
-                }
-
-                for (arg, param_ty) in args.iter().zip(param_tys.iter()) {
-                    let arg_ty = analyze_assignment_expr(arg, ctx)?;
-                    if &arg_ty != param_ty {
-                        return Err(SemanticError::InvalidFnCall(expr));
-                    }
-                }
-                Ok(*return_ty)
-            }
-            Type::Pointer(ty) => match *ty {
+        ast::PostfixExpr::FunctionCall(inner_expr, args) => {
+            match analyze_postfix_expr(inner_expr, ctx)? {
                 Type::Function {
                     return_ty,
                     param_tys,
@@ -1307,11 +1155,29 @@ fn analyze_postfix_expr<'ast, 'text>(
                     }
                     Ok(*return_ty)
                 }
+                Type::Pointer(ty) => match *ty {
+                    Type::Function {
+                        return_ty,
+                        param_tys,
+                    } => {
+                        if args.len() != param_tys.len() {
+                            return Err(SemanticError::InvalidFnCall(expr));
+                        }
+
+                        for (arg, param_ty) in args.iter().zip(param_tys.iter()) {
+                            let arg_ty = analyze_assignment_expr(arg, ctx)?;
+                            if &arg_ty != param_ty {
+                                return Err(SemanticError::InvalidFnCall(expr));
+                            }
+                        }
+                        Ok(*return_ty)
+                    }
+                    _ => Err(SemanticError::NotAFunction(inner_expr)),
+                },
                 _ => Err(SemanticError::NotAFunction(inner_expr)),
-            },
-            _ => Err(SemanticError::NotAFunction(inner_expr)),
-        },
-        PostfixExpr::MemberAccess(inner_expr, field) => {
+            }
+        }
+        ast::PostfixExpr::MemberAccess(inner_expr, field) => {
             match analyze_postfix_expr(inner_expr, ctx)? {
                 Type::Struct { name, members } => members
                     .into_iter()
@@ -1324,7 +1190,7 @@ fn analyze_postfix_expr<'ast, 'text>(
                 _ => Err(SemanticError::NotAStruct(inner_expr)),
             }
         }
-        PostfixExpr::PointerMemberAccess(inner_expr, field) => {
+        ast::PostfixExpr::PointerMemberAccess(inner_expr, field) => {
             match analyze_postfix_expr(inner_expr, ctx)? {
                 Type::Pointer(inner_ty) => match *inner_ty {
                     Type::Struct { name, members } => members
@@ -1341,7 +1207,7 @@ fn analyze_postfix_expr<'ast, 'text>(
             }
         }
 
-        PostfixExpr::PostIncr(inner_expr) | PostfixExpr::PostDecr(inner_expr) => {
+        ast::PostfixExpr::PostIncr(inner_expr) | ast::PostfixExpr::PostDecr(inner_expr) => {
             let ty = analyze_postfix_expr(inner_expr, ctx)?;
             match ty {
                 Type::Int | Type::Char | Type::Float | Type::Double | Type::Pointer(_) => Ok(ty),
@@ -1352,23 +1218,23 @@ fn analyze_postfix_expr<'ast, 'text>(
 }
 
 fn analyze_primary_expr<'ast, 'text>(
-    expr: &'ast Primary<'text>,
+    expr: &'ast ast::Primary<'text>,
     ctx: &mut SemanticContext<'text>,
 ) -> Result<Type<'text>, SemanticError<'ast, 'text>> {
     match expr {
-        Primary::Ident(ident) => match ctx.find_var(ident) {
+        ast::Primary::Ident(ident) => match ctx.find_var(ident) {
             Some(var) => Ok(var.ty.clone()),
             None => Err(SemanticError::UndefinedVariable(ident)),
         },
-        Primary::Int(_) => Ok(Type::Int),
-        Primary::Char(_) => Ok(Type::Char),
-        Primary::Float(_) => Ok(Type::Float),
-        Primary::EnumConstant(ident) => match ctx.find_enum_invariant(ident) {
+        ast::Primary::Int(_) => Ok(Type::Int),
+        ast::Primary::Char(_) => Ok(Type::Char),
+        ast::Primary::Float(_) => Ok(Type::Float),
+        ast::Primary::EnumConstant(ident) => match ctx.find_enum_invariant(ident) {
             Some(e) => Ok(e.ty.clone()),
             None => Err(SemanticError::UndefinedVariable(ident)), // there is no such thing as undefind enum
         },
-        Primary::String(_) => Ok(Type::String),
-        Primary::Parens(expr) => analyze_assignment_expr(expr, ctx),
+        ast::Primary::String(_) => Ok(Type::String),
+        ast::Primary::Parens(expr) => analyze_assignment_expr(expr, ctx),
     }
 }
 
