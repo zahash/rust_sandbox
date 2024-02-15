@@ -171,10 +171,7 @@ fn lex_with_pattern<'text>(
 ) -> Option<(&'text str, usize)> {
     if let Some(slice) = text.get(pos..text.len()) {
         if let Some(m) = pat.find(slice) {
-            assert!(
-                m.start() == 0,
-                "put caret ^ to match the text from the `pos` (text is sliced to start from pos)"
-            );
+            assert_eq!(m.start(), 0, "put caret ^ to match the text from the `pos` (text is sliced to start from pos)");
             return Some((m.as_str(), pos + m.end()));
         }
     }
