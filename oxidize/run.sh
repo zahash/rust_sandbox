@@ -3,6 +3,7 @@ set -e
 LIB_NAME="oxidize"
 
 # GENERATE HEADERS
+# requires cbindgen to be installed -> cargo install cbindgen
 # requires cbindgen.toml to be present (file can be empty).
 cbindgen --lang c --config cbindgen.toml --crate $LIB_NAME --output ./include/$LIB_NAME/$LIB_NAME.h
 

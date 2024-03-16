@@ -12,11 +12,28 @@ pub struct Person {
     pub age: c_int,
 }
 
-#[no_mangle]
-pub extern "C" fn use_person(_p: &Person) {}
+#[repr(C)]
+pub enum MyEnum {
+    A(u32),
+    B(f32, u64),
+    C { x: u32, y: u8 },
+    D,
+}
 
 #[no_mangle]
-pub extern "C" fn use_coords(_c: &Coords) {}
+pub extern "C" fn use_person(p: &Person) {
+    // do something with person
+}
+
+#[no_mangle]
+pub extern "C" fn use_coords(c: &Coords) {
+    // do something with coords
+}
+
+#[no_mangle]
+pub extern "C" fn use_my_enum(e: &MyEnum) {
+    // do something with my enum
+}
 
 #[no_mangle]
 pub extern "C" fn plus_one(a: c_int) -> c_int {
