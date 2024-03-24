@@ -21,17 +21,17 @@ pub enum MyEnum {
 }
 
 #[no_mangle]
-pub extern "C" fn use_person(p: &Person) {
+pub extern "C" fn use_person(_p: &Person) {
     // do something with person
 }
 
 #[no_mangle]
-pub extern "C" fn use_coords(c: &Coords) {
+pub extern "C" fn use_coords(_c: &Coords) {
     // do something with coords
 }
 
 #[no_mangle]
-pub extern "C" fn use_my_enum(e: &MyEnum) {
+pub extern "C" fn use_my_enum(_e: &MyEnum) {
     // do something with my enum
 }
 

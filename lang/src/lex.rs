@@ -30,29 +30,28 @@ pub enum LexError {
 }
 
 pub fn lex(text: &str) -> Result<Vec<Token>, LexError> {
-    match text.is_empty() {
-        true => Ok(vec![]),
-        false => {
-            let mut tokens = vec![];
-            let mut pos = 0;
-
-            loop {
-                while let Some(" ") | Some("\n") = text.get(pos..pos + 1) {
-                    pos += 1;
-                }
-
-                if pos >= text.len() {
-                    break;
-                }
-
-                let (token, next_pos) = lex_token(text, pos)?;
-                tokens.push(token);
-                pos = next_pos;
-            }
-
-            Ok(tokens)
-        }
+    if text.is_empty() {
+        return Ok(vec![]);
     }
+
+    let mut tokens = vec![];
+    let mut pos = 0;
+
+    loop {
+        while let Some(" ") | Some("\n") = text.get(pos..pos + 1) {
+            pos += 1;
+        }
+
+        if pos >= text.len() {
+            break;
+        }
+
+        let (token, next_pos) = lex_token(text, pos)?;
+        tokens.push(token);
+        pos = next_pos;
+    }
+
+    Ok(tokens)
 }
 
 fn lex_token(text: &str, pos: usize) -> Result<(Token, usize), LexError> {
@@ -171,7 +170,11 @@ fn lex_with_pattern<'text>(
 ) -> Option<(&'text str, usize)> {
     if let Some(slice) = text.get(pos..text.len()) {
         if let Some(m) = pat.find(slice) {
-            assert_eq!(m.start(), 0, "put caret ^ to match the text from the `pos` (text is sliced to start from pos)");
+            assert_eq!(
+                m.start(),
+                0,
+                "put caret ^ to match the text from the `pos` (text is sliced to start from pos)"
+            );
             return Some((m.as_str(), pos + m.end()));
         }
     }

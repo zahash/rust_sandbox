@@ -41,11 +41,11 @@ typedef struct MyEnum {
   };
 } MyEnum;
 
-void use_person(const struct Person *p);
+void use_person(const struct Person *_p);
 
-void use_coords(const struct Coords *c);
+void use_coords(const struct Coords *_c);
 
-void use_my_enum(const struct MyEnum *e);
+void use_my_enum(const struct MyEnum *_e);
 
 int plus_one(int a);
 
